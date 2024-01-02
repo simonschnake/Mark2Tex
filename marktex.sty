@@ -1,0 +1,19 @@
+\RequirePackage{ifluatex}
+\ifluatex
+\else
+  \PackageError{marktex}{LuaTeX is required for this package!}{}
+\fi
+\ProvidesPackage{marktex}
+
+\RequirePackage[normalem]{ulem}
+
+\directlua{
+  marktex = require(kpse.find_file("marktex.lua"))
+}
+\newcommand{\mdinput}[1]{
+	\directlua{tex.sprint("\\input{" .. marktex.convert("#1") .. "}")}
+}
+
+\newcommand{\mdinclude}[1]{
+	\directlua{tex.sprint("\\include{" .. marktex.convert("#1") .. "}")}
+}

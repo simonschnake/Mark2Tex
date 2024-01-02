@@ -1,0 +1,14 @@
+This is a `\latex` command.
+
+```tex
+\begin{env}
+This should be passed as a latex environment.
+\end{env}
+```
+..................................................
+This is a \latex command.
+
+\begin{env}
+This should be passed as a latex environment.
+\end{env}
+

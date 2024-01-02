@@ -1,0 +1,11 @@
+```
+This is verbatim text
+```
+
+This is also `verbatim` text
+..................................................
+\begin{verbatim}
+This is verbatim text
+\end{verbatim}
+
+This is also \texttt{verbatim} text

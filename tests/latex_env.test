@@ -1,0 +1,67 @@
+\begin{center}
+This is centered text
+\end{center}
+
+$$
+a + b = c
+$$
+
+\begin{align*}
+    \mathcal{B} &=\{u | F_X(x_i) \leq u \leq F_X(x_{i+1})\} \\
+                &= \{F_X(x_i) + u | 0 \leq u \leq F_X(x_{i+1}) - F_X(x_i)\} \\
+                &=\{F_X(x_i) + u | 0 \leq u \leq p_i\}\\
+                &=  \{F_X(x_i) + u \cdot p_i | u \in [0,1] \}
+\end{align*}
+
+
+$$
+\begin{align*}
+    F_{\mathcal{N}}(x)=\frac{1}{2} \left[1 + \text{erf}\left( \frac{x}{\sqrt{2}} \right) \right] ,
+\end{align*}
+$$
+
+$$
+\begin{align*}
+    \mathcal{B} &=\{u | F_X(x_i) \leq u \leq F_X(x_{i+1})\} \\
+                &= \{F_X(x_i) + u | 0 \leq u \leq F_X(x_{i+1}) - F_X(x_i)\} \\
+                &=\{F_X(x_i) + u | 0 \leq u \leq p_i\}\\
+                &=  \{F_X(x_i) + u \cdot p_i | u \in [0,1] \}
+\end{align*}
+$$
+
+```tex
+\begin{center}
+This is centered text
+\end{center}
+```
+..................................................
+\begin{center}
+This is centered text
+\end{center}
+
+$$
+a + b = c
+$$
+
+\begin{align*}
+    \mathcal{B} &=\{u | F_X(x_i) \leq u \leq F_X(x_{i+1})\} \\
+                &= \{F_X(x_i) + u | 0 \leq u \leq F_X(x_{i+1}) - F_X(x_i)\} \\
+                &=\{F_X(x_i) + u | 0 \leq u \leq p_i\}\\
+                &=  \{F_X(x_i) + u \cdot p_i | u \in [0,1] \}
+\end{align*}
+
+
+\begin{align*}
+    F_{\mathcal{N}}(x)=\frac{1}{2} \left[1 + \text{erf}\left( \frac{x}{\sqrt{2}} \right) \right] ,
+\end{align*}
+
+\begin{align*}
+    \mathcal{B} &=\{u | F_X(x_i) \leq u \leq F_X(x_{i+1})\} \\
+                &= \{F_X(x_i) + u | 0 \leq u \leq F_X(x_{i+1}) - F_X(x_i)\} \\
+                &=\{F_X(x_i) + u | 0 \leq u \leq p_i\}\\
+                &=  \{F_X(x_i) + u \cdot p_i | u \in [0,1] \}
+\end{align*}
+
+\begin{center}
+This is centered text
+\end{center}

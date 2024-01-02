@@ -1,0 +1,9 @@
+Minimizing `$\mathcal{L}_{\textrm{recon}}$ is equal to generating hits of the shower with a high likelihood. The second part $\mathcal{L}_{\textrm{prior}}$ is the expectation value of the prior distribution under the approximated distribution of the encoder.
+...........................................................
+The loss function consists of three parts. The first part $\mathcal{L}_{\textrm{recon}}$ is the reconstruction error of the shower $X$. Minimizing `$\mathcal{L}_{\textrm{recon}}$ is equal to generating hits of the shower with a high likelihood. The second part $\mathcal{L}_{\textrm{prior}}$ is the expectation value of the prior distribution under the approximated distribution of the encoder.
+Minimizing $\mathcal{L}_{\textrm{prior}}$  is equal to generating a latent vector $z$ with a high probability. The last term $\mathcal{H}(q_\varphi(z|X))$ is the entropy of the encoded values. It is a regularization on the latent space $z$.
+
+
+Here the encoder  $q_\varphi(z|x)$ approximates $z$ conditioned on $X$. To efficiently optimize the ELBO, sampling from $q_\varphi(z|x)$ is done by reparametrizing $z$ as $z = \mu_\varphi(X) + \sigma_\varphi(X) \cdot \epsilon$, where $\epsilon \sim \mathcal{N}(0, \mathbb{1})$.
+
+Since we approximate the prior $p_\theta(X)$ as locally normal distributed, the entropy is given by

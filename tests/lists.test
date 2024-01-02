@@ -1,0 +1,21 @@
+- Item 1
+- Item 2
+  With a second line
+- Item 3
+    1. Under item 3
+    2. Uses enumerate
+- Item 4
+Normaler text.
+..................................................
+\begin{itemize}
+\item Item 1
+\item Item 2
+  With a second line
+\item Item 3
+\begin{enumerate}
+\item Under item 3
+\item Uses enumerate
+\end{enumerate}
+\item Item 4
+\end{itemize}
+Normaler text.

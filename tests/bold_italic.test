@@ -1,0 +1,9 @@
+This is **bold** and *italic* text.
+This is **bold and *italic* text**.
+This is *italic and **bold** text*.
+This is __bold__ and _italic_ text.
+..................................................
+This is \textbf{bold} and \emph{italic} text.
+This is \textbf{bold and \emph{italic} text}.
+This is \emph{italic and \textbf{bold} text}.
+This is \textbf{bold} and \emph{italic} text.
