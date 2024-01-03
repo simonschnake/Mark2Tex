@@ -1,0 +1,13 @@
+[@cite1]
+[@cite1; @cite2]
+[@cite1; 
+@cite2]
+[@cite1,
+@cite2
+@cite3;
+]
+...........................................................
+\cite{cite1}
+\cite{cite1, cite2}
+\cite{cite1, cite2}
+\cite{cite1, cite2, cite3}

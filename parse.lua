@@ -104,6 +104,8 @@ local inner_grammar = {}
 
 local citation = V"citation"
 local cite = V"cite"
+local citation_start = V"citation_start"
+local citation_break = V"citation_break"
 local verbatim = V"verbatim"
 local math = V"math"
 local latex_cmd = V"latex_cmd"
@@ -119,8 +121,13 @@ local elements = V"elements"
 -- Citation
 --------------------
 
-inner_grammar.cite = C(P(1 - P";" - P"]")^1)
-inner_grammar.citation = P"[@" * Ct(cite * (P"; @" + cite)^0) * P"]" /
+inner_grammar.cite = C(P(P(1) - S"\n;,] ")^1)
+inner_grammar.citation_start = P"[@" + P"[\n@"
+inner_grammar.citation_break = ((S(",; ")^0 * newline) + S(",; ")^1) * newline^0 * "@"
+
+
+
+inner_grammar.citation = citation_start * Ct(cite * (citation_break * cite)^0) * S(";, ")^0 * newline^0 * P"]" /
 function(t) return {type = "citation", content = t} end
 
 --------------------

@@ -116,7 +116,7 @@ local function walk(ast, out, config)
             walk(ast.content, out, config)
         
         elseif ast.type == "citation" then
-            out[1] = out[1] .. "\\cite{" .. table.concat(ast.content, ",") .. "}"
+            out[1] = out[1] .. "\\cite{" .. table.concat(ast.content, ", ") .. "}"
 
         elseif ast.type == "verbatim" then
             out[1] = out[1] .. "\\texttt{" .. ast.content .. "}"
