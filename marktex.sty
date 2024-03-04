@@ -6,14 +6,15 @@
 \ProvidesPackage{marktex}
 
 \RequirePackage[normalem]{ulem}
+\RequirePackage{luacode}
 
 \directlua{
   marktex = require(kpse.find_file("marktex.lua"))
 }
 \newcommand{\mdinput}[1]{
-	\directlua{tex.sprint("\\input{" .. marktex.convert("#1") .. "}")}
+	\luaexec{tex.sprint("\\input{" .. marktex.convert("#1") .. "}")}
 }
 
 \newcommand{\mdinclude}[1]{
-	\directlua{tex.sprint("\\include{" .. marktex.convert("#1") .. "}")}
+	\luaexec{tex.sprint("\\include{" .. marktex.convert("#1") .. "}")}
 }
