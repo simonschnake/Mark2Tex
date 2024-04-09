@@ -7,5 +7,5 @@ return {
 		"subparagraph"
 	},
 
-	save_dir = ".marktex",
+	save_dir = "marktex",
 }
