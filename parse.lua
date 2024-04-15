@@ -102,6 +102,7 @@ local inner_grammar = {}
 
 -- Variables
 
+local bracket_citation = V"bracket_citation"
 local citation = V"citation"
 local cite = V"cite"
 local citation_start = V"citation_start"
@@ -125,10 +126,12 @@ inner_grammar.cite = C(P(P(1) - S"\n;,] ")^1)
 inner_grammar.citation_start = P"[@" + P"[\n@"
 inner_grammar.citation_break = ((S(",; ")^0 * newline) + S(",; ")^1) * newline^0 * "@"
 
+inner_grammar.bracket_citation = citation_start * Ct(cite * (citation_break * cite)^0) * S(";, ")^0 * newline^0 * P"]" /
+function(t) return {type = "bracket_citation", content = t} end
 
-
-inner_grammar.citation = citation_start * Ct(cite * (citation_break * cite)^0) * S(";, ")^0 * newline^0 * P"]" /
+inner_grammar.citation = P"@" * Ct(cite^1) * S(";, ")^0 * newline^0 /
 function(t) return {type = "citation", content = t} end
+
 
 --------------------
 -- Verbatim
@@ -191,7 +194,7 @@ inner_grammar.text = C((P(1) - escape)^1) / function(t) return {type = "text", c
 -- Inner
 --------------------
 
-inner_grammar.final_elements = citation + latex_cmd_in_verbatim + verbatim + math + latex_cmd
+inner_grammar.final_elements = bracket_citation + latex_cmd_in_verbatim + verbatim + math + latex_cmd + citation
 inner_grammar.elements = final_elements + italic + bold + strikethrough
 
 inner_grammar[1] = Ct((elements + text)^0)

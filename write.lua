@@ -115,8 +115,11 @@ local function walk(ast, out, config)
         elseif ast.type == "other" then
             walk(ast.content, out, config)
         
-        elseif ast.type == "citation" then
+        elseif ast.type == "bracket_citation" then
             out[1] = out[1] .. "\\cite{" .. table.concat(ast.content, ", ") .. "}"
+
+        elseif ast.type == "citation" then
+            out[1] = out[1] .. "\\cite{" .. ast.content .. "}"
 
         elseif ast.type == "verbatim" then
             out[1] = out[1] .. "\\texttt{" .. ast.content .. "}"
