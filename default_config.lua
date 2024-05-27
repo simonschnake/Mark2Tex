@@ -7,5 +7,8 @@ return {
 		"subparagraph"
 	},
 
+	paren_citation = "parencite",
+	citation = "cite",
+
 	save_dir = "marktex",
 }

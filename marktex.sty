@@ -8,13 +8,21 @@
 \RequirePackage[normalem]{ulem}
 \RequirePackage{luacode}
 
-\directlua{
+
+\begin{luacode*}
   marktex = require(kpse.find_file("marktex.lua"))
-}
+
+  file = io.open("marktex_config.lua", "r")
+  if file then
+    cfg = require("marktex_config")
+  end
+  file:close()
+\end{luacode*}
+
 \newcommand{\mdinput}[1]{
-	\luaexec{tex.sprint("\\input{" .. marktex.convert("#1") .. "}")}
+	\luaexec{tex.sprint("\\input{" .. marktex.convert("#1", cfg) .. "}")}
 }
 
 \newcommand{\mdinclude}[1]{
-	\luaexec{tex.sprint("\\include{" .. marktex.convert("#1") .. "}")}
+	\luaexec{tex.sprint("\\include{" .. marktex.convert("#1", cfg) .. "}")}
 }

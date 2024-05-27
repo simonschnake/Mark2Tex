@@ -5,8 +5,13 @@ local fu = require "fileutils"
 
 local self = {}
 -- Main function
-self.convert = function (input_path, config)
-    config = config or default_config
+self.convert = function (input_path, cfg)
+    local config = default_config
+    if cfg then
+        for k, v in pairs(cfg) do
+            config[k] = v
+        end
+    end
     -- Create mdtex directory if it does not exist
     fu.create_directory(config.save_dir)
 

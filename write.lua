@@ -108,9 +108,9 @@ local function walk(ast, out, config)
 		elseif ast.type == "other" then
 			walk(ast.content, out, config)
 		elseif ast.type == "paren_citation" then
-			out[1] = out[1] .. "\\citep{" .. table.concat(ast.content, ", ") .. "}"
+			out[1] = out[1] .. "\\" .. config.paren_citation .. "{" .. table.concat(ast.content, ", ") .. "}"
 		elseif ast.type == "citation" then
-			out[1] = out[1] .. "\\citet{" .. ast.content .. "}"
+			out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
 		elseif ast.type == "verbatim" then
 			out[1] = out[1] .. "\\texttt{" .. ast.content .. "}"
 		elseif ast.type == "math" or ast.type == "latex_cmd" then
