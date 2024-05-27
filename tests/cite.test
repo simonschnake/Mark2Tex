@@ -6,8 +6,12 @@
 @cite2
 @cite3;
 ]
+[@PhysRevD.98.030001]
+@cite1
 ...........................................................
+\parencite{cite1}
+\parencite{cite1, cite2}
+\parencite{cite1, cite2}
+\parencite{cite1, cite2, cite3}
+\parencite{PhysRevD.98.030001}
 \cite{cite1}
-\cite{cite1, cite2}
-\cite{cite1, cite2}
-\cite{cite1, cite2, cite3}

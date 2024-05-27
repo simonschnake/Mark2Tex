@@ -7,7 +7,7 @@ local hash = P("#")
 local double_dollar = P("$$")
 local newline = P("\n")
 local rest_of_line = (P(1) - newline) ^ 1
-local escape = S("$`*\\") + P("[@") + P("_") + P("~~")
+local escape = S("@$`*\\") + P("[@") + P("_") + P("~~")
 
 local outer_grammar = {}
 
@@ -132,6 +132,7 @@ local inner_grammar = {}
 local paren_citation = V("paren_citation")
 local citation = V("citation")
 local cite = V("cite")
+local cite2 = V("cite2")
 local citation_start = V("citation_start")
 local citation_break = V("citation_break")
 local verbatim = V("verbatim")
@@ -150,6 +151,7 @@ local elements = V("elements")
 --------------------
 
 inner_grammar.cite = C(P(P(1) - S("\n;,] ")) ^ 1)
+inner_grammar.cite2 = C(P(P(1) - S("\n;, .] ")) ^ 1)
 inner_grammar.citation_start = P("[@") + P("[\n@")
 inner_grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * "@"
 
@@ -162,13 +164,9 @@ inner_grammar.paren_citation = citation_start
 		return { type = "paren_citation", content = t }
 	end
 
-inner_grammar.citation = P("@")
-	* Ct(cite ^ 1)
-	* S(";, ") ^ 0
-	* newline ^ 0
-	/ function(t)
-		return { type = "citation", content = t }
-	end
+inner_grammar.citation = P("@") * cite2 / function(t)
+	return { type = "citation", content = t }
+end
 
 --------------------
 -- Verbatim
@@ -269,7 +267,7 @@ end
 -- Inner
 --------------------
 
-inner_grammar.final_elements = paren_citation + latex_cmd_in_verbatim + verbatim + math + latex_cmd + citation
+inner_grammar.final_elements = paren_citation + citation + latex_cmd_in_verbatim + verbatim + math + latex_cmd
 inner_grammar.elements = final_elements + italic + bold + strikethrough
 
 inner_grammar[1] = Ct((elements + text) ^ 0)
