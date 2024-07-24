@@ -24,7 +24,6 @@
 \newcommand{\mdinput}[1]{
   \luaexec{tex.sprint("\\input{" .. marktex.convert("#1", cfg) .. "}")}
 }
-% 
-% \newcommand{\mdinclude}[1]{
-	% \luaexec{tex.sprint("\\include{" .. marktex.convert("#1", cfg) .. "}")}
-% }
+\newcommand{\mdinclude}[1]{
+  \luaexec{tex.sprint("\\include{" .. marktex.convert("#1", cfg) .. "}")}
+}
