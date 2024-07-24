@@ -43,6 +43,7 @@ $$
 a + b = c
 $$
 
+
 \begin{align*}
     \mathcal{B} &=\{u | F_X(x_i) \leq u \leq F_X(x_{i+1})\} \\
                 &= \{F_X(x_i) + u | 0 \leq u \leq F_X(x_{i+1}) - F_X(x_i)\} \\

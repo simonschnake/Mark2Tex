@@ -31,23 +31,24 @@ outer_grammar.header = newline
 local latex_env = V("latex_env")
 local latex_env_in_double_dollar = V("latex_env_in_double_dollar")
 local double_dollar_env = V("double_dollar_env")
-local beginend_env = V("beginend_env")
-local begin_end = P("\\begin{")
-	* (P(1) - P("}")) ^ 1
-	* P("}")
-	* space ^ 0
-	* (P(1) - P("\\end{")) ^ 1
-	* P("\\end{")
+
+local begin_env = P("\\begin{")
 	* (P(1) - P("}")) ^ 1
 	* P("}")
 
-outer_grammar.latex_env_in_double_dollar = double_dollar * S(" \n") ^ 0 * C(begin_end) * S(" \n") ^ 0 * double_dollar
+local end_env = P("\\end{")
+	* (P(1) - P("}")) ^ 1
+	* P("}")
+
+outer_grammar.begin_end = begin_env * (V"begin_end_inner" + (1 - begin_env - end_env))^0 * end_env
+outer_grammar.begin_end_inner =  V"begin_end" + (1 - (begin_env + end_env))^1
+
+outer_grammar.latex_env_in_double_dollar = double_dollar * S(" \n") ^ 0 * C(V"begin_end") * S(" \n") ^ 0 * double_dollar
 outer_grammar.double_dollar_env = C(double_dollar * (P(1) - double_dollar) ^ 1 * double_dollar)
-outer_grammar.beginend_env = C(begin_end)
 
 outer_grammar.latex_env = newline
 	* space ^ 0
-	* (latex_env_in_double_dollar + double_dollar_env + beginend_env)
+	* (latex_env_in_double_dollar + double_dollar_env + V"begin_end")
 	/ function(t)
 		return { type = "latex", content = t }
 	end

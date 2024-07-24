@@ -1,0 +1,15 @@
+$$
+\begin{align}
+x = \begin{pmatrix}
+1 & 2 \\
+3 & 4
+\end{pmatrix}
+\end{align}
+$$
+..................................................
+\begin{align}
+x = \begin{pmatrix}
+1 & 2 \\
+3 & 4
+\end{pmatrix}
+\end{align}
