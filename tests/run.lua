@@ -77,12 +77,14 @@ package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
 
 local luaunit = load_luaunit()
 local core = require("marktex.core")
+local lfs = require("lfs")
 local parse = require("marktex.parse")
 local write = require("marktex.write")
 local default_config = require("marktex.default_config")
 
 local TEST_DIR = "tests"
 local FIXTURE_SEPARATOR = "^%.+$"
+local TMP_DIR = "tests/tmp"
 
 local function transform (markdown, config)
     config = config or default_config
@@ -212,6 +214,23 @@ local function create_test_case(filePath)
     end
 end
 
+local function write_file(path, content)
+    local file = assert(io.open(path, "w"))
+    file:write(content)
+    file:close()
+end
+
+local function file_exists(path)
+    return lfs.attributes(path) ~= nil
+end
+
+local function read_file(path)
+    local file = assert(io.open(path, "r"))
+    local content = file:read("*a")
+    file:close()
+    return content
+end
+
 local fixtures = list_fixtures()
 if #fixtures == 0 then
     error("no test fixtures found")
@@ -248,6 +267,43 @@ function test_config_tables_are_not_shared()
     config.header[1] = "chapter"
 
     luaunit.assertEquals(default_config.header[1], "section")
+end
+
+function test_convert_creates_output_directory()
+    local input_path = TMP_DIR .. "/convert_input.md"
+    local save_dir = TMP_DIR .. "/convert-output"
+
+    write_file(input_path, "# Title\n")
+
+    local output_path, err = core.convert(input_path, { save_dir = save_dir })
+
+    luaunit.assertNotNil(output_path, tostring(err))
+    luaunit.assertEquals(lfs.attributes(save_dir, "mode"), "directory")
+    luaunit.assertEquals(file_exists(output_path), true)
+end
+
+function test_convert_returns_error_for_missing_input()
+    local output_path, err = core.convert(TMP_DIR .. "/missing-input.md", {
+        save_dir = TMP_DIR .. "/missing-input-output",
+    })
+
+    luaunit.assertEquals(output_path, nil)
+    luaunit.assertNotNil(err)
+end
+
+function test_save_dir_shell_metacharacters_are_treated_as_path()
+    local input_path = TMP_DIR .. "/shell_meta_input.md"
+    local marker_path = TMP_DIR .. "/shell-meta-marker"
+    local save_dir = TMP_DIR .. "/literal;touch shell-meta-marker"
+
+    write_file(input_path, "Plain text.\n")
+
+    local output_path, err = core.convert(input_path, { save_dir = save_dir })
+
+    luaunit.assertNotNil(output_path, tostring(err))
+    luaunit.assertEquals(lfs.attributes(save_dir, "mode"), "directory")
+    luaunit.assertEquals(file_exists(marker_path), false)
+    luaunit.assertEquals(read_file(output_path):match("Plain text%."), "Plain text.")
 end
 
 os.exit(luaunit.LuaUnit.run())

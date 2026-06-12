@@ -36,23 +36,29 @@ self.convert = function (input_path, cfg)
     local config = resolve_config(cfg)
 
     -- Create mdtex directory if it does not exist
-    fu.create_directory(config.save_dir)
+    local success, err = fu.create_directory(config.save_dir)
+    if not success then
+        return nil, err
+    end
 
     -- Output file path
     local output_path = fu.get_output_filename(
         input_path, config.save_dir)
 
+    local last_modified = fu.getLastModifiedTime(input_path)
+    if not last_modified then
+        return nil, "Unable to stat file: " .. input_path
+    end
+
     -- Check if file has been modified since last conversion
     local last_conversion = fu.getFirstLine(output_path)
-    local last_modified = fu.getLastModifiedTime(input_path)
     if last_conversion == "% " .. last_modified then
         return output_path
     end
 
     local content, err = fu.read_file(input_path)
     if not content then
-        print(err)
-        return
+        return nil, err
     end
 
     local ast = parse(content, config)
@@ -63,8 +69,8 @@ self.convert = function (input_path, cfg)
 
     local success, err = fu.save_file(output_path, tex)
     if not success then
-        print(err)
-    else
+        return nil, err
+    elseif config.verbose then
         print("\nFile processed and saved to " .. output_path)
     end
     return output_path

@@ -3,10 +3,29 @@ local md5 = require("md5")
 
 local self = {}
 
+local path_separator = package.config:sub(1, 1)
+
+local function is_windows_absolute_path(path)
+    return path:match("^%a:[/\\]") ~= nil
+end
+
+local function is_absolute_path(path)
+    return path:sub(1, 1) == "/" or is_windows_absolute_path(path)
+end
+
+local function join_path(base, part)
+    if base == "" then
+        return part
+    end
+    return base .. path_separator .. part
+end
+
 -- Function to read file content
 self.read_file = function (path)
     local file = io.open(path, "r")
-    if not file then return nil, "Unable to open file" end
+    if not file then
+        return nil, "Unable to open file: " .. path
+    end
     local content = file:read("*a")
     file:close()
     return content
@@ -16,7 +35,9 @@ end
 -- Function to save file content
 self.save_file = function (path, content)
     local file = io.open(path, "w")
-    if not file then return nil, "Unable to write file" end
+    if not file then
+        return nil, "Unable to write file: " .. path
+    end
     file:write(content)
     file:close()
     return true
@@ -24,9 +45,30 @@ end
 
 -- Function to create a directory if it doesn't exist
 self.create_directory = function (path)
-    local command = string.format("mkdir -p %s", path)
-    print(command)
-    os.execute(command)
+    if path == nil or path == "" then
+        return nil, "Unable to create directory: empty path"
+    end
+
+    local current = ""
+    if is_absolute_path(path) then
+        current = path:sub(1, 1)
+    end
+
+    for part in path:gmatch("[^/\\]+") do
+        current = join_path(current, part)
+
+        local mode = lfs.attributes(current, "mode")
+        if mode == nil then
+            local ok, err = lfs.mkdir(current)
+            if not ok then
+                return nil, "Unable to create directory '" .. current .. "': " .. tostring(err)
+            end
+        elseif mode ~= "directory" then
+            return nil, "Unable to create directory '" .. current .. "': path exists and is not a directory"
+        end
+    end
+
+    return true
 end
 
 -- Function to get the output filename

@@ -241,6 +241,7 @@ pythontex-files-*/
 
 ## marktex generated files
 /marktex/
+/tests/tmp/
 
 ## Lua / LuaRocks local development
 lua_modules/
