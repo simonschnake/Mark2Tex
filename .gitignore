@@ -242,6 +242,10 @@ pythontex-files-*/
 ## marktex generated files
 /marktex/
 /tests/tmp/
+/tests/latex-smoke/marktex-output/
+/tests/latex-smoke/*.aux
+/tests/latex-smoke/*.log
+/tests/latex-smoke/*.pdf
 
 ## Lua / LuaRocks local development
 lua_modules/

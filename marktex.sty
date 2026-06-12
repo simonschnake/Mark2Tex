@@ -11,19 +11,66 @@
 
 
 \begin{luacode*}
-  marktex = require(kpse.find_file("marktex.lua"))
-  f = io.open("marktex_config.lua", "r")
-  if f then
+  local marktex_path = kpse.find_file("marktex.lua")
+  local marktex_dir = marktex_path:match("^(.*)[/\\][^/\\]-$")
+  if marktex_dir then
+    package.path = marktex_dir .. "/src/?.lua;" .. marktex_dir .. "/src/?/init.lua;" .. package.path
+    package.preload["marktex.nodes"] = function()
+      return dofile(marktex_dir .. "/src/marktex/nodes.lua")
+    end
+    package.preload["marktex.default_config"] = function()
+      return dofile(marktex_dir .. "/src/marktex/default_config.lua")
+    end
+    package.preload["marktex.fileutils"] = function()
+      return dofile(marktex_dir .. "/src/marktex/fileutils.lua")
+    end
+    package.preload["marktex.parse"] = function()
+      return dofile(marktex_dir .. "/src/marktex/parse.lua")
+    end
+    package.preload["marktex.write"] = function()
+      return dofile(marktex_dir .. "/src/marktex/write.lua")
+    end
+    package.preload["marktex.core"] = function()
+      return dofile(marktex_dir .. "/src/marktex/core.lua")
+    end
+  end
+
+  local marktex = require(marktex_path)
+  local cfg = {}
+
+  local config_file = io.open("marktex_config.lua", "r")
+  if config_file then
+    config_file:close()
     cfg = require("marktex_config")
-    f:close()
-  else
-    cfg = {}
+  end
+
+  local function strip_tex_extension(path)
+    return path:gsub("%.tex$", "")
+  end
+
+  local function tex_escape_path(path)
+    return path:gsub("\\", "/")
+  end
+
+  function marktex_input(path, include_mode)
+    local output_path, err = marktex.convert(path, cfg)
+    if not output_path then
+      tex.error("marktex failed to convert " .. path, { err or "unknown error" })
+      return
+    end
+
+    output_path = tex_escape_path(output_path)
+    if include_mode then
+      tex.sprint("\\include{" .. strip_tex_extension(output_path) .. "}")
+    else
+      tex.sprint("\\input{" .. output_path .. "}")
+    end
   end
 \end{luacode*}
 
 \newcommand{\mdinput}[1]{
-  \luaexec{tex.sprint("\\input{" .. marktex.convert("#1", cfg) .. "}")}
+  \luaexec{marktex_input("#1", false)}
 }
 \newcommand{\mdinclude}[1]{
-  \luaexec{tex.sprint("\\include{" .. marktex.convert("#1", cfg) .. "}")}
+  \luaexec{marktex_input("#1", true)}
 }
