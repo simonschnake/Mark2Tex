@@ -1,0 +1,13 @@
+```
+# Not a heading
+**not bold**
+@not-a-citation
+\notacommand
+```
+..................................................
+\begin{verbatim}
+# Not a heading
+**not bold**
+@not-a-citation
+\notacommand
+\end{verbatim}

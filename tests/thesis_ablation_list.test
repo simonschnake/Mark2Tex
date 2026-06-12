@@ -1,0 +1,9 @@
+- The base `\gls{cpf1}` model (`\gls{cpf1}`).
+- The `\gls{cpf1}` model incorporating the `\gls{dsf}` approach as defined in `\cref{sec:arch_cpf2}` (+`\gls{dsf}`).
+- The complete `\gls{cpf2}` model, which includes random assignment of $\alpha$ (`\gls{cpf2}`).
+..................................................
+\begin{itemize}
+\item The base \gls{cpf1} model (\gls{cpf1}).
+\item The \gls{cpf1} model incorporating the \gls{dsf} approach as defined in \cref{sec:arch_cpf2} (+\gls{dsf}).
+\item The complete \gls{cpf2} model, which includes random assignment of $\alpha$ (\gls{cpf2}).
+\end{itemize}

@@ -1,0 +1,13 @@
+The *Bethe-Bloch* formula provides the average energy loss per unit distance:
+$$
+\begin{align}
+-\expval{\dv{E}{x}} = K z^2 \frac{Z}{A} \frac{1}{\beta^{2}}.
+\end{align}
+$$
+At low particle energies, the $1/\beta^2$ term dominates.
+..................................................
+The \emph{Bethe-Bloch} formula provides the average energy loss per unit distance:
+\begin{align}
+-\expval{\dv{E}{x}} = K z^2 \frac{Z}{A} \frac{1}{\beta^{2}}.
+\end{align}
+At low particle energies, the $1/\beta^2$ term dominates.

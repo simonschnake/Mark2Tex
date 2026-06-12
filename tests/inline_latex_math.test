@@ -1,0 +1,5 @@
+Inline math $a_b + c^2$ stays math.
+A command \ref{sec:intro} and \autoref[page]{sec:intro} stay LaTeX.
+..................................................
+Inline math $a_b + c^2$ stays math.
+A command \ref{sec:intro} and \autoref[page]{sec:intro} stay LaTeX.

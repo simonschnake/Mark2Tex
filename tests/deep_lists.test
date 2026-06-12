@@ -1,0 +1,17 @@
+- Top
+  - Nested item
+    - Deeper item
+  - Back to nested
+- Back to top
+..................................................
+\begin{itemize}
+\item Top
+\begin{itemize}
+\item Nested item
+\begin{itemize}
+\item Deeper item
+\end{itemize}
+\item Back to nested
+\end{itemize}
+\item Back to top
+\end{itemize}

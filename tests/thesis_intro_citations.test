@@ -1,0 +1,20 @@
+```tex
+\chapter{Introduction}
+\label{chap:introduction}
+```
+
+Simulating these showers requires sophisticated techniques, with Geant4 [@geant_simul_toolkit] being one of the most commonly employed simulation toolkits.
+
+More recently, Diffusion Models [@Sohl-Dickstein:2015dhe] have also gained significant attention.
+
+In addition, a novel hybrid approach, termed _CaloHit_, is introduced.
+..................................................
+\chapter{Introduction}
+\label{chap:introduction}
+
+
+Simulating these showers requires sophisticated techniques, with Geant4 \parencite{geant_simul_toolkit} being one of the most commonly employed simulation toolkits.
+
+More recently, Diffusion Models \parencite{Sohl-Dickstein:2015dhe} have also gained significant attention.
+
+In addition, a novel hybrid approach, termed \emph{CaloHit}, is introduced.

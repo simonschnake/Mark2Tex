@@ -1,0 +1,11 @@
+First paragraph.
+
+Second paragraph with **bold**.
+
+Third paragraph with $x$.
+..................................................
+First paragraph.
+
+Second paragraph with \textbf{bold}.
+
+Third paragraph with $x$.

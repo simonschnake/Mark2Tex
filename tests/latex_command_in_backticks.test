@@ -1,0 +1,3 @@
+This `\LaTeX` command stays a command, but `plain code` becomes texttt.
+..................................................
+This \LaTeX command stays a command, but \texttt{plain code} becomes texttt.

@@ -1,0 +1,7 @@
+Electrons and positrons deposit energy primarily through ionization and `\gls{bremsstrahlung}` [@kolanoski16].
+
+For heavy charged particles, `\gls{bremsstrahlung}` is suppressed by the particle mass ($1/m^4$).
+..................................................
+Electrons and positrons deposit energy primarily through ionization and \gls{bremsstrahlung} \parencite{kolanoski16}.
+
+For heavy charged particles, \gls{bremsstrahlung} is suppressed by the particle mass ($1/m^4$).

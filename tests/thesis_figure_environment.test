@@ -1,0 +1,15 @@
+```tex
+\begin{figure}[hbtp]
+  \centering
+  \includegraphics[width = \linewidth]{figures/bethe_bloch.png}
+  \caption{Graphical representation adapted from \citet{ParticleDataGroup:2022pth}.}
+  \label{fig:bethe_bloch}
+\end{figure}
+```
+..................................................
+\begin{figure}[hbtp]
+  \centering
+  \includegraphics[width = \linewidth]{figures/bethe_bloch.png}
+  \caption{Graphical representation adapted from \citet{ParticleDataGroup:2022pth}.}
+  \label{fig:bethe_bloch}
+\end{figure}

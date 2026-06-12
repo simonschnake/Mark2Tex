@@ -1,0 +1,9 @@
+- Item with **bold** text
+- Item with `code` and $x$
+  Continuation with @source2024
+..................................................
+\begin{itemize}
+\item Item with \textbf{bold} text
+\item Item with \texttt{code} and $x$
+  Continuation with \cite{source2024}
+\end{itemize}

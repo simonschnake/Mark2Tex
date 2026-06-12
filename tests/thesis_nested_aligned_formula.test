@@ -1,0 +1,17 @@
+Applying the transformation $f^{-1}$ leads to:
+$$
+\begin{align}
+\begin{aligned}
+p(x_{0}) \dd{x} &= p(x_{0} \leq x \leq x_{0} + \dd{x})  \\
+&= p(z_{0})\left.\dv{f^{-1}}{x}\right|_{x=x_{0}}\!\dd{x}.
+\end{aligned}
+\end{align}
+$$
+..................................................
+Applying the transformation $f^{-1}$ leads to:
+\begin{align}
+\begin{aligned}
+p(x_{0}) \dd{x} &= p(x_{0} \leq x \leq x_{0} + \dd{x})  \\
+&= p(z_{0})\left.\dv{f^{-1}}{x}\right|_{x=x_{0}}\!\dd{x}.
+\end{aligned}
+\end{align}

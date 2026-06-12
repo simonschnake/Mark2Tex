@@ -1,0 +1,9 @@
+```lua
+local x = 1
+print(x)
+```
+..................................................
+\begin{verbatim}
+local x = 1
+print(x)
+\end{verbatim}

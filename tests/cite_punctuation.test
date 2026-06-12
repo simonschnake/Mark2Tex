@@ -1,0 +1,5 @@
+See @doe2020.
+Compare @doe2020, and [@alpha-1; @beta_2].
+..................................................
+See \cite{doe2020}.
+Compare \cite{doe2020}, and \parencite{alpha-1, beta_2}.

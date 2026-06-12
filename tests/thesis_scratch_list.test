@@ -1,0 +1,7 @@
+- @behrmann2019invertible showed that one can build an invertible network out of a resnet architecture [@He:2015wrn] `\todo{eigentlich sollten wir das dann auch noch einführen}`
+- one can view ResNets as Euler discretization of ODEs `\todo{hier könnte man gut das Glossar befüllen}`
+..................................................
+\begin{itemize}
+\item \cite{behrmann2019invertible} showed that one can build an invertible network out of a resnet architecture \parencite{He:2015wrn} \todo{eigentlich sollten wir das dann auch noch einführen}
+\item one can view ResNets as Euler discretization of ODEs \todo{hier könnte man gut das Glossar befüllen}
+\end{itemize}

@@ -31,6 +31,12 @@ Run the regression tests with:
 make test
 ```
 
+Run selected fixtures with:
+
+```sh
+lua tests/run.lua tests/header.test tests/lists.test
+```
+
 The test runner uses `luaunit` when it is installed. If `luaunit` is missing, it
 falls back to a small built-in assertion runner so the parser and writer fixtures
 can still be checked.

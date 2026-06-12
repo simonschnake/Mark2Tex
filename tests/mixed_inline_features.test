@@ -1,0 +1,3 @@
+Text with `code`, **bold**, _italic_, ~~strike~~, @cite, [@a; @b], $x$, and \cmd{arg}.
+..................................................
+Text with \texttt{code}, \textbf{bold}, \emph{italic}, \sout{strike}, \cite{cite}, \parencite{a, b}, $x$, and \cmd{arg}.

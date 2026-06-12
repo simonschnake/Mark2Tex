@@ -1,0 +1,7 @@
+The new model was evaluated with the fast Calorimeter Simulation Challenge (`\challenge`) Dataset II and III.
+
+In our research, we exclusively used the `\challenge` [@CaloChallenge]. The incident energy $E_{\rm inc}$ is log-uniformly distributed between $1 \unit[1]{GeV}$ and $1 \unit[1]{TeV}$.
+..................................................
+The new model was evaluated with the fast Calorimeter Simulation Challenge (\challenge) Dataset II and III.
+
+In our research, we exclusively used the \challenge \parencite{CaloChallenge}. The incident energy $E_{\rm inc}$ is log-uniformly distributed between $1 \unit[1]{GeV}$ and $1 \unit[1]{TeV}$.

@@ -1,0 +1,5 @@
+This has **bold with *italic* and ~~strike~~** inside.
+This has ~~strike with **bold** and _italic_~~ inside.
+..................................................
+This has \textbf{bold with \emph{italic} and \sout{strike}} inside.
+This has \sout{strike with \textbf{bold} and \emph{italic}} inside.

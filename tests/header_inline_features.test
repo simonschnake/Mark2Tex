@@ -1,0 +1,3 @@
+# Heading with `code`, @cite, and \alpha
+..................................................
+\section{Heading with \texttt{code}, \cite{cite}, and \alpha}

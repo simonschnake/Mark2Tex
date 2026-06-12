@@ -1,0 +1,15 @@
+* Star item
++ Plus item
+
+1) Enum using paren
+2. Enum using dot
+..................................................
+\begin{itemize}
+\item Star item
+\item Plus item
+\end{itemize}
+
+\begin{enumerate}
+\item Enum using paren
+\item Enum using dot
+\end{enumerate}
