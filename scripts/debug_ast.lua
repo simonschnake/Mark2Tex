@@ -1,6 +1,8 @@
 local dump = require("pl.pretty").dump
-local parse = require("parse")
-local default_config = require("default_config")
+package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
+
+local parse = require("marktex.parse")
+local default_config = require("marktex.default_config")
 
 local function dump_ast (markdown, config)
     config = config or default_config

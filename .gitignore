@@ -240,7 +240,7 @@ pythontex-files-*/
 *.xcp
 
 ## marktex generated files
-marktex/
+/marktex/
 
 ## Lua / LuaRocks local development
 lua_modules/

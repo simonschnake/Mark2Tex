@@ -18,6 +18,13 @@ dissertation workflow:
 
 ## Development
 
+The project is organized as:
+
+- `src/marktex/` contains the Lua implementation.
+- `tests/` contains the test runner and fixture files.
+- `scripts/` contains development helpers.
+- `marktex.lua` is the compatibility entry point used by `marktex.sty`.
+
 Run the regression tests with:
 
 ```sh

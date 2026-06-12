@@ -62,10 +62,12 @@ local function load_luaunit()
     return fallback
 end
 
+package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
+
 local luaunit = load_luaunit()
-local parse = require("parse")
-local write = require("write")
-local default_config = require("default_config")
+local parse = require("marktex.parse")
+local write = require("marktex.write")
+local default_config = require("marktex.default_config")
 
 local function transform (markdown, config)
     config = config or default_config
