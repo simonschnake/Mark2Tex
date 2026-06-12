@@ -1,4 +1,68 @@
-local luaunit = require("luaunit")
+local function load_luaunit()
+    local ok, luaunit = pcall(require, "luaunit")
+    if ok then
+        return luaunit
+    end
+
+    local fallback = {}
+
+    function fallback.assertNotNil(value)
+        if value == nil then
+            error("expected value not to be nil", 2)
+        end
+    end
+
+    function fallback.assertEquals(actual, expected)
+        if actual ~= expected then
+            error(
+                "\nexpected:\n" .. tostring(expected) ..
+                "\nactual:\n" .. tostring(actual),
+                2
+            )
+        end
+    end
+
+    fallback.LuaUnit = {}
+
+    function fallback.LuaUnit.run()
+        local test_names = {}
+        local total = 0
+        local failed = 0
+
+        for name, test in pairs(_G) do
+            if type(name) == "string" and name:match("^test_") and type(test) == "function" then
+                table.insert(test_names, name)
+            end
+        end
+
+        table.sort(test_names)
+
+        for _, name in ipairs(test_names) do
+            local test = _G[name]
+            total = total + 1
+            io.write(name .. " ... ")
+
+            local ok, err = pcall(test)
+            if ok then
+                io.write("ok\n")
+            else
+                failed = failed + 1
+                io.write("failed\n" .. err .. "\n")
+            end
+        end
+
+        print(string.format("%d tests, %d failures", total, failed))
+
+        if failed == 0 then
+            return 0
+        end
+        return 1
+    end
+
+    return fallback
+end
+
+local luaunit = load_luaunit()
 local parse = require("parse")
 local write = require("write")
 local default_config = require("default_config")

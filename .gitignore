@@ -239,6 +239,17 @@ pythontex-files-*/
 # xcolor
 *.xcp
 
+## marktex generated files
+marktex/
+
+## Lua / LuaRocks local development
+lua_modules/
+.luarocks/
+luacov.*
+
+## OS/editor noise
+.DS_Store
+
 # xmpincl
 *.xmpi
 
