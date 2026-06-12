@@ -1,4 +1,5 @@
 local lpeg = require("lpeg")
+local nodes = require("marktex.nodes")
 
 local P, S, R, C, Cs, Ct, V = lpeg.P, lpeg.S, lpeg.R, lpeg.C, lpeg.Cs, lpeg.Ct, lpeg.V
 
@@ -21,7 +22,7 @@ outer_grammar.header = newline
 	* space ^ 0
 	* Ct(C(hash ^ 1) * space * C((P(1) - newline) ^ 1))
 	/ function(t)
-		return { type = "header", level = #t[1], content = t[2] }
+		return nodes.header(#t[1], t[2])
 	end
 
 --------------------
@@ -50,7 +51,7 @@ outer_grammar.latex_env = newline
 	* space ^ 0
 	* (latex_env_in_double_dollar + double_dollar_env + V"begin_end")
 	/ function(t)
-		return { type = "latex", content = t }
+		return nodes.latex(t)
 	end
 
 --------------------
@@ -64,7 +65,7 @@ local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09
 
 outer_grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 	/ function(t)
-		return { type = "item", level = #t[1], content = t[2] }
+		return nodes.item(#t[1], t[2])
 	end
 
 --------------------
@@ -77,7 +78,7 @@ local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09
 
 outer_grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 	/ function(t)
-		return { type = "enum", level = #t[1], content = t[2] }
+		return nodes.enum(#t[1], t[2])
 	end
 
 --------------------
@@ -94,9 +95,9 @@ outer_grammar.code = newline
 	* P("`") ^ 3
 	/ function(type, content)
 		if type == "tex" then
-			return { type = "latex", content = content }
+			return nodes.latex(content)
 		else
-			return { type = "code", code_type = type, content = content }
+			return nodes.code(type, content)
 		end
 	end
 
@@ -109,7 +110,7 @@ local outer_elements = V("outer_elements")
 outer_grammar.outer_elements = header + code + latex_env + item + enum
 
 outer_grammar.other = C((P(1) - outer_elements) ^ 1) / function(t)
-	return { type = "other", content = t }
+	return nodes.other(t)
 end
 
 --------------------
@@ -162,11 +163,11 @@ inner_grammar.paren_citation = citation_start
 	* newline ^ 0
 	* P("]")
 	/ function(t)
-		return { type = "paren_citation", content = t }
+		return nodes.paren_citation(t)
 	end
 
 inner_grammar.citation = P("@") * cite2 / function(t)
-	return { type = "citation", content = t }
+	return nodes.citation(t)
 end
 
 --------------------
@@ -177,16 +178,14 @@ inner_grammar.verbatim = P("`")
 	* C((P(1) - P("`")) ^ 1)
 	* P("`")
 	/ function(t)
-		return { type = "verbatim", content = t }
+		return nodes.verbatim(t)
 	end
 
 --------------------
 -- Math
 --------------------
 
-inner_grammar.math = C(P("$") * (1 - P("$")) ^ 1 * P("$")) / function(t)
-	return { type = "math", content = t }
-end
+inner_grammar.math = C(P("$") * (1 - P("$")) ^ 1 * P("$")) / nodes.math
 
 --------------------
 --- Latex Command
@@ -194,14 +193,14 @@ end
 
 inner_grammar.latex_cmd = C(P("\\") * (1 - S("{[ ")) ^ 1 * (S("[{]") * (1 - S("}]")) ^ 1 * S("]}")) ^ 0)
 	/ function(t)
-		return { type = "latex_cmd", content = t }
+		return nodes.latex_cmd(t)
 	end
 
 inner_grammar.latex_cmd_in_verbatim = P("`")
 	* C(P("\\") * (1 - S("{[ `")) ^ 1 * (S("[{]") * (1 - S("}]")) ^ 1 * S("]}")) ^ 0)
 	* P("`")
 	/ function(t)
-		return { type = "latex_cmd", content = t }
+		return nodes.latex_cmd(t)
 	end
 
 --------------------
@@ -212,14 +211,14 @@ inner_grammar.italic_star = P("*")
 	* Ct((final_elements + bold + text) ^ 1)
 	* P("*")
 	/ function(t)
-		return { type = "italic", content = t }
+		return nodes.italic(t)
 	end
 
 inner_grammar.italic_underline = P("_")
 	* Ct((final_elements + bold + strikethrough + text) ^ 1)
 	* P("_")
 	/ function(t)
-		return { type = "italic", content = t }
+		return nodes.italic(t)
 	end
 
 inner_grammar.italic = inner_grammar.italic_star + inner_grammar.italic_underline
@@ -232,14 +231,14 @@ inner_grammar.bold_star = P("**")
 	* Ct((final_elements + italic + strikethrough + text) ^ 1)
 	* P("**")
 	/ function(t)
-		return { type = "bold", content = t }
+		return nodes.bold(t)
 	end
 
 inner_grammar.bold_underline = P("__")
 	* Ct((final_elements + italic + text) ^ 1)
 	* P("__")
 	/ function(t)
-		return { type = "bold", content = t }
+		return nodes.bold(t)
 	end
 
 inner_grammar.bold = inner_grammar.bold_star + inner_grammar.bold_underline
@@ -252,7 +251,7 @@ inner_grammar.strikethrough = P("~~")
 	* Ct((final_elements + italic + bold + text) ^ 1)
 	* P("~~")
 	/ function(t)
-		return { type = "strikethrough", content = t }
+		return nodes.strikethrough(t)
 	end
 
 --------------------
@@ -261,7 +260,7 @@ inner_grammar.strikethrough = P("~~")
 
 --inner_grammar.text = C((1 - elements)^1) / function(t) return {type = "text", content = t} end
 inner_grammar.text = C((P(1) - escape) ^ 1) / function(t)
-	return { type = "text", content = t }
+	return nodes.text(t)
 end
 
 --------------------

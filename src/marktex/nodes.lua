@@ -1,0 +1,63 @@
+local nodes = {}
+
+function nodes.header(level, content)
+	return { type = "header", level = level, content = content }
+end
+
+function nodes.latex(content)
+	return { type = "latex", content = content }
+end
+
+function nodes.item(level, content)
+	return { type = "item", level = level, content = content }
+end
+
+function nodes.enum(level, content)
+	return { type = "enum", level = level, content = content }
+end
+
+function nodes.code(code_type, content)
+	return { type = "code", code_type = code_type, content = content }
+end
+
+function nodes.other(content)
+	return { type = "other", content = content }
+end
+
+function nodes.paren_citation(content)
+	return { type = "paren_citation", content = content }
+end
+
+function nodes.citation(content)
+	return { type = "citation", content = content }
+end
+
+function nodes.verbatim(content)
+	return { type = "verbatim", content = content }
+end
+
+function nodes.math(content)
+	return { type = "math", content = content }
+end
+
+function nodes.latex_cmd(content)
+	return { type = "latex_cmd", content = content }
+end
+
+function nodes.italic(content)
+	return { type = "italic", content = content }
+end
+
+function nodes.bold(content)
+	return { type = "bold", content = content }
+end
+
+function nodes.strikethrough(content)
+	return { type = "strikethrough", content = content }
+end
+
+function nodes.text(content)
+	return { type = "text", content = content }
+end
+
+return nodes
