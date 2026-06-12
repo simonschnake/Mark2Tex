@@ -4,14 +4,37 @@ local default_config = require "marktex.default_config"
 local fu = require "marktex.fileutils"
 
 local self = {}
--- Main function
-self.convert = function (input_path, cfg)
-    local config = default_config
+
+local function copy_table(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for k, v in pairs(value) do
+        copy[k] = copy_table(v)
+    end
+    return copy
+end
+
+local function resolve_config(cfg)
+    local config = copy_table(default_config)
+
     if cfg then
         for k, v in pairs(cfg) do
-            config[k] = v
+            config[k] = copy_table(v)
         end
     end
+
+    return config
+end
+
+self.resolve_config = resolve_config
+
+-- Main function
+self.convert = function (input_path, cfg)
+    local config = resolve_config(cfg)
+
     -- Create mdtex directory if it does not exist
     fu.create_directory(config.save_dir)
 
