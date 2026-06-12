@@ -21,10 +21,10 @@
 
 \begin{itemize}
 \item \textbf{Objective:} Delve into the techniques used for modeling hit distributions.
-\end{itemize}
 \begin{itemize}
 \item \textbf{CDF Quantization:} Describe how this technique is used.
 \item \textbf{Gumbel-Top-K Trick:} Offer a simplified explanation.
+\end{itemize}
 \end{itemize}
 
 \section{Primer on the Gumbel-Top-K Trick}

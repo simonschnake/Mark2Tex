@@ -1,54 +1,3 @@
-local function set_item_first(ast)
-	for i, v in ipairs(ast) do
-		local t = v.type
-		if t == "enum" or t == "item" then
-			-- check if it is the first item/enum of that level
-			if i == 1 then
-				v.first = true
-			else
-				for j = i - 1, 1, -1 do
-					if ast[j].type ~= "item" and ast[j].type ~= "enum" then
-						v.first = true
-						break
-					elseif ast[j].type == t and ast[j].level == v.level then
-						v.first = false
-						break
-					elseif ast[j].level < v.level then
-						v.first = true
-						break
-					end
-				end
-			end
-		end
-	end
-end
-
-local function set_item_last(ast)
-	local len = #ast
-	for i, v in ipairs(ast) do
-		local t = v.type
-		if t == "enum" or t == "item" then
-			-- check if it is the last item/enum of that level
-			if i == len then
-				v.last = true
-			else
-				for j = i + 1, len do
-					if ast[j].type ~= "item" and ast[j].type ~= "enum" then
-						v.last = true
-						break
-					elseif ast[j].type == t and ast[j].level == v.level then
-						v.last = false
-						break
-					elseif ast[j].level < v.level then
-						v.last = true
-						break
-					end
-				end
-			end
-		end
-	end
-end
-
 --[[
 elements:
 - header
@@ -65,6 +14,51 @@ elements:
 - bold
 - text
 --]]
+
+local function is_list_node(ast)
+	return ast.type == "item" or ast.type == "enum"
+end
+
+local function list_environment(list_type)
+	if list_type == "item" then
+		return "itemize"
+	end
+	return "enumerate"
+end
+
+local function close_list(out, stack)
+	local current = table.remove(stack)
+	out[1] = out[1] .. "\n\\end{" .. list_environment(current.type) .. "}"
+end
+
+local function close_lists_until(out, stack, level)
+	while #stack > 0 and stack[#stack].level > level do
+		close_list(out, stack)
+	end
+end
+
+local function close_all_lists(out, stack)
+	while #stack > 0 do
+		close_list(out, stack)
+	end
+end
+
+local function open_list(out, stack, ast)
+	table.insert(stack, { type = ast.type, level = ast.level })
+	out[1] = out[1] .. "\n\\begin{" .. list_environment(ast.type) .. "}"
+end
+
+local function ensure_list_environment(out, stack, ast)
+	close_lists_until(out, stack, ast.level)
+
+	if #stack > 0 and stack[#stack].level == ast.level and stack[#stack].type ~= ast.type then
+		close_list(out, stack)
+	end
+
+	if #stack == 0 or stack[#stack].level < ast.level or stack[#stack].type ~= ast.type then
+		open_list(out, stack, ast)
+	end
+end
 
 local function walk(ast, out, config)
 	if ast.type == nil then
@@ -85,23 +79,11 @@ local function walk(ast, out, config)
 		elseif ast.type == "latex" then
 			out[1] = out[1] .. "\n" .. ast.content
 		elseif ast.type == "item" then
-			if ast.first then
-				out[1] = out[1] .. "\n\\begin{itemize}"
-			end
 			out[1] = out[1] .. "\n\\item "
 			walk(ast.content, out, config)
-			if ast.last then
-				out[1] = out[1] .. "\n\\end{itemize}"
-			end
 		elseif ast.type == "enum" then -- TODO: add
-			if ast.first then
-				out[1] = out[1] .. "\n\\begin{enumerate}"
-			end
 			out[1] = out[1] .. "\n\\item" -- TODO: the space after \item is not always needed
 			walk(ast.content, out, config)
-			if ast.last then
-				out[1] = out[1] .. "\n\\end{enumerate}"
-			end
 		elseif ast.type == "code" then
 			-- TODO: add code type
 			out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
@@ -136,11 +118,21 @@ local function walk(ast, out, config)
 end
 
 local function write(ast, config)
-	set_item_first(ast)
-	set_item_last(ast)
-
 	local output = { "" }
-	walk(ast, output, config)
+	local list_stack = {}
+
+	for _, node in ipairs(ast) do
+		if is_list_node(node) then
+			ensure_list_environment(output, list_stack, node)
+			walk(node, output, config)
+		else
+			close_all_lists(output, list_stack)
+			walk(node, output, config)
+		end
+	end
+
+	close_all_lists(output, list_stack)
+
 	return output[1]:sub(2) -- remove first newline that was added
 end
 
