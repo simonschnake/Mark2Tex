@@ -21,7 +21,7 @@ dissertation workflow:
 The project is organized as:
 
 - `src/marktex/` contains the Lua implementation, including AST node constructors.
-- `tests/` contains the test runner and fixture files.
+- `tests/` contains the test runner, unit tests, and fixture files.
 - `scripts/` contains development helpers.
 - `marktex.lua` is the compatibility entry point used by `marktex.sty`.
 

@@ -74,79 +74,10 @@ local function load_luaunit()
 end
 
 package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
+package.path = "./?.lua;" .. package.path
 
 local luaunit = load_luaunit()
-local core = require("marktex.core")
-local lfs = require("lfs")
-local parse = require("marktex.parse")
-local write = require("marktex.write")
-local default_config = require("marktex.default_config")
-
-local TEST_DIR = "tests"
-local FIXTURE_SEPARATOR = "^%.+$"
-local TMP_DIR = "tests/tmp"
-
-local function transform (markdown, config)
-    config = config or default_config
-    local ast = parse(markdown, config)
-    return write(ast, config)
-end
-
-local function strip_newlines_at_start_and_end (str)
-    return str:gsub("^[\n\r]+", ""):gsub("[\n\r]+$", "")
-end
-
-local function split_lines(content)
-    local lines = {}
-    local start = 1
-
-    while true do
-        local newline = content:find("\n", start, true)
-        if not newline then
-            table.insert(lines, content:sub(start))
-            break
-        end
-
-        table.insert(lines, content:sub(start, newline - 1))
-        start = newline + 1
-    end
-
-    return lines
-end
-
-local function join_lines(lines, first, last)
-    if last < first then
-        return ""
-    end
-
-    return table.concat(lines, "\n", first, last)
-end
-
-local function read_test_file(filePath)
-    local file = io.open(filePath, "r")
-    if not file then
-        return nil, nil, "unable to open fixture"
-    end
-
-    local content = file:read("*all")
-    file:close()
-
-    local lines = split_lines(content)
-
-    for index, line in ipairs(lines) do
-        if line:match(FIXTURE_SEPARATOR) then
-            return join_lines(lines, 1, index - 1), join_lines(lines, index + 1, #lines)
-        end
-    end
-
-    return nil, nil, "missing fixture separator line"
-end
-
-local function fixture_name(filePath)
-    local name = filePath:match("([^/\\]-)%.test$")
-    name = name or filePath:gsub("[/\\%.]", "_")
-    return "test_" .. name:gsub("[^%w_]", "_")
-end
+local helpers = require("tests.helpers")
 
 local function list_fixtures_from_args()
     if #cli_args == 0 then
@@ -168,9 +99,9 @@ local function list_fixtures_with_lfs()
     end
 
     local files = {}
-    for filename in lfs.dir(TEST_DIR) do
+    for filename in lfs.dir(helpers.TEST_DIR) do
         if filename:match("%.test$") then
-            table.insert(files, TEST_DIR .. "/" .. filename)
+            table.insert(files, helpers.TEST_DIR .. "/" .. filename)
         end
     end
 
@@ -178,7 +109,7 @@ local function list_fixtures_with_lfs()
 end
 
 local function list_fixtures_with_popen()
-    local command = "find " .. TEST_DIR .. " -maxdepth 1 -type f -name '*.test' -print"
+    local command = "find " .. helpers.TEST_DIR .. " -maxdepth 1 -type f -name '*.test' -print"
     local handle = io.popen(command)
     if not handle then
         return nil
@@ -202,47 +133,16 @@ end
 
 local function create_test_case(filePath)
     return function()
-        local markdown, expectedLatex, err = read_test_file(filePath)
+        local markdown, expectedLatex, err = helpers.read_test_file(filePath)
         luaunit.assertNotNil(markdown, filePath .. ": " .. tostring(err))
         luaunit.assertNotNil(expectedLatex, filePath .. ": " .. tostring(err))
 
-        expectedLatex = strip_newlines_at_start_and_end(expectedLatex)
-        local actualLatex = transform(markdown)
-        actualLatex = strip_newlines_at_start_and_end(actualLatex)
+        expectedLatex = helpers.strip_newlines_at_start_and_end(expectedLatex)
+        local actualLatex = helpers.transform(markdown)
+        actualLatex = helpers.strip_newlines_at_start_and_end(actualLatex)
 
         luaunit.assertEquals(actualLatex, expectedLatex)
     end
-end
-
-local function write_file(path, content)
-    local file = assert(io.open(path, "w"))
-    file:write(content)
-    file:close()
-end
-
-local function file_exists(path)
-    return lfs.attributes(path) ~= nil
-end
-
-local function read_file(path)
-    local file = assert(io.open(path, "r"))
-    local content = file:read("*a")
-    file:close()
-    return content
-end
-
-local function assert_node(node, node_type)
-    luaunit.assertNotNil(node)
-    luaunit.assertEquals(node.type, node_type)
-end
-
-local function find_node(nodes, node_type)
-    for _, node in ipairs(nodes) do
-        if node.type == node_type then
-            return node
-        end
-    end
-    return nil
 end
 
 local fixtures = list_fixtures()
@@ -251,119 +151,11 @@ if #fixtures == 0 then
 end
 
 for _, filePath in ipairs(fixtures) do
-    _G[fixture_name(filePath)] = create_test_case(filePath)
+    _G[helpers.fixture_name(filePath)] = create_test_case(filePath)
 end
 
-function test_config_overrides_do_not_mutate_defaults()
-    local original_save_dir = default_config.save_dir
-    local original_header_1 = default_config.header[1]
-
-    local config = core.resolve_config({
-        save_dir = "custom-output",
-        header = { "chapter", "section" },
-        citation = "autocite",
-    })
-
-    luaunit.assertEquals(config.save_dir, "custom-output")
-    luaunit.assertEquals(config.header[1], "chapter")
-    luaunit.assertEquals(config.header[2], "section")
-    luaunit.assertEquals(config.citation, "autocite")
-    luaunit.assertEquals(config.paren_citation, default_config.paren_citation)
-
-    luaunit.assertEquals(default_config.save_dir, original_save_dir)
-    luaunit.assertEquals(default_config.header[1], original_header_1)
-    luaunit.assertEquals(default_config.citation, "cite")
-end
-
-function test_config_tables_are_not_shared()
-    local config = core.resolve_config()
-
-    config.header[1] = "chapter"
-
-    luaunit.assertEquals(default_config.header[1], "section")
-end
-
-function test_convert_creates_output_directory()
-    local input_path = TMP_DIR .. "/convert_input.md"
-    local save_dir = TMP_DIR .. "/convert-output"
-
-    write_file(input_path, "# Title\n")
-
-    local output_path, err = core.convert(input_path, { save_dir = save_dir })
-
-    luaunit.assertNotNil(output_path, tostring(err))
-    luaunit.assertEquals(lfs.attributes(save_dir, "mode"), "directory")
-    luaunit.assertEquals(file_exists(output_path), true)
-end
-
-function test_convert_returns_error_for_missing_input()
-    local output_path, err = core.convert(TMP_DIR .. "/missing-input.md", {
-        save_dir = TMP_DIR .. "/missing-input-output",
-    })
-
-    luaunit.assertEquals(output_path, nil)
-    luaunit.assertNotNil(err)
-end
-
-function test_save_dir_shell_metacharacters_are_treated_as_path()
-    local input_path = TMP_DIR .. "/shell_meta_input.md"
-    local marker_path = TMP_DIR .. "/shell-meta-marker"
-    local save_dir = TMP_DIR .. "/literal;touch shell-meta-marker"
-
-    write_file(input_path, "Plain text.\n")
-
-    local output_path, err = core.convert(input_path, { save_dir = save_dir })
-
-    luaunit.assertNotNil(output_path, tostring(err))
-    luaunit.assertEquals(lfs.attributes(save_dir, "mode"), "directory")
-    luaunit.assertEquals(file_exists(marker_path), false)
-    luaunit.assertEquals(read_file(output_path):match("Plain text%."), "Plain text.")
-end
-
-function test_ast_header_and_inline_nodes()
-    local ast = parse("# Heading with **bold** and @cite\n", default_config)
-    local header = ast[1]
-
-    assert_node(header, "header")
-    luaunit.assertEquals(header.level, 1)
-    assert_node(header.content[1], "text")
-    assert_node(header.content[2], "bold")
-    assert_node(header.content[3], "text")
-    assert_node(header.content[4], "citation")
-    luaunit.assertEquals(header.content[4].content, "cite")
-end
-
-function test_ast_list_nodes_keep_level_and_inline_content()
-    local ast = parse("- Parent\n  - Child with `code`\n", default_config)
-
-    assert_node(ast[1], "item")
-    luaunit.assertEquals(ast[1].level, 0)
-    luaunit.assertEquals(ast[1].content[1].content, "Parent")
-
-    assert_node(ast[2], "item")
-    luaunit.assertEquals(ast[2].level, 2)
-    assert_node(ast[2].content[2], "verbatim")
-    luaunit.assertEquals(ast[2].content[2].content, "code")
-end
-
-function test_ast_code_and_latex_nodes()
-    local ast = parse("```lua\nprint(1)\n```\n\n```tex\n\\begin{center}\nText\n\\end{center}\n```\n", default_config)
-
-    assert_node(ast[1], "code")
-    luaunit.assertEquals(ast[1].code_type, "lua")
-    luaunit.assertEquals(ast[1].content, "print(1)\n")
-
-    assert_node(ast[3], "latex")
-    luaunit.assertEquals(ast[3].content, "\\begin{center}\nText\n\\end{center}\n")
-end
-
-function test_ast_parenthetical_citation_node()
-    local ast = parse("[@alpha; @beta]\n", default_config)
-    local citation = find_node(ast[1].content, "paren_citation")
-
-    assert_node(citation, "paren_citation")
-    luaunit.assertEquals(citation.content[1], "alpha")
-    luaunit.assertEquals(citation.content[2], "beta")
-end
+require("tests.unit_config")(luaunit)
+require("tests.unit_core")(luaunit)
+require("tests.unit_ast")(luaunit)
 
 os.exit(luaunit.LuaUnit.run())
