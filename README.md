@@ -144,6 +144,65 @@ Das bindet die generierte Datei per `\include` ein.
 Wichtig: marktex benoetigt LuaLaTeX. Andere Engines wie pdfLaTeX werden vom
 Paket nicht unterstuetzt.
 
+## Installation
+
+Aus dem Repository kann ein TeX-Live-Paketarchiv gebaut werden:
+
+```sh
+make dist
+```
+
+Das erzeugt `dist/marktex.tar.xz`. Das Archiv enthaelt eine TDS-Struktur und
+ein eingebettetes `tlpobj`, sodass es direkt mit `tlmgr` installiert werden
+kann:
+
+```sh
+tlmgr install --file dist/marktex.tar.xz
+```
+
+Zum Pruefen ohne Installation gibt es:
+
+```sh
+make tlmgr-install-dry-run
+```
+
+Das Paket installiert `marktex.sty` unter `tex/latex/marktex/` und die
+Lua-Implementierung unter `scripts/marktex/`.
+
+### Overleaf
+
+Overleaf erlaubt normalerweise keine projektlokale Installation per `tlmgr`.
+Fuer Overleaf gibt es deshalb ein eigenes Bundle:
+
+```sh
+make overleaf-zip
+```
+
+Das erzeugt `dist/marktex-overleaf.zip`. Dieses Archiv ist keine
+TeX-Live-Installation, sondern enthaelt die Dateien in einer Form, die direkt
+in ein Overleaf-Projekt hochgeladen werden kann:
+
+```text
+marktex.sty
+marktex.lua
+src/marktex/*.lua
+README.md
+LICENSE
+```
+
+In Overleaf muessen `marktex.sty` und `marktex.lua` auf der obersten Ebene des
+Projekts liegen; der Ordner `src/marktex/` muss relativ dazu erhalten bleiben.
+Im Overleaf-Menue muss als Compiler LuaLaTeX ausgewaehlt werden. Danach kann
+das Paket wie lokal verwendet werden:
+
+```tex
+\usepackage{marktex}
+
+\begin{document}
+\mdinput{content.md}
+\end{document}
+```
+
 ## Konfiguration
 
 Wenn im Arbeitsverzeichnis eine `marktex_config.lua` liegt, wird sie beim Laden

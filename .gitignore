@@ -44,6 +44,9 @@
 # latexrun
 latex.out/
 
+## Local package build artifacts
+dist/
+
 ## Auxiliary and intermediate files from other packages:
 # algorithms
 *.alg
