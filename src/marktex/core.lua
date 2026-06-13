@@ -2,8 +2,10 @@ local parse = require "marktex.parse"
 local write = require "marktex.write"
 local default_config = require "marktex.default_config"
 local fu = require "marktex.fileutils"
+local md5 = require("md5")
 
 local self = {}
+local CACHE_VERSION = "v1"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -31,6 +33,61 @@ end
 
 self.resolve_config = resolve_config
 
+local function sort_keys(left, right)
+    local left_type = type(left)
+    local right_type = type(right)
+
+    if left_type == right_type then
+        if left_type == "number" then
+            return left < right
+        end
+        return tostring(left) < tostring(right)
+    end
+
+    return left_type < right_type
+end
+
+local function serialize_value(value)
+    local value_type = type(value)
+
+    if value_type == "table" then
+        local keys = {}
+        for key in pairs(value) do
+            keys[#keys + 1] = key
+        end
+
+        table.sort(keys, sort_keys)
+
+        local parts = { "{" }
+        for _, key in ipairs(keys) do
+            parts[#parts + 1] = serialize_value(key)
+            parts[#parts + 1] = "="
+            parts[#parts + 1] = serialize_value(value[key])
+            parts[#parts + 1] = ";"
+        end
+        parts[#parts + 1] = "}"
+        return table.concat(parts)
+    elseif value_type == "string" then
+        return string.format("%q", value)
+    elseif value_type == "number" or value_type == "boolean" then
+        return tostring(value)
+    elseif value_type == "nil" then
+        return "nil"
+    end
+
+    return string.format("%s:%s", value_type, tostring(value))
+end
+
+local function build_cache_key(content, config)
+    local serialized = table.concat({
+        CACHE_VERSION,
+        serialize_value(content),
+        serialize_value(config),
+    }, "\n")
+
+    return md5.sumhexa(serialized)
+end
+
 -- Main function
 self.convert = function (input_path, cfg)
     local config = resolve_config(cfg)
@@ -45,27 +102,24 @@ self.convert = function (input_path, cfg)
     local output_path = fu.get_output_filename(
         input_path, config.save_dir)
 
-    local last_modified = fu.getLastModifiedTime(input_path)
-    if not last_modified then
-        return nil, "Unable to stat file: " .. input_path
-    end
-
-    -- Check if file has been modified since last conversion
-    local last_conversion = fu.getFirstLine(output_path)
-    if last_conversion == "% " .. last_modified then
-        return output_path
-    end
-
     local content, err = fu.read_file(input_path)
     if not content then
         return nil, err
     end
 
+    local cache_key = build_cache_key(content, config)
+
+    -- Check whether the cached output matches the current content and config.
+    local last_conversion = fu.getFirstLine(output_path)
+    if last_conversion == "% cache:" .. cache_key then
+        return output_path
+    end
+
     local ast = parse(content, config)
     local tex = write(ast, config)
 
-    -- Add last modified time to the first line of the output file
-    tex = "% " .. last_modified .. "\n" .. tex
+    -- Add a cache fingerprint to the first line of the output file.
+    tex = "% cache:" .. cache_key .. "\n" .. tex
 
     local success, err = fu.save_file(output_path, tex)
     if not success then

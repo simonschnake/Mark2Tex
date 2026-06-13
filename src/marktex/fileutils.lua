@@ -79,12 +79,6 @@ self.get_output_filename = function(input_path, out_dir)
     return out_dir .. "/" .. (name or name_with_ext) .. "_" .. md5_hash .. ".tex"
 end
 
--- Function to get the last modification time of a file
-self.getLastModifiedTime = function(filePath)
-    local attributes = lfs.attributes(filePath)
-    return attributes and os.date("%Y-%m-%d %H:%M:%S", attributes.modification)
-end
-
 -- Function to get the first line of a file
 self.getFirstLine = function(filePath)
     local file = io.open(filePath, "r")
