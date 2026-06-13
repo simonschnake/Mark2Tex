@@ -1,24 +1,23 @@
 # marktex
 
-marktex ist ein LuaLaTeX-Paket fuer Markdown-nahe Textfragmente in
-LaTeX-Dokumenten. Es liest `.md`-Dateien waehrend der LaTeX-Kompilierung,
-uebersetzt den aktuell unterstuetzten Dialekt nach LaTeX und bindet das
-generierte `.tex` wieder in das Dokument ein.
+marktex is a LuaLaTeX package for Markdown-like text fragments inside
+LaTeX documents. It reads `.md` files during LaTeX compilation, translates
+the currently supported dialect to LaTeX, and inputs the generated `.tex`
+file back into the document.
 
-Der Fokus liegt auf einer LaTeX-nahen Schreibweise fuer wissenschaftliche
-Dokumente, nicht auf vollstaendiger Markdown- oder CommonMark-Kompatibilitaet.
-Falls sich Kompatibilitaet mit ueblichen Markdown-Tools ergibt, ist das ein
-willkommenes Nebenprodukt, aber kein primaeres Projektziel.
+The focus is on a LaTeX-friendly writing style for scientific documents, not
+on full Markdown or CommonMark compatibility. If compatibility with common
+Markdown tools happens as a side effect, that is welcome, but it is not the
+primary project goal.
 
-## Wofuer marktex gedacht ist
+## What marktex is for
 
-marktex ist nuetzlich, wenn groessere Textteile angenehmer in einer
-Markdown-aehnlichen Syntax geschrieben werden sollen, das Zieldokument aber
-weiterhin ein echtes LaTeX-Dokument bleibt. LaTeX-Kommandos, mathematische
-Ausdruecke, Zitationen und rohe LaTeX-Umgebungen duerfen deshalb bewusst im
-Markdown vorkommen.
+marktex is useful when larger chunks of text are more convenient to write in a
+Markdown-like syntax, while the target document should still remain a real
+LaTeX document. LaTeX commands, mathematical expressions, citations, and raw
+LaTeX environments are therefore intentionally allowed inside the Markdown.
 
-Ein typischer Ausschnitt:
+A typical snippet:
 
 ````md
 # Motivation
@@ -39,7 +38,7 @@ For the final selection we use:
 ```
 ````
 
-Daraus wird LaTeX-Ausgabe wie:
+This turns into LaTeX output such as:
 
 ```tex
 \section{Motivation}
@@ -60,63 +59,61 @@ For the final selection we use:
 \end{align}
 ```
 
-## Unterstuetzter Markdown-Subset
+## Supported Markdown subset
 
-Der aktuelle Parser unterstuetzt bewusst nur einen kleinen, getesteten Subset:
+The current parser intentionally supports only a small, tested subset:
 
-- Ueberschriften mit `#`, `##`, `###`, ...
-- Absatzerkennung fuer normalen Text
-- kursiv mit `*text*` oder `_text_`
-- fett mit `**text**` oder `__text__`
-- durchgestrichen mit `~~text~~`
-- Inline-Code mit Backticks, z.B. `` `code` ``
-- fenced code blocks mit drei Backticks
-- fenced `tex`-Bloecke als rohe LaTeX-Ausgabe
-- Inline-Math mit `$...$`
-- LaTeX-Kommandos wie `\alpha`, `\cref{...}` oder `\textit{...}`
-- ungeordnete Listen mit `-`, `*` oder `+`
-- geordnete Listen mit `1.` oder `1)`
-- einige verschachtelte Listenformen
-- einzelne Zitationen wie `@key`
-- Pandoc-aehnliche Zitationsgruppen wie `[@key1; @key2]`
-- rohe LaTeX-Umgebungen mit `\begin{...}` und `\end{...}`
-- LaTeX-Umgebungen innerhalb von `$$ ... $$`, wobei die Dollar-Wrapper entfernt werden
+- headings with `#`, `##`, `###`, ...
+- paragraph detection for normal text
+- italics with `*text*` or `_text_`
+- bold with `**text**` or `__text__`
+- strikethrough with `~~text~~`
+- inline code with backticks, e.g. `` `code` ``
+- fenced code blocks with three backticks
+- fenced `tex` blocks as raw LaTeX output
+- inline math with `$...$`
+- LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
+- unordered lists with `-`, `*`, or `+`
+- ordered lists with `1.` or `1)`
+- some nested list forms
+- single citations such as `@key`
+- Pandoc-style citation groups such as `[@key1; @key2]`
+- raw LaTeX environments with `\begin{...}` and `\end{...}`
+- LaTeX environments inside `$$ ... $$`, with the dollar wrappers removed
 
-Die Ausgabe ist LaTeX-nah:
+The output is LaTeX-like:
 
-- Ueberschriften werden standardmaessig auf `\section`, `\subsection`,
-  `\subsubsection`, `\paragraph` und `\subparagraph` gemappt.
-- `@key` wird standardmaessig zu `\cite{key}`.
-- `[@key1; @key2]` wird standardmaessig zu `\parencite{key1, key2}`.
-- Listen werden zu `itemize` oder `enumerate`.
-- normale Code-Bloecke werden als `verbatim` ausgegeben.
-- `tex`-Code-Bloecke werden unveraendert als LaTeX ausgegeben.
-- normaler Text wird nicht automatisch fuer LaTeX-Sonderzeichen escaped.
+- headings are mapped by default to `\section`, `\subsection`,
+  `\subsubsection`, `\paragraph`, and `\subparagraph`
+- `@key` becomes `\cite{key}` by default
+- `[@key1; @key2]` becomes `\parencite{key1, key2}` by default
+- lists become `itemize` or `enumerate`
+- normal code blocks are emitted as `verbatim`
+- `tex` code blocks are emitted unchanged as LaTeX
+- normal text is not automatically escaped for LaTeX special characters
 
-## Bewusst nicht unterstuetzt
+## Deliberately unsupported
 
-marktex ist kein vollstaendiger Markdown-Konverter. Insbesondere sollte man
-aktuell nicht davon ausgehen, dass folgende Bereiche wie in CommonMark, Pandoc
-oder GitHub Markdown funktionieren:
+marktex is not a full Markdown converter. In particular, do not expect the
+following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
-- Tabellen in Markdown-Syntax
-- Links und Bilder in Markdown-Syntax
-- Blockquotes
-- HTML-Bloecke
-- Footnotes
-- Task lists
-- Referenz-Links
-- beliebige Escaping-Regeln
-- vollstaendig spezifizierte Edge Cases fuer verschachtelte Inline-Elemente
-- hilfreiche Parserdiagnosen mit Zeile und Spalte
+- tables in Markdown syntax
+- links and images in Markdown syntax
+- blockquotes
+- HTML blocks
+- footnotes
+- task lists
+- reference links
+- arbitrary escaping rules
+- fully specified edge cases for nested inline elements
+- helpful parser diagnostics with line and column numbers
 
-Wenn solche Konstrukte gebraucht werden, ist die bevorzugte Schreibweise im
-Moment meistens direktes LaTeX, etwa als `tex`-Codeblock oder rohe
-LaTeX-Umgebung.
+If you need such constructs, the preferred approach at the moment is usually
+direct LaTeX, for example as a `tex` code block or a raw LaTeX environment.
 
-## LaTeX-Nutzung
+## LaTeX usage
 
-In einem LuaLaTeX-Dokument wird marktex als Paket geladen:
+In a LuaLaTeX document, marktex is loaded as a package:
 
 ```tex
 \documentclass{article}
@@ -129,58 +126,57 @@ In einem LuaLaTeX-Dokument wird marktex als Paket geladen:
 \end{document}
 ```
 
-`\mdinput{...}` konvertiert die angegebene Markdown-Datei nach LaTeX und bindet
-die generierte Datei per `\input` ein. Die generierten Dateien landen
-standardmaessig im Verzeichnis `marktex/`.
+`\mdinput{...}` converts the given Markdown file to LaTeX and inputs the
+generated file via `\input`. Generated files are placed in the `marktex/`
+directory by default.
 
-Fuer kapitelartige Dateien gibt es ausserdem:
+For chapter-like files there is also:
 
 ```tex
 \mdinclude{chapter.md}
 ```
 
-Das bindet die generierte Datei per `\include` ein.
+This inputs the generated file via `\include`.
 
-Wichtig: marktex benoetigt LuaLaTeX. Andere Engines wie pdfLaTeX werden vom
-Paket nicht unterstuetzt.
+Important: marktex requires LuaLaTeX. Other engines such as pdfLaTeX are not
+supported.
 
 ## Installation
 
-Aus dem Repository kann ein TeX-Live-Paketarchiv gebaut werden:
+You can build a TeX Live package archive from this repository:
 
 ```sh
 make dist
 ```
 
-Das erzeugt `dist/marktex.tar.xz`. Das Archiv enthaelt eine TDS-Struktur und
-ein eingebettetes `tlpobj`, sodass es direkt mit `tlmgr` installiert werden
-kann:
+This produces `dist/marktex.tar.xz`. The archive contains a TDS structure and
+an embedded `tlpobj`, so it can be installed directly with `tlmgr`:
 
 ```sh
 tlmgr install --file dist/marktex.tar.xz
 ```
 
-Zum Pruefen ohne Installation gibt es:
+To check the archive without installing it, use:
 
 ```sh
 make tlmgr-install-dry-run
 ```
 
-Das Paket installiert `marktex.sty` unter `tex/latex/marktex/` und die
-Lua-Implementierung unter `scripts/marktex/`.
+The package installs `marktex.sty` under `tex/latex/marktex/` and the Lua
+implementation under `scripts/marktex/`.
 
 ### Overleaf
 
-Overleaf erlaubt normalerweise keine projektlokale Installation per `tlmgr`.
-Fuer Overleaf gibt es deshalb ein eigenes Bundle:
+Overleaf usually does not allow project-local installation via `tlmgr`.
+For Overleaf there is therefore a separate bundle:
 
 ```sh
 make overleaf-zip
 ```
 
-Das erzeugt `dist/marktex-overleaf.zip`. Dieses Archiv ist keine
-TeX-Live-Installation, sondern enthaelt die Dateien in einer Form, die direkt
-in ein Overleaf-Projekt hochgeladen werden kann:
+This produces `dist/marktex-overleaf.zip`. That archive is not a TeX Live
+installation; instead it contains the files in a form that can be uploaded
+directly into an Overleaf project:
 
 ```text
 marktex.sty
@@ -190,10 +186,10 @@ README.md
 LICENSE
 ```
 
-In Overleaf muessen `marktex.sty` und `marktex.lua` auf der obersten Ebene des
-Projekts liegen; der Ordner `src/marktex/` muss relativ dazu erhalten bleiben.
-Im Overleaf-Menue muss als Compiler LuaLaTeX ausgewaehlt werden. Danach kann
-das Paket wie lokal verwendet werden:
+In Overleaf, `marktex.sty` and `marktex.lua` must live at the top level of the
+project; the `src/marktex/` directory must remain relative to them. In the
+Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
+can be used like it is locally:
 
 ```tex
 \usepackage{marktex}
@@ -203,11 +199,10 @@ das Paket wie lokal verwendet werden:
 \end{document}
 ```
 
-## Konfiguration
+## Configuration
 
-Wenn im Arbeitsverzeichnis eine `marktex_config.lua` liegt, wird sie beim Laden
-des Pakets verwendet. Damit koennen die wichtigsten LaTeX-Mappings angepasst
-werden:
+If a `marktex_config.lua` file exists in the working directory, it is used when
+the package is loaded. This lets you adjust the main LaTeX mappings:
 
 ```lua
 return {
@@ -226,7 +221,7 @@ return {
 }
 ```
 
-Die Default-Konfiguration ist:
+The default configuration is:
 
 ```lua
 return {
@@ -245,23 +240,23 @@ return {
 }
 ```
 
-## Beispiele fuer LaTeX-nahe Markdown-Dateien
+## Examples of LaTeX-friendly Markdown files
 
-Inline-LaTeX bleibt erhalten:
+Inline LaTeX is preserved:
 
 ```md
 The corrected energy is $E_\mathrm{corr}$ and the result is shown in
 \cref{fig:energy-response}.
 ```
 
-Zitationen koennen knapp geschrieben werden:
+Citations can be written concisely:
 
 ```md
 The detector model follows @detector-note and the calibration strategy follows
 [@calibration-paper; @run2-performance].
 ```
 
-Komplexere LaTeX-Bloecke koennen direkt im Markdown stehen:
+More complex LaTeX blocks can be written directly in Markdown:
 
 ````md
 ```tex
@@ -280,7 +275,7 @@ Layer & bins \\
 ```
 ````
 
-Auch rohe Umgebungen ohne Code-Fence werden erkannt:
+Raw environments without a code fence are also recognized:
 
 ```md
 \begin{align}
@@ -288,46 +283,46 @@ Auch rohe Umgebungen ohne Code-Fence werden erkannt:
 \end{align}
 ```
 
-## Entwicklung
+## Development
 
-Die Projektstruktur:
+Project layout:
 
-- `src/marktex/` enthaelt die Lua-Implementierung.
-- `marktex.lua` ist der Kompatibilitaets-Einstiegspunkt.
-- `marktex.sty` bindet marktex in LuaLaTeX ein.
-- `tests/` enthaelt Fixture-Tests, Unit-Tests und einen LaTeX-Smoke-Test.
-- `scripts/` enthaelt Entwicklungshelfer.
+- `src/marktex/` contains the Lua implementation.
+- `marktex.lua` is the compatibility entry point.
+- `marktex.sty` integrates marktex into LuaLaTeX.
+- `tests/` contains fixture tests, unit tests, and a LaTeX smoke test.
+- `scripts/` contains development helpers.
 
-Regression-Tests ausfuehren:
+Run regression tests:
 
 ```sh
 make test
 ```
 
-Einzelne Fixtures ausfuehren:
+Run individual fixtures:
 
 ```sh
 lua tests/run.lua tests/header.test tests/lists.test
 ```
 
-LuaLaTeX-Integration testen:
+Test LuaLaTeX integration:
 
 ```sh
 make latex-smoke
 ```
 
-Der Test-Runner nutzt `luaunit`, wenn es installiert ist. Falls `luaunit`
-fehlt, verwendet er einen kleinen eingebauten Assertion-Runner, damit Parser-
-und Writer-Fixtures weiterhin geprueft werden koennen.
+The test runner uses `luaunit` if it is installed. If `luaunit` is missing, it
+falls back to a small built-in assertion runner so that parser and writer
+fixtures can still be checked.
 
-## Abhaengigkeiten
+## Dependencies
 
-Zur Laufzeit werden aktuell Lua-Module fuer LPeg, Dateisystemzugriffe und MD5
-verwendet:
+At runtime, the project currently uses Lua modules for LPeg, filesystem access,
+and MD5:
 
 - `lpeg`
 - `lfs`
 - `md5`
 
-Fuer die LaTeX-Integration wird eine funktionierende LuaLaTeX-Installation
-benoetigt. `luaunit` ist fuer die Tests optional.
+A working LuaLaTeX installation is required for the LaTeX integration.
+`luaunit` is optional for tests.
