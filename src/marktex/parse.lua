@@ -283,7 +283,11 @@ end
 local function parse_inner_ast(ast)
 	for _, element in ipairs(ast) do
 		if element.type == "header" or element.type == "item" or element.type == "enum" or element.type == "other" then
-			element.content = inner_grammar:match(element.content)
+			local parsed_content = inner_grammar:match(element.content)
+			if parsed_content == nil then
+				parsed_content = { nodes.text(element.content) }
+			end
+			element.content = parsed_content
 		end
 		---table.insert(final_ast, element)
 	end

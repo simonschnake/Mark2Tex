@@ -48,4 +48,65 @@ return function(luaunit)
 		luaunit.assertEquals(citation.content[1], "alpha")
 		luaunit.assertEquals(citation.content[2], "beta")
 	end
+
+	function test_ast_falls_back_to_text_for_unclosed_inline_markers()
+		local ast = parse("*open only\nThis has `unterminated\nThis has $unterminated\nText with [@missing\n", default_config)
+		local expected = "*open only\nThis has `unterminated\nThis has $unterminated\nText with [@missing"
+		local actual = helpers.strip_newlines_at_start_and_end(ast[1].content[1].content)
+
+		helpers.assert_node(luaunit, ast[1], "other")
+		luaunit.assertEquals(#ast[1].content, 1)
+		helpers.assert_node(luaunit, ast[1].content[1], "text")
+		luaunit.assertEquals(actual, expected)
+
+		local transformed = helpers.strip_newlines_at_start_and_end(
+			helpers.transform("*open only\nThis has `unterminated\nThis has $unterminated\nText with [@missing\n")
+		)
+		luaunit.assertEquals(transformed, expected)
+	end
+
+	function test_ast_preserves_mixed_block_order()
+		local ast = parse(
+			[[# Heading with *inline*
+
+Paragraph before
+
+```lua
+print(1)
+```
+
+\begin{align}
+a = b
+\end{align}
+
+- Item one
+  - Child one
+- Item two
+
+Trailing text
+]],
+			default_config
+		)
+
+		luaunit.assertEquals(#ast, 10)
+		luaunit.assertEquals(ast[1].type, "header")
+		luaunit.assertEquals(ast[2].type, "other")
+		luaunit.assertEquals(ast[3].type, "code")
+		luaunit.assertEquals(ast[4].type, "other")
+		luaunit.assertEquals(ast[5].type, "latex")
+		luaunit.assertEquals(ast[6].type, "other")
+		luaunit.assertEquals(ast[7].type, "item")
+		luaunit.assertEquals(ast[8].type, "item")
+		luaunit.assertEquals(ast[9].type, "item")
+		luaunit.assertEquals(ast[10].type, "other")
+
+		luaunit.assertEquals(ast[1].content[1].content, "Heading with ")
+		helpers.assert_node(luaunit, ast[1].content[2], "italic")
+		luaunit.assertEquals(ast[3].code_type, "lua")
+		luaunit.assertEquals(ast[3].content, "print(1)\n")
+		luaunit.assertEquals(ast[7].level, 0)
+		luaunit.assertEquals(ast[8].level, 2)
+		luaunit.assertEquals(ast[9].level, 0)
+		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[10].content[1].content), "Trailing text")
+	end
 end
