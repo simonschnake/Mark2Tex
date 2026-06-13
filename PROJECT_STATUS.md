@@ -156,7 +156,108 @@ Moegliche Umsetzung:
 - Cache-Header als strukturierte Zeile weiter ausbauen.
 - Zusätzliche Tests fuer Cache-Breaking-Changes ergaenzen.
 
-### 2. Supported Markdown dokumentieren
+### 2. Parser neu schneiden
+
+Der groesste strukturelle Hebel liegt im Parser selbst. Langfristig sollte die
+aktuelle LPeg-Grammatik in eine klarere, lesbarere Form ueberfuehrt werden, die
+den Markdown-Workflow explizit abbildet statt ihn nur implizit zu erraten.
+
+Zielbild:
+
+- Block-Parsing und Inline-Parsing voneinander trennen.
+- Listen als echte verschachtelte Struktur modellieren.
+- Paragraphen, Blank Lines und Blockgrenzen explizit behandeln.
+- Source-Positionen pro Node mitfuehren.
+- Unsaubere Eingaben kontrolliert behandeln statt stillschweigend zu verwursteln.
+
+Warum das wichtig ist:
+
+- Die aktuelle Grammatik ist stark reihenfolgeabhaengig.
+- Viele Regeln sind nur als Sonderfall lesbar.
+- Listen- und Inline-Nesting sind schwer zu erweitern.
+- Fehlerdiagnosen bleiben sonst dauerhaft oberflaechlich.
+
+Konkreter Umbaupfad:
+
+1. Aktuelles Verhalten als Vertragsbasis festhalten.
+
+   Bevor die Grammatik umgebaut wird, sollten die bestehenden Fixtures als
+   erwarteter Kompatibilitaetsvertrag verstanden werden. Zusaetzlich sollten
+   einige gezielte Parser-Unit-Tests fuer AST-Formen ergaenzt werden, damit wir
+   nicht nur LaTeX-Output vergleichen.
+
+   Erfolgskriterium: Die vorhandenen Tests laufen unveraendert, und die
+   wichtigsten Blocktypen haben explizite AST-Tests.
+
+2. Parser-Schnitt intern vorbereiten.
+
+   Der heutige Parser kann nach aussen weiterhin `parse(markdown, config)`
+   anbieten, intern aber in klarere Phasen aufgeteilt werden:
+   `normalize_input`, `parse_blocks`, `parse_inlines`, `normalize_ast`.
+   Anfangs duerfen diese Phasen noch das alte Verhalten nachbilden.
+
+   Erfolgskriterium: Der oeffentliche Einstiegspunkt bleibt stabil, aber die
+   Datei ist in klar benannte Schritte zerlegt.
+
+3. Einen zeilenorientierten Block-Parser einfuehren.
+
+   Als erster echter Neuschnitt sollte die Blockebene aus der grossen LPeg-
+   Grammatik herausgeloest werden. Der Block-Parser sollte Zeilen lesen und
+   explizit erkennen:
+
+   - Blank Lines
+   - Headings
+   - Paragraphen
+   - fenced code blocks
+   - LaTeX-Bloecke
+   - rohe Textbloecke
+
+   Listen koennen in diesem Schritt noch beim alten Verhalten bleiben, damit
+   der erste Umbau klein bleibt.
+
+   Erfolgskriterium: Headings, Paragraphen, Code und LaTeX-Bloecke entstehen aus
+   dem neuen Block-Parser, waehrend alle Fixtures weiter gruen bleiben.
+
+4. Listen als echte Struktur modellieren.
+
+   Danach sollten Listen nicht mehr als flache `item`-/`enum`-Nodes mit Level
+   in den Writer wandern. Stattdessen sollte der Parser echte `list`- und
+   `list_item`-Nodes bauen, inklusive verschachtelter Listen.
+
+   Erfolgskriterium: Der Writer muss Listen nicht mehr aus Level-Werten
+   rekonstruieren, sondern kann direkt die AST-Struktur ausgeben.
+
+5. Inline-Parser separat stabilisieren.
+
+   Wenn die Blockstruktur klar ist, sollte Inline-Markdown in einer separaten
+   Phase verarbeitet werden. Dabei bleiben LaTeX-Kommandos und Math bewusst
+   erstklassige Elemente, weil marktex LaTeX-nah bleiben soll.
+
+   Erfolgskriterium: Inline-Parsing ist unabhaengig von der Blockerkennung
+   testbar, und unklare Inline-Syntax kann kontrolliert als Text erhalten oder
+   als Warning gemeldet werden.
+
+6. Source-Positionen und Warnings einfuehren.
+
+   Sobald Blocks und Inlines getrennt sind, sollten Nodes Positionen bekommen:
+   mindestens Zeile, spaeter optional Spalte. Darauf kann ein Warning-System
+   aufbauen, das Probleme in `marktex.log` schreibt und ueber `marktex.sty` als
+   LaTeX-Warnings durchreicht.
+
+   Erfolgskriterium: Ein bewusst kaputter Markdown-Fall erzeugt eine hilfreiche
+   Warning mit Position, laeuft aber nach definierter Regel weiter.
+
+7. Alten Parserpfad entfernen.
+
+   Erst wenn Blockstruktur, Listen, Inlines und Warnings stabil sind, sollte die
+   alte kombinierte LPeg-Grammatik entfernt werden. Bis dahin kann sie als
+   Sicherheitsnetz fuer noch nicht migrierte Sonderfaelle dienen.
+
+   Erfolgskriterium: Der neue Parser deckt die Fixtures ab, der alte Pfad wird
+   nicht mehr benoetigt, und die Parser-Datei ist konzeptionell deutlich
+   einfacher zu lesen.
+
+### 3. Supported Markdown dokumentieren
 
 Vor einer groesseren Parser-Ueberarbeitung sollte klar werden, was marktex
 absichtlich unterstuetzt und was nicht. Das schuetzt vor versehentlicher
@@ -168,7 +269,7 @@ Moegliche Umsetzung:
 - Beispiele fuer LaTeX-nahe Nutzung aufnehmen.
 - Nicht-Ziele explizit nennen, zum Beispiel vollstaendige CommonMark-Kompatibilitaet.
 
-### 3. Parser-Fehler und Edge-Cases haerten
+### 4. Parser-Fehler und Edge-Cases haerten
 
 Danach lohnt sich eine Runde Parser-Robustheit:
 
@@ -176,7 +277,7 @@ Danach lohnt sich eine Runde Parser-Robustheit:
 - Definieren, ob solche Eingaben als Text erhalten bleiben oder Fehler werfen.
 - Optional bessere Fehlerobjekte mit Position und Kontext.
 
-### 4. Packaging entscheiden
+### 5. Packaging entscheiden
 
 Die rockspec-Frage sollte wiederkommen, sobald klar ist, welche Distribution
 realistisch ist. Fuer Entwicklung waere eine rockspec nuetzlich; fuer LaTeX-Nutzer
@@ -188,27 +289,47 @@ Moegliche Umsetzung:
 - Installationsanleitung fuer lokale Entwicklung schreiben.
 - Separate Installationsanleitung fuer LaTeX-Projekte schreiben.
 
-### 5. CI einfuehren
+### 6. CI einfuehren
 
 Eine einfache CI mit `make test` waere risikoarm und schnell wertvoll. Der
 LaTeX-Smoke-Test kann optional oder in einem separaten Job laufen, weil
 TeX-Dependencies groesser sind.
 
-### 6. Writer sauberer machen
+### 7. Writer sauberer machen
 
 Der Writer sollte langfristig keine Eingabe-ASTs mutieren und klarer zwischen
 "Markdown-Text" und "rohem LaTeX" unterscheiden. Dazu gehoeren Tests fuer
 LaTeX-Sonderzeichen und eine bewusste Entscheidung, ob Escaping Standard,
 Option oder Nicht-Ziel ist.
 
-## Offene Designfragen
+## Designentscheidungen
 
-- Soll marktex LaTeX-nahes Markdown bleiben oder naeher an CommonMark ruecken?
-- Soll normaler Text automatisch LaTeX-escaped werden?
-- Sind Parse-Fehler besser als harte Fehler oder als "Text bleibt Text"?
-- Soll Caching standardmaessig aggressiv sein oder lieber konservativ?
-- Welcher Installationsweg ist langfristig der wichtigste: Dissertation-style
-  lokal im Projekt, LuaRocks, CTAN oder eine Mischform?
+Die aktuelle Richtung ist klar:
+
+- marktex bleibt bewusst LaTeX-nahes Markdown.
+- Obsidian-Syntax ist die naheliegende Referenz fuer den Markdown-Teil.
+- LaTeX-Funktionalitaet hat im Zweifel Vorrang vor strikter Markdown-Konformitaet.
+- Wo es sinnvoll ist, kann marktex mehr von CommonMark uebernehmen, aber nicht
+  auf Kosten der LaTeX-Freiheit.
+- LaTeX-Sonderzeichen bewusst nicht automatisch zu escapen ist Teil des
+  gewollten Workflows.
+- Ein Escape-Modus oder eine Option dafuer kann spaeter ergaenzt werden.
+- Der Parser soll Warnungen liefern, auch wenn Inhalte am Ende dennoch nach
+  LaTeX weiterlaufen.
+- Parser-Probleme sollen in der LaTeX-Kompilierung sichtbar werden, idealerweise
+  als Warnings und zusaetzlich in einem eigenen `marktex.log`.
+- Das Caching darf eher konservativ als aggressiv sein.
+- Die Zielverteilung ist CTAN beziehungsweise ein normales installierbares
+  LaTeX-Paket.
+- LuaRocks kann auf dem Weg helfen, ist aber kein zentrales Ziel.
+- Eine lokale Installation fuer die Entwicklung ist voellig in Ordnung.
+
+Praktisch heisst das fuer den Parser:
+
+- lieber robuste LaTeX-Durchreichung als harte Ablehnung jeder unklaren Eingabe
+- klare Warnungen fuer Sonderfaelle und verlorene Struktur
+- bekannte Markdown-Faelle sauber abdecken, ohne die LaTeX-Nutzbarkeit zu
+  beschneiden
 
 ## Kurzfazit
 
