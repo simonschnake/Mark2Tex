@@ -1,304 +1,35 @@
-local lpeg = require("lpeg")
-local nodes = require("marktex.nodes")
+local parse_blocks = require("marktex.parse_blocks")
+local parse_inlines = require("marktex.parse_inlines")
 
-local P, S, R, C, Cs, Ct, V = lpeg.P, lpeg.S, lpeg.R, lpeg.C, lpeg.Cs, lpeg.Ct, lpeg.V
+local INLINE_BLOCK_TYPES = {
+	header = true,
+	item = true,
+	enum = true,
+	other = true,
+}
 
-local space = P(" ") ^ 1
-local hash = P("#")
-local double_dollar = P("$$")
-local newline = P("\n")
-local rest_of_line = (P(1) - newline) ^ 1
-local escape = S("@$`*\\") + P("[@") + P("_") + P("~~")
-
-local outer_grammar = {}
-
---------------------
--- Header
---------------------
-
-local header = V("header")
-
-outer_grammar.header = newline
-	* space ^ 0
-	* Ct(C(hash ^ 1) * space * C((P(1) - newline) ^ 1))
-	/ function(t)
-		return nodes.header(#t[1], t[2])
-	end
-
---------------------
--- Latex Environment
---------------------
-
-local latex_env = V("latex_env")
-local latex_env_in_double_dollar = V("latex_env_in_double_dollar")
-local double_dollar_env = V("double_dollar_env")
-
-local begin_env = P("\\begin{")
-	* (P(1) - P("}")) ^ 1
-	* P("}")
-
-local end_env = P("\\end{")
-	* (P(1) - P("}")) ^ 1
-	* P("}")
-
-outer_grammar.begin_end = begin_env * (V"begin_end_inner" + (1 - begin_env - end_env))^0 * end_env
-outer_grammar.begin_end_inner =  V"begin_end" + (1 - (begin_env + end_env))^1
-
-outer_grammar.latex_env_in_double_dollar = double_dollar * S(" \n") ^ 0 * C(V"begin_end") * S(" \n") ^ 0 * double_dollar
-outer_grammar.double_dollar_env = C(double_dollar * (P(1) - double_dollar) ^ 1 * double_dollar)
-
-outer_grammar.latex_env = newline
-	* space ^ 0
-	* (latex_env_in_double_dollar + double_dollar_env + V"begin_end")
-	/ function(t)
-		return nodes.latex(t)
-	end
-
---------------------
--- Item
---------------------
-
-local item = V("item")
-
-local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
-local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line
-
-outer_grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
-	/ function(t)
-		return nodes.item(#t[1], t[2])
-	end
-
---------------------
--- Enum
---------------------
-local enum = V("enum")
-
-local start_of_enum = newline * C(S(" \t") ^ 0) * R("09") ^ 1 * S(".)")
-local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line
-
-outer_grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
-	/ function(t)
-		return nodes.enum(#t[1], t[2])
-	end
-
---------------------
--- Code
---------------------
-
-local code = V("code")
-
-outer_grammar.code = newline
-	* P("`") ^ 3
-	* C(rest_of_line ^ -1)
-	* newline
-	* C((P(1) - P("`") ^ 3) ^ 1)
-	* P("`") ^ 3
-	/ function(type, content)
-		if type == "tex" then
-			return nodes.latex(content)
-		else
-			return nodes.code(type, content)
-		end
-	end
-
---------------------
--- Other
---------------------
-
-local other = V("other")
-local outer_elements = V("outer_elements")
-outer_grammar.outer_elements = header + code + latex_env + item + enum
-
-outer_grammar.other = C((P(1) - outer_elements) ^ 1) / function(t)
-	return nodes.other(t)
+local function normalize_input(str)
+	return "\n" .. str
 end
 
---------------------
--- Outer
---------------------
-
-local outer = V("outer")
-outer_grammar.outer = Ct((outer_elements + other) ^ 0)
-
-outer_grammar[1] = outer
-outer_grammar = P(outer_grammar) * -1
-
---------------------
-
---- Inner Grammar
-
-local inner_grammar = {}
-
--- Variables
-
-local paren_citation = V("paren_citation")
-local citation = V("citation")
-local cite = V("cite")
-local cite2 = V("cite2")
-local citation_start = V("citation_start")
-local citation_break = V("citation_break")
-local verbatim = V("verbatim")
-local math = V("math")
-local latex_cmd = V("latex_cmd")
-local latex_cmd_in_verbatim = V("latex_cmd_in_verbatim")
-local italic = V("italic")
-local bold = V("bold")
-local strikethrough = V("strikethrough")
-local text = V("text")
-local final_elements = V("final_elements")
-local elements = V("elements")
-
---------------------
--- Citation
---------------------
-
-inner_grammar.cite = C(P(P(1) - S("\n;,] ")) ^ 1)
-inner_grammar.cite2 = C(P(P(1) - S("\n;, .] ")) ^ 1)
-inner_grammar.citation_start = P("[@") + P("[\n@")
-inner_grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * "@"
-
-inner_grammar.paren_citation = citation_start
-	* Ct(cite * (citation_break * cite) ^ 0)
-	* S(";, ") ^ 0
-	* newline ^ 0
-	* P("]")
-	/ function(t)
-		return nodes.paren_citation(t)
-	end
-
-inner_grammar.citation = P("@") * cite2 / function(t)
-	return nodes.citation(t)
-end
-
---------------------
--- Verbatim
---------------------
-
-inner_grammar.verbatim = P("`")
-	* C((P(1) - P("`")) ^ 1)
-	* P("`")
-	/ function(t)
-		return nodes.verbatim(t)
-	end
-
---------------------
--- Math
---------------------
-
-inner_grammar.math = C(P("$") * (1 - P("$")) ^ 1 * P("$")) / nodes.math
-
---------------------
---- Latex Command
---------------------
-
-inner_grammar.latex_cmd = C(P("\\") * (1 - S("{[ ")) ^ 1 * (S("[{]") * (1 - S("}]")) ^ 1 * S("]}")) ^ 0)
-	/ function(t)
-		return nodes.latex_cmd(t)
-	end
-
-inner_grammar.latex_cmd_in_verbatim = P("`")
-	* C(P("\\") * (1 - S("{[ `")) ^ 1 * (S("[{]") * (1 - S("}]")) ^ 1 * S("]}")) ^ 0)
-	* P("`")
-	/ function(t)
-		return nodes.latex_cmd(t)
-	end
-
---------------------
--- Italic
---------------------
-
-inner_grammar.italic_star = P("*")
-	* Ct((final_elements + bold + text) ^ 1)
-	* P("*")
-	/ function(t)
-		return nodes.italic(t)
-	end
-
-inner_grammar.italic_underline = P("_")
-	* Ct((final_elements + bold + strikethrough + text) ^ 1)
-	* P("_")
-	/ function(t)
-		return nodes.italic(t)
-	end
-
-inner_grammar.italic = inner_grammar.italic_star + inner_grammar.italic_underline
-
---------------------
--- Bold
---------------------
-
-inner_grammar.bold_star = P("**")
-	* Ct((final_elements + italic + strikethrough + text) ^ 1)
-	* P("**")
-	/ function(t)
-		return nodes.bold(t)
-	end
-
-inner_grammar.bold_underline = P("__")
-	* Ct((final_elements + italic + text) ^ 1)
-	* P("__")
-	/ function(t)
-		return nodes.bold(t)
-	end
-
-inner_grammar.bold = inner_grammar.bold_star + inner_grammar.bold_underline
-
---------------------
--- Striketrough
--- ---------------
-
-inner_grammar.strikethrough = P("~~")
-	* Ct((final_elements + italic + bold + text) ^ 1)
-	* P("~~")
-	/ function(t)
-		return nodes.strikethrough(t)
-	end
-
---------------------
--- Text
---------------------
-
---inner_grammar.text = C((1 - elements)^1) / function(t) return {type = "text", content = t} end
-inner_grammar.text = C((P(1) - escape) ^ 1) / function(t)
-	return nodes.text(t)
-end
-
---------------------
--- Inner
---------------------
-
-inner_grammar.final_elements = paren_citation + citation + latex_cmd_in_verbatim + verbatim + math + latex_cmd
-inner_grammar.elements = final_elements + italic + bold + strikethrough
-
-inner_grammar[1] = Ct((elements + text) ^ 0)
-
-inner_grammar = P(inner_grammar) * -1
-
---------------------
-
-local function parse_outer_ast(str)
-	return outer_grammar:match(str)
-end
-
-local function parse_inner_ast(ast)
+local function add_inline_nodes(ast)
 	for _, element in ipairs(ast) do
-		if element.type == "header" or element.type == "item" or element.type == "enum" or element.type == "other" then
-			local parsed_content = inner_grammar:match(element.content)
-			if parsed_content == nil then
-				parsed_content = { nodes.text(element.content) }
-			end
-			element.content = parsed_content
+		if INLINE_BLOCK_TYPES[element.type] then
+			element.content = parse_inlines(element.content)
 		end
-		---table.insert(final_ast, element)
 	end
 	return ast
 end
 
+local function normalize_ast(ast)
+	return ast
+end
+
 local function parse(str, config)
-	str = "\n" .. str -- add newline to beginning of string to make parsing easier
-	local outer_ast = parse_outer_ast(str)
-	local inner_ast = parse_inner_ast(outer_ast)
-	return inner_ast
+	local input = normalize_input(str)
+	local block_ast = parse_blocks(input)
+	local inline_ast = add_inline_nodes(block_ast)
+	return normalize_ast(inline_ast)
 end
 
 return parse

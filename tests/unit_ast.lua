@@ -1,8 +1,53 @@
 local parse = require("marktex.parse")
+local parse_blocks = require("marktex.parse_blocks")
+local parse_inlines = require("marktex.parse_inlines")
 local default_config = require("marktex.default_config")
 local helpers = require("tests.helpers")
 
 return function(luaunit)
+	function test_block_parser_leaves_inline_content_unparsed()
+		local ast = parse_blocks("\n# Heading with **bold** and @cite\n")
+		local header = ast[1]
+
+		helpers.assert_node(luaunit, header, "header")
+		luaunit.assertEquals(header.content, "Heading with **bold** and @cite")
+	end
+
+	function test_inline_parser_parses_inline_nodes()
+		local ast = parse_inlines("Heading with **bold** and @cite")
+
+		helpers.assert_node(luaunit, ast[1], "text")
+		helpers.assert_node(luaunit, ast[2], "bold")
+		helpers.assert_node(luaunit, ast[3], "text")
+		helpers.assert_node(luaunit, ast[4], "citation")
+		luaunit.assertEquals(ast[4].content, "cite")
+	end
+
+	function test_inline_parser_keeps_broken_inline_cases_as_text()
+		local cases = {
+			"Text with @ only",
+			"Text with $5 and no math",
+			"Text with `open code",
+			"Text with **open bold",
+			"Text with [@broken citation",
+		}
+
+		for _, input in ipairs(cases) do
+			local ast = parse_inlines(input)
+			helpers.assert_node(luaunit, ast[1], "text")
+			luaunit.assertEquals(#ast, 1)
+			luaunit.assertEquals(ast[1].content, input)
+		end
+	end
+
+	function test_inline_parser_supports_nested_latex_command_args()
+		local ast = parse_inlines("Text with \\cmd{a{b}c}")
+
+		helpers.assert_node(luaunit, ast[1], "text")
+		helpers.assert_node(luaunit, ast[2], "latex_cmd")
+		luaunit.assertEquals(ast[2].content, "\\cmd{a{b}c}")
+	end
+
 	function test_ast_header_and_inline_nodes()
 		local ast = parse("# Heading with **bold** and @cite\n", default_config)
 		local header = ast[1]

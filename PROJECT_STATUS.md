@@ -29,6 +29,8 @@ Die wichtigsten Verbesserungen der letzten Runde:
 - Dateisystemzugriffe geben Fehler zurueck, statt stillschweigend zu scheitern.
 - `marktex.sty` hat einen LuaLaTeX-Smoke-Test und meldet Konvertierungsfehler
   per `tex.error`.
+- Der Parser ist intern in Block-Parsing, Inline-Parsing und eine kleine
+  Orchestrierung in `parse.lua` getrennt.
 
 ## Verifikation
 
@@ -189,15 +191,15 @@ Konkreter Umbaupfad:
    Erfolgskriterium: Die vorhandenen Tests laufen unveraendert, und die
    wichtigsten Blocktypen haben explizite AST-Tests.
 
-2. Parser-Schnitt intern vorbereiten.
+2. Parser-Schnitt intern vorbereiten. Erledigt als erster Umbau-Schritt.
 
    Der heutige Parser kann nach aussen weiterhin `parse(markdown, config)`
    anbieten, intern aber in klarere Phasen aufgeteilt werden:
    `normalize_input`, `parse_blocks`, `parse_inlines`, `normalize_ast`.
-   Anfangs duerfen diese Phasen noch das alte Verhalten nachbilden.
+   Diese Phasen bilden aktuell noch bewusst das alte Verhalten nach.
 
    Erfolgskriterium: Der oeffentliche Einstiegspunkt bleibt stabil, aber die
-   Datei ist in klar benannte Schritte zerlegt.
+   Datei ist in klar benannte Schritte zerlegt. Dieses Kriterium ist erfuellt.
 
 3. Einen zeilenorientierten Block-Parser einfuehren.
 

@@ -31,6 +31,12 @@
     package.preload["marktex.fileutils"] = function()
       return dofile(marktex_dir .. "/src/marktex/fileutils.lua")
     end
+    package.preload["marktex.parse_blocks"] = function()
+      return dofile(marktex_dir .. "/src/marktex/parse_blocks.lua")
+    end
+    package.preload["marktex.parse_inlines"] = function()
+      return dofile(marktex_dir .. "/src/marktex/parse_inlines.lua")
+    end
     package.preload["marktex.parse"] = function()
       return dofile(marktex_dir .. "/src/marktex/parse.lua")
     end
