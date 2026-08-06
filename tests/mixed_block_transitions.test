@@ -1,0 +1,26 @@
+Before.
+
+$$
+\begin{align*}
+a + b = c
+\end{align*}
+$$
+
+\begin{quote}
+Raw *LaTeX* content.
+\end{quote}
+
+After.
+..................................................
+Before.
+
+\begin{align*}
+a + b = c
+\end{align*}
+
+
+\begin{quote}
+Raw *LaTeX* content.
+\end{quote}
+
+After.

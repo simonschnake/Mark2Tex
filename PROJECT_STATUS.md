@@ -1,4 +1,4 @@
-# marktex Projektstatus
+# Mark2TeX Projektstatus
 
 Dieses Dokument beschreibt den aktuellen Stand des Projekts, bekannte
 Schwachstellen im Code und sinnvolle naechste Schritte. Es ist als
@@ -7,13 +7,13 @@ genug, um daraus Issues oder eine Roadmap abzuleiten.
 
 ## Aktueller Stand
 
-marktex ist ein LuaLaTeX-Paket, das einen bewusst kleinen Markdown-Dialekt in
+Mark2TeX ist ein LuaLaTeX-Paket, das einen bewusst kleinen Markdown-Dialekt in
 LaTeX uebersetzt. Der aktuelle Code ist deutlich modularer als der
 urspruengliche Stand:
 
-- `src/marktex/` enthaelt die Lua-Implementierung.
-- `marktex.lua` ist der Kompatibilitaets-Einstiegspunkt.
-- `marktex.sty` bindet marktex in LuaLaTeX ein.
+- `src/mark2tex/` enthaelt die Lua-Implementierung.
+- `mark2tex.lua` ist der Kompatibilitaets-Einstiegspunkt.
+- `mark2tex.sty` bindet Mark2TeX in LuaLaTeX ein.
 - `tests/` enthaelt Fixture-Tests, Unit-Tests und einen LaTeX-Smoke-Test.
 - `scripts/` enthaelt Entwicklungshelfer.
 
@@ -27,7 +27,7 @@ Die wichtigsten Verbesserungen der letzten Runde:
   abgesichert.
 - Konfiguration wird nicht mehr durch einzelne Konvertierungen mutiert.
 - Dateisystemzugriffe geben Fehler zurueck, statt stillschweigend zu scheitern.
-- `marktex.sty` hat einen LuaLaTeX-Smoke-Test und meldet Konvertierungsfehler
+- `mark2tex.sty` hat einen LuaLaTeX-Smoke-Test und meldet Konvertierungsfehler
   per `tex.error`.
 - Der Parser ist intern in Block-Parsing, Inline-Parsing und eine kleine
   Orchestrierung in `parse.lua` getrennt.
@@ -42,7 +42,7 @@ make latex-smoke
 ```
 
 `make test` prueft die Lua-Unit-Tests und Markdown-Fixtures. `make
-latex-smoke` kompiliert ein kleines LuaLaTeX-Dokument mit `marktex.sty` und
+latex-smoke` kompiliert ein kleines LuaLaTeX-Dokument mit `mark2tex.sty` und
 stellt sicher, dass die Paket-Integration grundsaetzlich funktioniert.
 
 ## Unterstuetztes Verhalten
@@ -55,6 +55,7 @@ abgedeckt sind vor allem:
 - kursiv, fett und durchgestrichen
 - Inline-Code und fenced code blocks
 - Inline-Math und LaTeX-Kommandos
+- Pipe-Tabellen mit Inline-Markup und Spaltenausrichtung
 - ungeordnete und geordnete Listen, inklusive einiger nested-list Faelle
 - Pandoc-artige Zitationen
 - rohe LaTeX-Umgebungen
@@ -87,7 +88,7 @@ Der Writer gibt LaTeX direkt aus und ist dadurch nah am Zielsystem, aber einige
 Entscheidungen sind noch implizit:
 
 - Normaler Text wird nicht fuer LaTeX-Sonderzeichen escaped. Das kann gewollt
-  sein, weil marktex LaTeX-nahe Markdown-Dateien erwartet, sollte aber klar
+  sein, weil Mark2TeX LaTeX-nahe Markdown-Dateien erwartet, sollte aber klar
   dokumentiert oder konfigurierbar werden.
 - Header-Level werden beim Schreiben begrenzt, dabei wird aktuell der AST-Knoten
   veraendert. Das ist klein, aber unschoen, weil der Writer Seiteneffekte auf
@@ -110,7 +111,7 @@ Die Konvertierung vermeidet Arbeit ueber einen Cache im generierten
 
 ### LaTeX-Paketintegration
 
-`marktex.sty` funktioniert wieder mit der neuen Modulstruktur, aber der Ansatz
+`mark2tex.sty` funktioniert wieder mit der neuen Modulstruktur, aber der Ansatz
 ist noch etwas spröde:
 
 - Die lokalen Module werden explizit in `package.preload` registriert. Wenn neue
@@ -118,7 +119,7 @@ ist noch etwas spröde:
 - Pfade werden nur minimal fuer TeX normalisiert.
 - `\mdinclude` entfernt `.tex` am generierten Zielpfad, aber komplexere
   Include-Pfade und Sonderzeichen sind noch nicht systematisch getestet.
-- Das Laden von `marktex_config.lua` ist einfach gehalten und nicht weiter
+- Das Laden von `mark2tex_config.lua` ist einfach gehalten und nicht weiter
   isoliert.
 
 ### Dependencies und Packaging
@@ -233,7 +234,7 @@ Konkreter Umbaupfad:
 
    Wenn die Blockstruktur klar ist, sollte Inline-Markdown in einer separaten
    Phase verarbeitet werden. Dabei bleiben LaTeX-Kommandos und Math bewusst
-   erstklassige Elemente, weil marktex LaTeX-nah bleiben soll.
+   erstklassige Elemente, weil Mark2TeX LaTeX-nah bleiben soll.
 
    Erfolgskriterium: Inline-Parsing ist unabhaengig von der Blockerkennung
    testbar, und unklare Inline-Syntax kann kontrolliert als Text erhalten oder
@@ -243,7 +244,7 @@ Konkreter Umbaupfad:
 
    Sobald Blocks und Inlines getrennt sind, sollten Nodes Positionen bekommen:
    mindestens Zeile, spaeter optional Spalte. Darauf kann ein Warning-System
-   aufbauen, das Probleme in `marktex.log` schreibt und ueber `marktex.sty` als
+   aufbauen, das Probleme in `mark2tex.log` schreibt und ueber `mark2tex.sty` als
    LaTeX-Warnings durchreicht.
 
    Erfolgskriterium: Ein bewusst kaputter Markdown-Fall erzeugt eine hilfreiche
@@ -261,7 +262,7 @@ Konkreter Umbaupfad:
 
 ### 3. Supported Markdown dokumentieren
 
-Vor einer groesseren Parser-Ueberarbeitung sollte klar werden, was marktex
+Vor einer groesseren Parser-Ueberarbeitung sollte klar werden, was Mark2TeX
 absichtlich unterstuetzt und was nicht. Das schuetzt vor versehentlicher
 CommonMark-Erwartung und macht Tests zielgerichteter.
 
@@ -287,7 +288,7 @@ ist aber wahrscheinlich auch ein TDS-/CTAN-artiges Layout relevant.
 
 Moegliche Umsetzung:
 
-- `marktex-dev-1.rockspec` oder stabile rockspec neu bewerten.
+- `mark2tex-dev-1.rockspec` oder stabile rockspec neu bewerten.
 - Installationsanleitung fuer lokale Entwicklung schreiben.
 - Separate Installationsanleitung fuer LaTeX-Projekte schreiben.
 
@@ -308,10 +309,10 @@ Option oder Nicht-Ziel ist.
 
 Die aktuelle Richtung ist klar:
 
-- marktex bleibt bewusst LaTeX-nahes Markdown.
+- Mark2TeX bleibt bewusst LaTeX-nahes Markdown.
 - Obsidian-Syntax ist die naheliegende Referenz fuer den Markdown-Teil.
 - LaTeX-Funktionalitaet hat im Zweifel Vorrang vor strikter Markdown-Konformitaet.
-- Wo es sinnvoll ist, kann marktex mehr von CommonMark uebernehmen, aber nicht
+- Wo es sinnvoll ist, kann Mark2TeX mehr von CommonMark uebernehmen, aber nicht
   auf Kosten der LaTeX-Freiheit.
 - LaTeX-Sonderzeichen bewusst nicht automatisch zu escapen ist Teil des
   gewollten Workflows.
@@ -319,7 +320,7 @@ Die aktuelle Richtung ist klar:
 - Der Parser soll Warnungen liefern, auch wenn Inhalte am Ende dennoch nach
   LaTeX weiterlaufen.
 - Parser-Probleme sollen in der LaTeX-Kompilierung sichtbar werden, idealerweise
-  als Warnings und zusaetzlich in einem eigenen `marktex.log`.
+  als Warnings und zusaetzlich in einem eigenen `mark2tex.log`.
 - Das Caching darf eher konservativ als aggressiv sein.
 - Die Zielverteilung ist CTAN beziehungsweise ein normales installierbares
   LaTeX-Paket.

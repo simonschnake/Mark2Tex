@@ -242,10 +242,10 @@ pythontex-files-*/
 # xcolor
 *.xcp
 
-## marktex generated files
-/marktex/
+## Mark2TeX generated files
+/mark2tex/
 /tests/tmp/
-/tests/latex-smoke/marktex-output/
+/tests/latex-smoke/mark2tex-output/
 /tests/latex-smoke/*.aux
 /tests/latex-smoke/*.log
 /tests/latex-smoke/*.pdf

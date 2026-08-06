@@ -1,0 +1,89 @@
+
+\RequirePackage{ifluatex}
+\ifluatex
+\else
+  \PackageError{mark2tex}{LuaTeX is required for this package!}{}
+\fi
+\ProvidesPackage{mark2tex}[2026/08/06 v0.2.0 Markdown-like fragments for LuaLaTeX]
+
+\RequirePackage[normalem]{ulem}
+\RequirePackage{luacode}
+
+
+\begin{luacode*}
+  local mark2tex_path = kpse.find_file("mark2tex.lua", "lua") or kpse.find_file("mark2tex.lua")
+  if not mark2tex_path then
+    tex.error("mark2tex.lua not found", { "Install the Mark2TeX Lua files where Kpathsea can find them." })
+    return
+  end
+
+  local mark2tex_dir = mark2tex_path:match("^(.*)[/\\][^/\\]-$")
+  if mark2tex_dir then
+    package.path = mark2tex_dir .. "/?.lua;" .. mark2tex_dir .. "/?/init.lua;"
+      .. mark2tex_dir .. "/src/?.lua;" .. mark2tex_dir .. "/src/?/init.lua;"
+      .. package.path
+    package.preload["mark2tex.nodes"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/nodes.lua")
+    end
+    package.preload["mark2tex.default_config"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/default_config.lua")
+    end
+    package.preload["mark2tex.fileutils"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/fileutils.lua")
+    end
+    package.preload["mark2tex.parse_blocks"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/parse_blocks.lua")
+    end
+    package.preload["mark2tex.parse_inlines"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/parse_inlines.lua")
+    end
+    package.preload["mark2tex.parse"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/parse.lua")
+    end
+    package.preload["mark2tex.write"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/write.lua")
+    end
+    package.preload["mark2tex.core"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/core.lua")
+    end
+  end
+
+  local mark2tex = dofile(mark2tex_path)
+  local cfg = {}
+
+  local config_file = io.open("mark2tex_config.lua", "r")
+  if config_file then
+    config_file:close()
+    cfg = require("mark2tex_config")
+  end
+
+  local function strip_tex_extension(path)
+    return path:gsub("%.tex$", "")
+  end
+
+  local function tex_escape_path(path)
+    return path:gsub("\\", "/")
+  end
+
+  function mark2tex_input(path, include_mode)
+    local output_path, err = mark2tex.convert(path, cfg)
+    if not output_path then
+      tex.error("Mark2TeX failed to convert " .. path, { err or "unknown error" })
+      return
+    end
+
+    output_path = tex_escape_path(output_path)
+    if include_mode then
+      tex.sprint("\\include{" .. strip_tex_extension(output_path) .. "}")
+    else
+      tex.sprint("\\input{" .. output_path .. "}")
+    end
+  end
+\end{luacode*}
+
+\newcommand{\mdinput}[1]{
+  \luaexec{mark2tex_input("#1", false)}
+}
+\newcommand{\mdinclude}[1]{
+  \luaexec{mark2tex_input("#1", true)}
+}

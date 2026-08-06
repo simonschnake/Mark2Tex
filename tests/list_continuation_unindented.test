@@ -1,0 +1,11 @@
+- Item 1
+Continuation without indent
+- Item 2
+..................................................
+\begin{itemize}
+\item Item 1
+\end{itemize}
+Continuation without indent
+\begin{itemize}
+\item Item 2
+\end{itemize}

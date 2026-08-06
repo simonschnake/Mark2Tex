@@ -1,0 +1,13 @@
+| Left | Center | Right |
+| :--- | :----: | ----: |
+| **a** | `b` | $c$ |
+..................................................
+\begin{center}
+\begin{tabular}{lcr}
+\hline
+Left & Center & Right \\
+\hline
+\textbf{a} & \texttt{b} & $c$ \\
+\hline
+\end{tabular}
+\end{center}

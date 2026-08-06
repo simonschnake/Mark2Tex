@@ -1,5 +1,5 @@
 local lpeg = require("lpeg")
-local nodes = require("marktex.nodes")
+local nodes = require("mark2tex.nodes")
 
 local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
 
@@ -16,14 +16,16 @@ grammar.cite = C(P(P(1) - S("\n;,] ")) ^ 1)
 grammar.cite2 = C(P(P(1) - S("\n;, .] ")) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
+grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]")) ^ 1)
 
 grammar.paren_citation = V("citation_start")
 	* Ct(V("cite") * (V("citation_break") * V("cite")) ^ 0)
+	* V("citation_locator") ^ -1
 	* S(";, ") ^ 0
 	* newline ^ 0
 	* P("]")
-	/ function(t)
-		return nodes.paren_citation(t)
+	/ function(citations, locator)
+		return nodes.paren_citation(citations, locator)
 	end
 
 grammar.citation = P("@") * V("cite2") / function(t)

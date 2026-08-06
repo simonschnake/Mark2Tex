@@ -1,11 +1,13 @@
-local parse = require "marktex.parse"
-local write = require "marktex.write"
-local default_config = require "marktex.default_config"
-local fu = require "marktex.fileutils"
+local parse = require "mark2tex.parse"
+local write = require "mark2tex.write"
+local default_config = require "mark2tex.default_config"
+local fu = require "mark2tex.fileutils"
 local md5 = require("md5")
 
 local self = {}
-local CACHE_VERSION = "v1"
+-- Increase this whenever parser or writer behavior changes so existing output
+-- files are regenerated instead of serving stale LaTeX from the cache.
+local CACHE_VERSION = "v2"
 
 local function copy_table(value)
     if type(value) ~= "table" then

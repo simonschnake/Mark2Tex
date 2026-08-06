@@ -1,5 +1,5 @@
-local parse_blocks = require("marktex.parse_blocks")
-local parse_inlines = require("marktex.parse_inlines")
+local parse_blocks = require("mark2tex.parse_blocks")
+local parse_inlines = require("mark2tex.parse_inlines")
 
 local INLINE_BLOCK_TYPES = {
 	header = true,
@@ -14,7 +14,16 @@ end
 
 local function add_inline_nodes(ast)
 	for _, element in ipairs(ast) do
-		if INLINE_BLOCK_TYPES[element.type] then
+		if element.type == "table" then
+			for index, cell in ipairs(element.headers) do
+				element.headers[index] = parse_inlines(cell)
+			end
+			for _, row in ipairs(element.rows) do
+				for index, cell in ipairs(row) do
+					row[index] = parse_inlines(cell)
+				end
+			end
+		elseif INLINE_BLOCK_TYPES[element.type] then
 			element.content = parse_inlines(element.content)
 		end
 	end

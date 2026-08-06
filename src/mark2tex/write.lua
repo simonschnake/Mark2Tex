@@ -87,10 +87,40 @@ local function walk(ast, out, config)
 		elseif ast.type == "code" then
 			-- TODO: add code type
 			out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
+		elseif ast.type == "table" then
+			out[1] = out[1] .. "\n\\begin{center}\n\\begin{tabular}{" .. table.concat(ast.alignments) .. "}\n\\hline\n"
+			for index = 1, #ast.alignments do
+				if index > 1 then
+					out[1] = out[1] .. " & "
+				end
+				if ast.headers[index] then
+					walk(ast.headers[index], out, config)
+				end
+			end
+			out[1] = out[1] .. " \\\\\n\\hline"
+
+			for _, row in ipairs(ast.rows) do
+				out[1] = out[1] .. "\n"
+				for index = 1, #ast.alignments do
+					if index > 1 then
+						out[1] = out[1] .. " & "
+					end
+					if row[index] then
+						walk(row[index], out, config)
+					end
+				end
+				out[1] = out[1] .. " \\\\"
+			end
+
+			out[1] = out[1] .. "\n\\hline\n\\end{tabular}\n\\end{center}"
 		elseif ast.type == "other" then
 			walk(ast.content, out, config)
 		elseif ast.type == "paren_citation" then
-			out[1] = out[1] .. "\\" .. config.paren_citation .. "{" .. table.concat(ast.content, ", ") .. "}"
+			out[1] = out[1] .. "\\" .. config.paren_citation
+			if ast.locator then
+				out[1] = out[1] .. "[" .. ast.locator .. "]"
+			end
+			out[1] = out[1] .. "{" .. table.concat(ast.content, ", ") .. "}"
 		elseif ast.type == "citation" then
 			out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
 		elseif ast.type == "verbatim" then

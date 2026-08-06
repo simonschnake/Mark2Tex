@@ -1,6 +1,6 @@
-# marktex
+# Mark2TeX
 
-marktex is a LuaLaTeX package for Markdown-like text fragments inside
+Mark2TeX is a LuaLaTeX package for Markdown-like text fragments inside
 LaTeX documents. It reads `.md` files during LaTeX compilation, translates
 the currently supported dialect to LaTeX, and inputs the generated `.tex`
 file back into the document.
@@ -10,9 +10,9 @@ on full Markdown or CommonMark compatibility. If compatibility with common
 Markdown tools happens as a side effect, that is welcome, but it is not the
 primary project goal.
 
-## What marktex is for
+## What Mark2TeX is for
 
-marktex is useful when larger chunks of text are more convenient to write in a
+Mark2TeX is useful when larger chunks of text are more convenient to write in a
 Markdown-like syntax, while the target document should still remain a real
 LaTeX document. LaTeX commands, mathematical expressions, citations, and raw
 LaTeX environments are therefore intentionally allowed inside the Markdown.
@@ -72,12 +72,13 @@ The current parser intentionally supports only a small, tested subset:
 - fenced code blocks with three backticks
 - fenced `tex` blocks as raw LaTeX output
 - inline math with `$...$`
+- pipe tables, including inline formatting and math inside cells
 - LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
 - unordered lists with `-`, `*`, or `+`
 - ordered lists with `1.` or `1)`
 - some nested list forms
 - single citations such as `@key`
-- Pandoc-style citation groups such as `[@key1; @key2]`
+- Pandoc-style citation groups such as `[@key1; @key2]`, including locators such as `[@key, p. 433]`
 - raw LaTeX environments with `\begin{...}` and `\end{...}`
 - LaTeX environments inside `$$ ... $$`, with the dollar wrappers removed
 
@@ -87,17 +88,27 @@ The output is LaTeX-like:
   `\subsubsection`, `\paragraph`, and `\subparagraph`
 - `@key` becomes `\cite{key}` by default
 - `[@key1; @key2]` becomes `\parencite{key1, key2}` by default
+- `[@key, p. 433]` becomes `\parencite[p. 433]{key}` by default
 - lists become `itemize` or `enumerate`
+- pipe tables become centered LaTeX `tabular` environments; delimiter colons control `l`, `c`, and `r` alignment
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - normal text is not automatically escaped for LaTeX special characters
 
+## Robustness rules
+
+Mark2TeX only transforms complete, unambiguous Markdown constructs. An
+underscore in ordinary text (for example `snake_case`) is kept literally;
+italics require a matching closing underscore or asterisk. Likewise, an
+unclosed fenced code block or an unclosed `\begin{...}` environment is emitted
+as ordinary text instead of being partially converted. Paragraphs immediately
+before or after a list remain separate paragraphs.
+
 ## Deliberately unsupported
 
-marktex is not a full Markdown converter. In particular, do not expect the
+Mark2TeX is not a full Markdown converter. In particular, do not expect the
 following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
-- tables in Markdown syntax
 - links and images in Markdown syntax
 - blockquotes
 - HTML blocks
@@ -113,11 +124,11 @@ direct LaTeX, for example as a `tex` code block or a raw LaTeX environment.
 
 ## LaTeX usage
 
-In a LuaLaTeX document, marktex is loaded as a package:
+In a LuaLaTeX document, Mark2TeX is loaded as a package:
 
 ```tex
 \documentclass{article}
-\usepackage{marktex}
+\usepackage{mark2tex}
 
 \begin{document}
 
@@ -127,7 +138,7 @@ In a LuaLaTeX document, marktex is loaded as a package:
 ```
 
 `\mdinput{...}` converts the given Markdown file to LaTeX and inputs the
-generated file via `\input`. Generated files are placed in the `marktex/`
+generated file via `\input`. Generated files are placed in the `mark2tex/`
 directory by default.
 
 For chapter-like files there is also:
@@ -138,7 +149,7 @@ For chapter-like files there is also:
 
 This inputs the generated file via `\include`.
 
-Important: marktex requires LuaLaTeX. Other engines such as pdfLaTeX are not
+Important: Mark2TeX requires LuaLaTeX. Other engines such as pdfLaTeX are not
 supported.
 
 ## Installation
@@ -149,11 +160,11 @@ You can build a TeX Live package archive from this repository:
 make dist
 ```
 
-This produces `dist/marktex.tar.xz`. The archive contains a TDS structure and
+This produces `dist/mark2tex.tar.xz`. The archive contains a TDS structure and
 an embedded `tlpobj`, so it can be installed directly with `tlmgr`:
 
 ```sh
-tlmgr install --file dist/marktex.tar.xz
+tlmgr install --file dist/mark2tex.tar.xz
 ```
 
 To check the archive without installing it, use:
@@ -162,8 +173,8 @@ To check the archive without installing it, use:
 make tlmgr-install-dry-run
 ```
 
-The package installs `marktex.sty` under `tex/latex/marktex/` and the Lua
-implementation under `scripts/marktex/`.
+The package installs `mark2tex.sty` under `tex/latex/mark2tex/` and the Lua
+implementation under `scripts/mark2tex/`.
 
 ### Overleaf
 
@@ -174,25 +185,25 @@ For Overleaf there is therefore a separate bundle:
 make overleaf-zip
 ```
 
-This produces `dist/marktex-overleaf.zip`. That archive is not a TeX Live
+This produces `dist/mark2tex-overleaf.zip`. That archive is not a TeX Live
 installation; instead it contains the files in a form that can be uploaded
 directly into an Overleaf project:
 
 ```text
-marktex.sty
-marktex.lua
-src/marktex/*.lua
+mark2tex.sty
+mark2tex.lua
+src/mark2tex/*.lua
 README.md
 LICENSE
 ```
 
-In Overleaf, `marktex.sty` and `marktex.lua` must live at the top level of the
-project; the `src/marktex/` directory must remain relative to them. In the
+In Overleaf, `mark2tex.sty` and `mark2tex.lua` must live at the top level of the
+project; the `src/mark2tex/` directory must remain relative to them. In the
 Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
 can be used like it is locally:
 
 ```tex
-\usepackage{marktex}
+\usepackage{mark2tex}
 
 \begin{document}
 \mdinput{content.md}
@@ -201,7 +212,7 @@ can be used like it is locally:
 
 ## Configuration
 
-If a `marktex_config.lua` file exists in the working directory, it is used when
+If a `mark2tex_config.lua` file exists in the working directory, it is used when
 the package is loaded. This lets you adjust the main LaTeX mappings:
 
 ```lua
@@ -217,7 +228,7 @@ return {
   citation = "autocite",
   paren_citation = "parencite",
 
-  save_dir = "generated-marktex",
+  save_dir = "generated-mark2tex",
 }
 ```
 
@@ -236,7 +247,7 @@ return {
   paren_citation = "parencite",
   citation = "cite",
 
-  save_dir = "marktex",
+  save_dir = "mark2tex",
 }
 ```
 
@@ -255,6 +266,26 @@ Citations can be written concisely:
 The detector model follows @detector-note and the calibration strategy follows
 [@calibration-paper; @run2-performance].
 ```
+
+For a parenthetical citation with a page or section locator, place the locator
+after a comma. It is passed as the optional argument of `\parencite`:
+
+```md
+The original proposal is discussed in [@Turing1950, p. 433].
+```
+
+Pipe tables accept the usual alignment markers in their delimiter row and can
+contain the supported inline Markdown and LaTeX syntax:
+
+```md
+| Quantity | Value | Comment |
+| :------- | :---: | ------: |
+| Energy   | $E$   | **fit** |
+| Events   | 42    | @sample |
+```
+
+This produces a centered `tabular` with left-, center-, and right-aligned
+columns respectively.
 
 More complex LaTeX blocks can be written directly in Markdown:
 
@@ -287,9 +318,9 @@ Raw environments without a code fence are also recognized:
 
 Project layout:
 
-- `src/marktex/` contains the Lua implementation.
-- `marktex.lua` is the compatibility entry point.
-- `marktex.sty` integrates marktex into LuaLaTeX.
+- `src/mark2tex/` contains the Lua implementation.
+- `mark2tex.lua` is the compatibility entry point.
+- `mark2tex.sty` integrates Mark2TeX into LuaLaTeX.
 - `tests/` contains fixture tests, unit tests, and a LaTeX smoke test.
 - `scripts/` contains development helpers.
 

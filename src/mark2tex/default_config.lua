@@ -10,5 +10,5 @@ return {
 	paren_citation = "parencite",
 	citation = "cite",
 
-	save_dir = "marktex",
+	save_dir = "mark2tex",
 }

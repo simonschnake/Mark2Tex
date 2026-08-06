@@ -1,0 +1,13 @@
+Before list.
+- Item 1
+- Item 2
+
+After list.
+..................................................
+Before list.
+\begin{itemize}
+\item Item 1
+\item Item 2
+\end{itemize}
+
+After list.

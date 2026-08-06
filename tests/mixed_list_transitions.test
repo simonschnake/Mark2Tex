@@ -1,0 +1,17 @@
+- Top
+  - Nested
+    1. Deeper
+  - Back
+- Sibling
+..................................................
+\begin{itemize}
+\item Top
+\begin{itemize}
+\item Nested
+\begin{enumerate}
+\item Deeper
+\end{enumerate}
+\item Back
+\end{itemize}
+\item Sibling
+\end{itemize}

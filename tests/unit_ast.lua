@@ -1,7 +1,7 @@
-local parse = require("marktex.parse")
-local parse_blocks = require("marktex.parse_blocks")
-local parse_inlines = require("marktex.parse_inlines")
-local default_config = require("marktex.default_config")
+local parse = require("mark2tex.parse")
+local parse_blocks = require("mark2tex.parse_blocks")
+local parse_inlines = require("mark2tex.parse_inlines")
+local default_config = require("mark2tex.default_config")
 local helpers = require("tests.helpers")
 
 return function(luaunit)
@@ -48,6 +48,48 @@ return function(luaunit)
 		luaunit.assertEquals(ast[2].content, "\\cmd{a{b}c}")
 	end
 
+	function test_inline_parser_keeps_dangerous_underscore_text_intact()
+		local ast = parse_inlines("snake_case stays readable")
+
+		helpers.assert_node(luaunit, ast[1], "text")
+		luaunit.assertEquals(#ast, 1)
+		luaunit.assertEquals(ast[1].content, "snake_case stays readable")
+	end
+
+	function test_block_parser_keeps_unclosed_code_fence_as_text()
+		local ast = parse_blocks("\n```lua\nprint(1)\n")
+
+		helpers.assert_node(luaunit, ast[1], "other")
+		luaunit.assertEquals(#ast, 1)
+		luaunit.assertEquals(ast[1].content, "\n```lua\nprint(1)\n")
+	end
+
+	function test_block_parser_keeps_unclosed_latex_environment_as_text()
+		local ast = parse_blocks([[
+\begin{align}
+a = b
+]])
+
+		helpers.assert_node(luaunit, ast[1], "other")
+		luaunit.assertEquals(#ast, 1)
+		luaunit.assertEquals(ast[1].content, "\\begin{align}\na = b\n")
+	end
+
+	function test_block_parser_keeps_text_and_list_boundaries_separate()
+		local ast = parse_blocks([[
+Paragraph before
+- Item one
+Paragraph after
+]])
+
+		helpers.assert_node(luaunit, ast[1], "other")
+		helpers.assert_node(luaunit, ast[2], "item")
+		helpers.assert_node(luaunit, ast[3], "other")
+		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[1].content), "Paragraph before")
+		luaunit.assertEquals(ast[2].content, "Item one")
+		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[3].content), "Paragraph after")
+	end
+
 	function test_ast_header_and_inline_nodes()
 		local ast = parse("# Heading with **bold** and @cite\n", default_config)
 		local header = ast[1]
@@ -92,6 +134,15 @@ return function(luaunit)
 		helpers.assert_node(luaunit, citation, "paren_citation")
 		luaunit.assertEquals(citation.content[1], "alpha")
 		luaunit.assertEquals(citation.content[2], "beta")
+	end
+
+	function test_ast_parenthetical_citation_node_with_locator()
+		local ast = parse("[@Turing1950, p. 433]\n", default_config)
+		local citation = helpers.find_node(ast[1].content, "paren_citation")
+
+		helpers.assert_node(luaunit, citation, "paren_citation")
+		luaunit.assertEquals(citation.content[1], "Turing1950")
+		luaunit.assertEquals(citation.locator, "p. 433")
 	end
 
 	function test_ast_falls_back_to_text_for_unclosed_inline_markers()

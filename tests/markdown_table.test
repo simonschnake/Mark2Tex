@@ -1,0 +1,41 @@
+### Wiederkehrende Symbole
+
+| Symbol    | Typische Bedeutung                              |
+| --------- | ----------------------------------------------- |
+| $x$       | Eingabevektor                                   |
+| $X$       | Datenmatrix oder Folge mehrerer Eingabevektoren |
+| $w$       | Gewichtsvektor eines einzelnen Neurons          |
+| $W$       | Gewichtsmatrix einer Schicht                    |
+| $b$       | Bias oder Biasvektor                            |
+| $z$       | lineares Zwischenergebnis vor der Aktivierung   |
+| $h$       | Zwischenrepräsentation                          |
+| $f$       | Aktivierungsfunktion                            |
+| $y$       | beobachteter Zielwert                           |
+| $\hat{y}$ | Modellvorhersage                                |
+| $Q,K,V$   | Query-, Key- und Value-Matrizen der Attention   |
+
+Die genaue Bedeutung kann je nach Text variieren.
+..................................................
+\subsubsection{Wiederkehrende Symbole}
+
+\begin{center}
+\begin{tabular}{ll}
+\hline
+Symbol & Typische Bedeutung \\
+\hline
+$x$ & Eingabevektor \\
+$X$ & Datenmatrix oder Folge mehrerer Eingabevektoren \\
+$w$ & Gewichtsvektor eines einzelnen Neurons \\
+$W$ & Gewichtsmatrix einer Schicht \\
+$b$ & Bias oder Biasvektor \\
+$z$ & lineares Zwischenergebnis vor der Aktivierung \\
+$h$ & Zwischenrepräsentation \\
+$f$ & Aktivierungsfunktion \\
+$y$ & beobachteter Zielwert \\
+$\hat{y}$ & Modellvorhersage \\
+$Q,K,V$ & Query-, Key- und Value-Matrizen der Attention \\
+\hline
+\end{tabular}
+\end{center}
+
+Die genaue Bedeutung kann je nach Text variieren.

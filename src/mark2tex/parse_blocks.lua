@@ -1,5 +1,5 @@
 local lpeg = require("lpeg")
-local nodes = require("marktex.nodes")
+local nodes = require("mark2tex.nodes")
 
 local P, S, R, C, Ct, V = lpeg.P, lpeg.S, lpeg.R, lpeg.C, lpeg.Ct, lpeg.V
 
@@ -8,6 +8,7 @@ local hash = P("#")
 local double_dollar = P("$$")
 local newline = P("\n")
 local rest_of_line = (P(1) - newline) ^ 1
+local horizontal_space = S(" \t") ^ 0
 
 local grammar = {}
 
@@ -89,10 +90,80 @@ grammar.code = newline
 	end
 
 --------------------
+-- Table
+--------------------
+
+local function trim(value)
+	return value:match("^%s*(.-)%s*$")
+end
+
+local function split_table_row(line)
+	line = trim(line)
+	if line:sub(1, 1) == "|" then
+		line = line:sub(2)
+	end
+	if line:sub(-1) == "|" then
+		line = line:sub(1, -2)
+	end
+
+	local cells = {}
+	local cell_start = 1
+	local in_math = false
+	local in_code = false
+
+	for index = 1, #line do
+		local character = line:sub(index, index)
+		local previous = index > 1 and line:sub(index - 1, index - 1) or ""
+
+		if character == "`" and previous ~= "\\" and not in_math then
+			in_code = not in_code
+		elseif character == "$" and previous ~= "\\" and not in_code then
+			in_math = not in_math
+		elseif character == "|" and previous ~= "\\" and not in_math and not in_code then
+			table.insert(cells, trim(line:sub(cell_start, index - 1)))
+			cell_start = index + 1
+		end
+	end
+
+	table.insert(cells, trim(line:sub(cell_start)))
+	return cells
+end
+
+local function table_alignment(separator)
+	if separator:match("^:.*:$") then
+		return "c"
+	elseif separator:match(":$") then
+		return "r"
+	end
+	return "l"
+end
+
+local table_line = C(#((P(1) - newline - P("|")) ^ 0 * P("|")) * (P(1) - newline) ^ 1)
+local separator_cell = horizontal_space * P(":") ^ -1 * P("-") ^ 3 * P("-") ^ 0 * P(":") ^ -1 * horizontal_space
+local separator_line = C(horizontal_space * P("|") ^ -1 * separator_cell * (P("|") * separator_cell) ^ 1 * P("|") ^ -1 * horizontal_space)
+
+grammar.table = newline
+	* table_line
+	* newline
+	* separator_line
+	* (newline * table_line) ^ 0
+	/ function(header_line, separator, ...)
+		local rows = { ... }
+		local alignments = {}
+		for _, cell in ipairs(split_table_row(separator)) do
+			table.insert(alignments, table_alignment(cell))
+		end
+		for index, row in ipairs(rows) do
+			rows[index] = split_table_row(row)
+		end
+		return nodes.table(split_table_row(header_line), alignments, rows)
+	end
+
+--------------------
 -- Other
 --------------------
 
-grammar.outer_elements = V("header") + V("code") + V("latex_env") + V("item") + V("enum")
+grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

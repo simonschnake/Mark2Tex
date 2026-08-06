@@ -20,12 +20,16 @@ function nodes.code(code_type, content)
 	return { type = "code", code_type = code_type, content = content }
 end
 
+function nodes.table(headers, alignments, rows)
+	return { type = "table", headers = headers, alignments = alignments, rows = rows }
+end
+
 function nodes.other(content)
 	return { type = "other", content = content }
 end
 
-function nodes.paren_citation(content)
-	return { type = "paren_citation", content = content }
+function nodes.paren_citation(content, locator)
+	return { type = "paren_citation", content = content, locator = locator }
 end
 
 function nodes.citation(content)

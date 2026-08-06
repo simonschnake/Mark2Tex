@@ -1,5 +1,5 @@
 LUA ?= lua
-PACKAGE ?= marktex
+PACKAGE ?= mark2tex
 VERSION ?= 0.2.0
 REVISION ?= 2
 DIST_DIR ?= dist
@@ -21,21 +21,22 @@ dist: $(DIST_ARCHIVE)
 
 overleaf-zip: $(OVERLEAF_ARCHIVE)
 
-$(DIST_ARCHIVE): marktex.sty marktex.lua README.md LICENSE $(wildcard src/marktex/*.lua)
-	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/marktex"
-	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/scripts/marktex/src/marktex"
-	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/marktex"
+
+$(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark2tex/*.lua)
+	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/mark2tex"
+	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/src/mark2tex"
+	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/mark2tex"
 	@mkdir -p "$(DIST_BUILD_DIR)/tlpkg/tlpobj"
-	@cp marktex.sty "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/marktex/"
-	@cp marktex.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/marktex/"
-	@cp src/marktex/*.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/marktex/src/marktex/"
-	@cp README.md LICENSE "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/marktex/"
+	@cp mark2tex.sty "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/mark2tex/"
+	@cp mark2tex.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/"
+	@cp src/mark2tex/*.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/src/mark2tex/"
+	@cp README.md LICENSE "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/mark2tex/"
 	@{ \
 		echo "name $(PACKAGE)"; \
 		echo "category Package"; \
 		echo "revision $(REVISION)"; \
 		echo "shortdesc Markdown-like fragments for LuaLaTeX documents"; \
-		echo "longdesc marktex reads Markdown-like .md files during LuaLaTeX compilation,"; \
+		echo "longdesc Mark2TeX reads Markdown-like .md files during LuaLaTeX compilation,"; \
 		echo "longdesc converts the supported LaTeX-oriented subset to TeX, and inputs"; \
 		echo "longdesc the generated file back into the document."; \
 		echo "depend latex"; \
@@ -51,11 +52,11 @@ $(DIST_ARCHIVE): marktex.sty marktex.lua README.md LICENSE $(wildcard src/markte
 	@tar -C "$(DIST_BUILD_DIR)" -cf - texmf-dist tlpkg | xz -9e > "$(DIST_ARCHIVE)"
 	@echo "Built $(DIST_ARCHIVE)"
 
-$(OVERLEAF_ARCHIVE): marktex.sty marktex.lua README.md LICENSE $(wildcard src/marktex/*.lua)
-	@mkdir -p "$(OVERLEAF_BUILD_DIR)/src/marktex"
-	@cp marktex.sty marktex.lua README.md LICENSE "$(OVERLEAF_BUILD_DIR)/"
-	@cp src/marktex/*.lua "$(OVERLEAF_BUILD_DIR)/src/marktex/"
-	@cd "$(OVERLEAF_BUILD_DIR)" && zip -qr "../../$(notdir $(OVERLEAF_ARCHIVE))" marktex.sty marktex.lua src README.md LICENSE
+$(OVERLEAF_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark2tex/*.lua)
+	@mkdir -p "$(OVERLEAF_BUILD_DIR)/src/mark2tex"
+	@cp mark2tex.sty mark2tex.lua README.md LICENSE "$(OVERLEAF_BUILD_DIR)/"
+	@cp src/mark2tex/*.lua "$(OVERLEAF_BUILD_DIR)/src/mark2tex/"
+	@cd "$(OVERLEAF_BUILD_DIR)" && zip -qr "../../$(notdir $(OVERLEAF_ARCHIVE))" mark2tex.sty mark2tex.lua src README.md LICENSE
 	@echo "Built $(OVERLEAF_ARCHIVE)"
 
 tlmgr-install-dry-run: $(DIST_ARCHIVE)

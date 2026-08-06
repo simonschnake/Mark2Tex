@@ -8,4 +8,4 @@ if debug and debug.getinfo then
     end
 end
 
-return require("marktex.core")
+return require("mark2tex.core")

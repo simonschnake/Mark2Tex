@@ -1,4 +1,4 @@
-local core = require("marktex.core")
+local core = require("mark2tex.core")
 local lfs = require("lfs")
 local helpers = require("tests.helpers")
 

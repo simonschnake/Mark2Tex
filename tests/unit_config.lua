@@ -1,5 +1,5 @@
-local core = require("marktex.core")
-local default_config = require("marktex.default_config")
+local core = require("mark2tex.core")
+local default_config = require("mark2tex.default_config")
 
 return function(luaunit)
 	function test_config_overrides_do_not_mutate_defaults()
