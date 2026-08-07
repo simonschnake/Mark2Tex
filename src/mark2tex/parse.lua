@@ -5,6 +5,7 @@ local INLINE_BLOCK_TYPES = {
 	header = true,
 	item = true,
 	enum = true,
+	blockquote = true,
 	other = true,
 }
 

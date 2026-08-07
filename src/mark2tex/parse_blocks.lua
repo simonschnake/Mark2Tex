@@ -90,6 +90,17 @@ grammar.code = newline
 	end
 
 --------------------
+-- Blockquote
+--------------------
+
+local quote_line = newline * P(">") * P(" ") ^ -1 * C(rest_of_line ^ -1)
+
+grammar.blockquote = Ct(quote_line * quote_line ^ 0)
+	/ function(lines)
+		return nodes.blockquote(table.concat(lines, "\n"))
+	end
+
+--------------------
 -- Table
 --------------------
 
@@ -163,7 +174,7 @@ grammar.table = newline
 -- Other
 --------------------
 
-grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("item") + V("enum")
+grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

@@ -87,6 +87,10 @@ local function walk(ast, out, config)
 		elseif ast.type == "code" then
 			-- TODO: add code type
 			out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
+		elseif ast.type == "blockquote" then
+			out[1] = out[1] .. "\n\\begin{quote}\n"
+			walk(ast.content, out, config)
+			out[1] = out[1] .. "\n\\end{quote}"
 		elseif ast.type == "table" then
 			out[1] = out[1] .. "\n\\begin{center}\n\\begin{tabular}{" .. table.concat(ast.alignments) .. "}\n\\hline\n"
 			for index = 1, #ast.alignments do

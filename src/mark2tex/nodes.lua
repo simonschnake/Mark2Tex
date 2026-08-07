@@ -20,6 +20,10 @@ function nodes.code(code_type, content)
 	return { type = "code", code_type = code_type, content = content }
 end
 
+function nodes.blockquote(content)
+	return { type = "blockquote", content = content }
+end
+
 function nodes.table(headers, alignments, rows)
 	return { type = "table", headers = headers, alignments = alignments, rows = rows }
 end

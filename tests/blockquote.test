@@ -1,0 +1,17 @@
+Paragraph before.
+
+> **Beobachtungen** → Daten → erkennbare Zusammenhänge → Modell → Anwendung auf neue Fälle
+>
+> Eine zweite Zeile mit *Inline-Formatierung*.
+
+Paragraph after.
+.....................................................
+Paragraph before.
+
+\begin{quote}
+\textbf{Beobachtungen} → Daten → erkennbare Zusammenhänge → Modell → Anwendung auf neue Fälle
+
+Eine zweite Zeile mit \emph{Inline-Formatierung}.
+\end{quote}
+
+Paragraph after.

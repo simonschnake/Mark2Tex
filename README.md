@@ -71,6 +71,7 @@ The current parser intentionally supports only a small, tested subset:
 - inline code with backticks, e.g. `` `code` ``
 - fenced code blocks with three backticks
 - fenced `tex` blocks as raw LaTeX output
+- blockquotes with `>`
 - inline math with `$...$`
 - pipe tables, including inline formatting and math inside cells
 - LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
@@ -90,10 +91,26 @@ The output is LaTeX-like:
 - `[@key1; @key2]` becomes `\parencite{key1, key2}` by default
 - `[@key, p. 433]` becomes `\parencite[p. 433]{key}` by default
 - lists become `itemize` or `enumerate`
+- blockquotes become LaTeX `quote` environments
 - pipe tables become centered LaTeX `tabular` environments; delimiter colons control `l`, `c`, and `r` alignment
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - normal text is not automatically escaped for LaTeX special characters
+
+### Blockquotes
+
+A blockquote is written by starting every quoted line with `>`:
+
+```md
+> **Beobachtungen** → Daten → erkennbare Zusammenhänge → Modell → Anwendung auf neue Fälle
+>
+> Eine zweite Zeile mit *Inline-Formatierung*.
+```
+
+Mark2TeX removes the markers, applies the supported inline formatting, and
+wraps the complete block in a LaTeX `quote` environment. Blank lines inside a
+blockquote must therefore be written as `>` lines. Nested blockquotes and lazy
+continuation lines without a `>` marker are not supported.
 
 ## Robustness rules
 
@@ -110,7 +127,6 @@ Mark2TeX is not a full Markdown converter. In particular, do not expect the
 following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
 - links and images in Markdown syntax
-- blockquotes
 - HTML blocks
 - footnotes
 - task lists
