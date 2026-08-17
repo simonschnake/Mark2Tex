@@ -17,7 +17,7 @@ return function(luaunit)
 		local ast = parse_inlines("Heading with **bold** and @cite")
 
 		helpers.assert_node(luaunit, ast[1], "text")
-		helpers.assert_node(luaunit, ast[2], "bold")
+		helpers.assert_node(luaunit, helpers.find_node(ast, "bold"), "bold")
 		helpers.assert_node(luaunit, ast[3], "text")
 		helpers.assert_node(luaunit, ast[4], "citation")
 		luaunit.assertEquals(ast[4].content, "cite")
@@ -35,9 +35,48 @@ return function(luaunit)
 		for _, input in ipairs(cases) do
 			local ast = parse_inlines(input)
 			helpers.assert_node(luaunit, ast[1], "text")
-			luaunit.assertEquals(#ast, 1)
-			luaunit.assertEquals(ast[1].content, input)
+			luaunit.assertEquals(table.concat((function()
+				local parts = {}
+				for _, node in ipairs(ast) do
+					parts[#parts + 1] = node.content
+				end
+				return parts
+			end)()), input)
 		end
+	end
+
+	function test_inline_parser_protects_dollar_and_parenthesis_math()
+		local ast = parse_inlines("$a_b$ and \\(x + @citation\\)")
+
+		helpers.assert_node(luaunit, ast[1], "inline_math")
+		luaunit.assertEquals(ast[1].content, "$a_b$")
+		helpers.assert_node(luaunit, ast[3], "inline_math")
+		luaunit.assertEquals(ast[3].content, "\\(x + @citation\\)")
+	end
+
+	function test_inline_parser_keeps_math_protected_inside_formatting()
+		local ast = parse_inlines("**$a_b$**")
+
+		helpers.assert_node(luaunit, ast[1], "bold")
+		helpers.assert_node(luaunit, ast[1].content[1], "inline_math")
+		luaunit.assertEquals(ast[1].content[1].content, "$a_b$")
+	end
+
+	function test_inline_parser_respects_escaped_math_delimiters()
+		local ast, warnings = parse_inlines([[\$not math\$ and \\\(x\\\)]])
+
+		luaunit.assertEquals(#warnings, 0)
+		helpers.assert_node(luaunit, ast[#ast], "inline_math")
+		luaunit.assertEquals(ast[#ast].content, [[\(x\\\)]])
+	end
+
+	function test_inline_parser_reports_invalid_math_delimiters_without_losing_other_formatting()
+		local ast, warnings = parse_inlines("$open and **bold**")
+
+		luaunit.assertEquals(#warnings, 1)
+		luaunit.assertEquals(warnings[1].category, "math-delimiter")
+		luaunit.assertEquals(warnings[1].kind, "unclosed")
+		helpers.assert_node(luaunit, helpers.find_node(ast, "bold"), "bold")
 	end
 
 	function test_inline_parser_supports_nested_latex_command_args()
@@ -125,6 +164,23 @@ Paragraph after
 
 		helpers.assert_node(luaunit, ast[3], "latex")
 		luaunit.assertEquals(ast[3].content, "\\begin{center}\nText\n\\end{center}\n")
+	end
+
+	function test_ast_display_math_is_a_block_node()
+		local ast = parse("$$\nx^2\n$$\n", default_config)
+
+		helpers.assert_node(luaunit, ast[1], "display_math")
+		luaunit.assertEquals(ast[1].content, "\nx^2\n")
+	end
+
+	function test_ast_keeps_display_math_in_tables_literal_with_warning()
+		local ast = parse("| left | right |\n|---|---|\n| $x$ | $$y$$ |\n", default_config)
+
+		luaunit.assertEquals(#ast.warnings, 1)
+		luaunit.assertEquals(ast.warnings[1].kind, "display-in-table")
+		helpers.assert_node(luaunit, ast[1].rows[1][1][1], "inline_math")
+		helpers.assert_node(luaunit, ast[1].rows[1][2][1], "text")
+		luaunit.assertEquals(ast[1].rows[1][2][1].content, "$$y$$")
 	end
 
 	function test_ast_parenthetical_citation_node()

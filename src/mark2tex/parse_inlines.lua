@@ -1,5 +1,6 @@
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
+local math = require("mark2tex.math")
 
 local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
 
@@ -46,8 +47,6 @@ grammar.verbatim = P("`")
 --------------------
 -- Math
 --------------------
-
-grammar.math = C(P("$") * (1 - P("$")) ^ 1 * P("$")) / nodes.math
 
 --------------------
 -- Latex Command
@@ -123,18 +122,19 @@ end
 -- Inner
 --------------------
 
-grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("math") + V("latex_cmd")
+grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
 grammar[1] = Ct((V("elements") + V("text")) ^ 0)
 grammar = P(grammar) * -1
 
-local function parse_inlines(str)
-	local parsed = grammar:match(str)
+local function parse_inlines(str, options)
+	local protected, tokens, warnings = math.protect_inlines(str, options)
+	local parsed = grammar:match(protected)
 	if parsed == nil then
-		return { nodes.text(str) }
+		return { nodes.text(str) }, warnings
 	end
-	return parsed
+	return math.expand_tokens(parsed, tokens), warnings
 end
 
 return parse_inlines

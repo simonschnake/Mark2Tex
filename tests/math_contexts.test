@@ -1,0 +1,36 @@
+- Item
+  \[
+  x^2
+  \]
+
+> \[
+> y^2
+> \]
+
+| inline | display |
+|---|---|
+| $z$ | $$w$$ |
+..................................................
+\begin{itemize}
+\item Item
+\[
+  x^2
+  \]
+\end{itemize}
+
+\begin{quote}
+
+\[
+y^2
+\]
+\end{quote}
+
+\begin{center}
+\begin{tabular}{ll}
+\hline
+inline & display \\
+\hline
+$z$ & $$w$$ \\
+\hline
+\end{tabular}
+\end{center}

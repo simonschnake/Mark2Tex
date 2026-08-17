@@ -1,0 +1,19 @@
+Inline $a_b + c^2$ and \(x + @citation\) stay protected.
+
+$$
+u = v
+$$
+
+\[
+w = z
+\]
+..................................................
+Inline $a_b + c^2$ and \(x + @citation\) stay protected.
+
+\[
+u = v
+\]
+
+\[
+w = z
+\]

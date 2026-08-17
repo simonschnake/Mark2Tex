@@ -15,7 +15,7 @@ test:
 	$(LUA) tests/run.lua
 
 latex-smoke:
-	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error main.tex
+	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error main.tex
 
 dist: $(DIST_ARCHIVE)
 

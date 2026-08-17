@@ -72,7 +72,8 @@ The current parser intentionally supports only a small, tested subset:
 - fenced code blocks with three backticks
 - fenced `tex` blocks as raw LaTeX output
 - blockquotes with `>`
-- inline math with `$...$`
+- inline math with `$...$` or `\\(...\\)`
+- display math with `$$...$$` or `\\[...\\]`
 - pipe tables, including inline formatting and math inside cells
 - LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
 - unordered lists with `-`, `*`, or `+`
@@ -81,7 +82,7 @@ The current parser intentionally supports only a small, tested subset:
 - single citations such as `@key`
 - Pandoc-style citation groups such as `[@key1; @key2]`, including locators such as `[@key, p. 433]`
 - raw LaTeX environments with `\begin{...}` and `\end{...}`
-- LaTeX environments inside `$$ ... $$`, with the dollar wrappers removed
+- raw LaTeX environments with optional `$$ ... $$` or `\\[ ... \\]` wrappers
 
 The output is LaTeX-like:
 
@@ -95,7 +96,31 @@ The output is LaTeX-like:
 - pipe tables become centered LaTeX `tabular` environments; delimiter colons control `l`, `c`, and `r` alignment
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
+- `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
 - normal text is not automatically escaped for LaTeX special characters
+
+### Mathematics
+
+Mathematics is a Mark2TeX extension; CommonMark itself does not define math
+delimiters. The supported forms and their output are:
+
+| Input | Context | Output |
+| --- | --- | --- |
+| `$x^2$` | inline text, headings, lists, blockquotes, and table cells | unchanged |
+| `\\(x^2\\)` | inline text, headings, lists, blockquotes, and table cells | unchanged |
+| `$$x^2$$` | display block, including lists and blockquotes | `\\[x^2\\]` |
+| `\\[x^2\\]` | display block, including lists and blockquotes | unchanged |
+| `\\begin{align}...\\end{align}` | raw LaTeX block | unchanged |
+
+Markdown syntax inside math is not interpreted. A raw LaTeX environment wrapped
+in `$$...$$` or `\\[...\\]` is emitted as the environment alone, avoiding
+invalid nested display math. Display delimiters in pipe-table cells are kept
+literal and reported as warnings; inline math is supported there.
+
+Unclosed, empty, or mismatched math delimiters are preserved literally and
+produce a `math-delimiter` warning during file conversion. A delimiter
+preceded by an odd number of backslashes is treated as escaped. Code spans,
+fenced code blocks, and `tex` blocks are never parsed as math.
 
 ### Blockquotes
 

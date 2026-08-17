@@ -7,7 +7,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v2"
+local CACHE_VERSION = "v3"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -117,8 +117,11 @@ self.convert = function (input_path, cfg)
         return output_path
     end
 
-    local ast = parse(content, config)
-    local tex = write(ast, config)
+	local ast = parse(content, config)
+	for _, warning in ipairs(ast.warnings or {}) do
+		io.stderr:write("mark2tex warning [" .. warning.category .. "]: " .. warning.kind .. " delimiter " .. warning.delimiter .. " kept literal\n")
+	end
+	local tex = write(ast, config)
 
     -- Add a cache fingerprint to the first line of the output file.
     tex = "% cache:" .. cache_key .. "\n" .. tex

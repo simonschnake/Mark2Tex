@@ -39,21 +39,39 @@ grammar.begin_end = begin_env * (V("begin_end_inner") + (1 - begin_env - end_env
 grammar.begin_end_inner = V("begin_end") + (1 - (begin_env + end_env)) ^ 1
 
 grammar.latex_env_in_double_dollar = double_dollar * S(" \n") ^ 0 * C(V("begin_end")) * S(" \n") ^ 0 * double_dollar
-grammar.double_dollar_env = C(double_dollar * (P(1) - double_dollar) ^ 1 * double_dollar)
+grammar.latex_env_in_brackets = P("\\[") * S(" \n") ^ 0 * C(V("begin_end")) * S(" \n") ^ 0 * P("\\]")
 
 grammar.latex_env = newline
 	* space ^ 0
-	* (V("latex_env_in_double_dollar") + V("double_dollar_env") + V("begin_end"))
+	* (V("latex_env_in_double_dollar") + V("latex_env_in_brackets") + V("begin_end"))
 	/ function(t)
 		return nodes.latex(t)
 	end
+
+--------------------
+-- Display Math
+--------------------
+
+grammar.display_math_dollar = P("$$")
+	* C((P(1) - P("$$")) ^ 1)
+	* P("$$")
+	/ nodes.display_math
+
+grammar.display_math_bracket = P("\\[")
+	* C((P(1) - P("\\]")) ^ 1)
+	* P("\\]")
+	/ nodes.display_math
+
+grammar.display_math = newline
+	* space ^ 0
+	* (V("display_math_dollar") + V("display_math_bracket"))
 
 --------------------
 -- Item
 --------------------
 
 local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
-local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line
+local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 	/ function(t)
@@ -65,7 +83,7 @@ grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 --------------------
 
 local start_of_enum = newline * C(S(" \t") ^ 0) * R("09") ^ 1 * S(".)")
-local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line
+local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line ^ -1
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 	/ function(t)
@@ -174,7 +192,7 @@ grammar.table = newline
 -- Other
 --------------------
 
-grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("display_math") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

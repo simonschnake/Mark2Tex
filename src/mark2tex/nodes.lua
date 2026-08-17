@@ -44,8 +44,12 @@ function nodes.verbatim(content)
 	return { type = "verbatim", content = content }
 end
 
-function nodes.math(content)
-	return { type = "math", content = content }
+function nodes.inline_math(content)
+	return { type = "inline_math", content = content }
+end
+
+function nodes.display_math(content)
+	return { type = "display_math", content = content }
 end
 
 function nodes.latex_cmd(content)

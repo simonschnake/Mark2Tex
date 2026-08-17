@@ -34,6 +34,9 @@
     package.preload["mark2tex.parse_blocks"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/parse_blocks.lua")
     end
+    package.preload["mark2tex.math"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/math.lua")
+    end
     package.preload["mark2tex.parse_inlines"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/parse_inlines.lua")
     end

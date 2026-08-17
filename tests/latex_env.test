@@ -39,9 +39,9 @@ This is centered text
 This is centered text
 \end{center}
 
-$$
+\[
 a + b = c
-$$
+\]
 
 
 \begin{align*}

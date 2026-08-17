@@ -8,7 +8,8 @@ elements:
 - other
 - citation
 - verbatim
-- math
+- inline_math
+- display_math
 - latex_cmd
 - italic
 - bold
@@ -129,8 +130,15 @@ local function walk(ast, out, config)
 			out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
 		elseif ast.type == "verbatim" then
 			out[1] = out[1] .. "\\texttt{" .. ast.content .. "}"
-		elseif ast.type == "math" or ast.type == "latex_cmd" then
+		elseif ast.type == "inline_math" or ast.type == "latex_cmd" then
 			out[1] = out[1] .. ast.content
+		elseif ast.type == "display_math" then
+			local trimmed, removed = out[1]:gsub("\n[ \t]+$", "\n")
+			out[1] = trimmed
+			if removed == 0 then
+				out[1] = out[1] .. "\n"
+			end
+			out[1] = out[1] .. "\\[" .. ast.content .. "\\]"
 		elseif ast.type == "italic" then
 			out[1] = out[1] .. "\\emph{"
 			walk(ast.content, out, config)
