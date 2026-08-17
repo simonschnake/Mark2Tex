@@ -15,7 +15,9 @@ test:
 	$(LUA) tests/run.lua
 
 latex-smoke:
-	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error main.tex
+	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
+	grep -Eq '^INPUT (\./)?content\.md$$' tests/latex-smoke/main.fls
+	grep -Eq '^INPUT (\./)?chapter\.md$$' tests/latex-smoke/main.fls
 
 dist: $(DIST_ARCHIVE)
 

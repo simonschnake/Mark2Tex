@@ -109,6 +109,10 @@ self.convert = function (input_path, cfg)
         return nil, err
     end
 
+    if kpse and kpse.record_input_file then
+        kpse.record_input_file(input_path)
+    end
+
     local cache_key = build_cache_key(content, config)
 
     -- Check whether the cached output matches the current content and config.

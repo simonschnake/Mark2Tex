@@ -64,6 +64,42 @@ return function(luaunit)
 		luaunit.assertNotNil(err)
 	end
 
+	function test_convert_records_successful_inputs_on_every_call()
+		local input_path = helpers.TMP_DIR .. "/recorded_input.md"
+		local save_dir = helpers.TMP_DIR .. "/recorded-input-output"
+		local missing_path = helpers.TMP_DIR .. "/missing-recorded-input.md"
+		local recorded_paths = {}
+		local original_kpse = _G.kpse
+
+		helpers.write_file(input_path, "# Recorded\n")
+		_G.kpse = {
+			record_input_file = function(path)
+				table.insert(recorded_paths, path)
+			end,
+		}
+
+		local ok, test_err = pcall(function()
+			local first_output, first_err = core.convert(input_path, { save_dir = save_dir })
+			luaunit.assertNotNil(first_output, tostring(first_err))
+
+			local cached_output, cached_err = core.convert(input_path, { save_dir = save_dir })
+			luaunit.assertNotNil(cached_output, tostring(cached_err))
+			luaunit.assertEquals(cached_output, first_output)
+
+			local missing_output, missing_err = core.convert(missing_path, { save_dir = save_dir })
+			luaunit.assertEquals(missing_output, nil)
+			luaunit.assertNotNil(missing_err)
+		end)
+
+		_G.kpse = original_kpse
+		if not ok then
+			error(test_err, 0)
+		end
+
+		luaunit.assertEquals(recorded_paths, { input_path, input_path })
+		luaunit.assertEquals(_G.kpse, original_kpse)
+	end
+
 	function test_save_dir_shell_metacharacters_are_treated_as_path()
 		local input_path = helpers.TMP_DIR .. "/shell_meta_input.md"
 		local marker_path = helpers.TMP_DIR .. "/shell-meta-marker"

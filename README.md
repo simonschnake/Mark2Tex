@@ -190,6 +190,10 @@ For chapter-like files there is also:
 
 This inputs the generated file via `\include`.
 
+Both `\mdinput` and `\mdinclude` register their Markdown source files with
+LuaTeX's recorder. Build tools such as `latexmk` can therefore detect Markdown
+changes from the generated `.fls` file and rebuild the document automatically.
+
 Important: Mark2TeX requires LuaLaTeX. Other engines such as pdfLaTeX are not
 supported.
 
