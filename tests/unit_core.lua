@@ -3,6 +3,14 @@ local lfs = require("lfs")
 local helpers = require("tests.helpers")
 
 return function(luaunit)
+	function test_get_output_path_uses_configured_save_directory()
+		local output_path = core.get_output_path("chapters/introduction.md", {
+			save_dir = "generated",
+		})
+
+		luaunit.assertEquals(output_path:match("^generated/introduction_[0-9a-f]+%.tex$") ~= nil, true)
+	end
+
 	function test_convert_creates_output_directory()
 		local input_path = helpers.TMP_DIR .. "/convert_input.md"
 		local save_dir = helpers.TMP_DIR .. "/convert-output"

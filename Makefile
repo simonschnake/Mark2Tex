@@ -18,6 +18,7 @@ latex-smoke:
 	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
 	grep -Eq '^INPUT (\./)?content\.md$$' tests/latex-smoke/main.fls
 	grep -Eq '^INPUT (\./)?chapter\.md$$' tests/latex-smoke/main.fls
+	! grep -Eq '^INPUT (\./)?excluded\.md$$' tests/latex-smoke/main.fls
 
 dist: $(DIST_ARCHIVE)
 

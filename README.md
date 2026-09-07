@@ -190,6 +190,17 @@ For chapter-like files there is also:
 
 This inputs the generated file via `\include`.
 
+To compile only selected Markdown includes, use `\mdincludeonly` in the
+preamble with the same Markdown paths passed to `\mdinclude`:
+
+```tex
+\mdincludeonly{introduction.md,conclusion.md}
+```
+
+Like LaTeX's `\includeonly`, excluded files retain their auxiliary data. They
+are not converted or registered as inputs during that run. An empty
+`\mdincludeonly{}` excludes all `\mdinclude` files. `\mdinput` is unaffected.
+
 Both `\mdinput` and `\mdinclude` register their Markdown source files with
 LuaTeX's recorder. Build tools such as `latexmk` can therefore detect Markdown
 changes from the generated `.fls` file and rebuild the document automatically.

@@ -35,6 +35,11 @@ end
 
 self.resolve_config = resolve_config
 
+self.get_output_path = function(input_path, cfg)
+    local config = resolve_config(cfg)
+    return fu.get_output_filename(input_path, config.save_dir)
+end
+
 local function sort_keys(left, right)
     local left_type = type(left)
     local right_type = type(right)
@@ -101,8 +106,7 @@ self.convert = function (input_path, cfg)
     end
 
     -- Output file path
-    local output_path = fu.get_output_filename(
-        input_path, config.save_dir)
+    local output_path = self.get_output_path(input_path, config)
 
     local content, err = fu.read_file(input_path)
     if not content then

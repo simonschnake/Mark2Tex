@@ -53,6 +53,7 @@
 
   local mark2tex = dofile(mark2tex_path)
   local cfg = {}
+  local includeonly_paths = nil
 
   local config_file = io.open("mark2tex_config.lua", "r")
   if config_file then
@@ -68,7 +69,34 @@
     return path:gsub("\\", "/")
   end
 
+  local function trim(value)
+    return value:match("^%s*(.-)%s*$")
+  end
+
+  function mark2tex_includeonly(paths)
+    includeonly_paths = {}
+    local output_paths = {}
+
+    for path in paths:gmatch("[^,]+") do
+      path = trim(path)
+      if path ~= "" then
+        includeonly_paths[path] = true
+        output_paths[#output_paths + 1] = strip_tex_extension(
+          tex_escape_path(mark2tex.get_output_path(path, cfg))
+        )
+      end
+    end
+
+    tex.sprint("\\includeonly{" .. table.concat(output_paths, ",") .. "}")
+  end
+
   function mark2tex_input(path, include_mode)
+    if include_mode and includeonly_paths and not includeonly_paths[path] then
+      local output_path = tex_escape_path(mark2tex.get_output_path(path, cfg))
+      tex.sprint("\\include{" .. strip_tex_extension(output_path) .. "}")
+      return
+    end
+
     local output_path, err = mark2tex.convert(path, cfg)
     if not output_path then
       tex.error("Mark2TeX failed to convert " .. path, { err or "unknown error" })
@@ -89,4 +117,7 @@
 }
 \newcommand{\mdinclude}[1]{
   \luaexec{mark2tex_input("#1", true)}
+}
+\newcommand{\mdincludeonly}[1]{
+  \luaexec{mark2tex_includeonly("#1")}
 }
