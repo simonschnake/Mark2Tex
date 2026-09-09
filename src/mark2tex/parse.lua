@@ -5,7 +5,6 @@ local INLINE_BLOCK_TYPES = {
 	header = true,
 	item = true,
 	enum = true,
-	blockquote = true,
 	other = true,
 }
 
@@ -23,7 +22,9 @@ local function add_inline_nodes(ast, warnings)
 	end
 
 	for _, element in ipairs(ast) do
-		if element.type == "table" then
+		if element.type == "blockquote" then
+			element.content = add_inline_nodes(parse_blocks(normalize_input(element.content)), warnings)
+		elseif element.type == "table" then
 			for index, cell in ipairs(element.headers) do
 				element.headers[index] = parse_content(cell, { allow_display = false })
 			end

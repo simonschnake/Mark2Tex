@@ -5,6 +5,18 @@ local default_config = require("mark2tex.default_config")
 local helpers = require("tests.helpers")
 
 return function(luaunit)
+	function test_ast_nested_quote_table_propagates_warnings()
+		local ast = parse("> > | A | B |\n> > | --- | --- |\n> > | $x$ | $$y$$ |", default_config)
+		local quote = ast[1]
+		helpers.assert_node(luaunit, quote, "blockquote")
+		helpers.assert_node(luaunit, quote.content[1], "blockquote")
+		local tab = quote.content[1].content[1]
+		helpers.assert_node(luaunit, tab, "table")
+		helpers.assert_node(luaunit, tab.rows[1][1][1], "inline_math")
+		luaunit.assertEquals(#ast.warnings, 1)
+		luaunit.assertEquals(ast.warnings[1].kind, "display-in-table")
+	end
+
 	function test_block_parser_leaves_inline_content_unparsed()
 		local ast = parse_blocks("\n# Heading with **bold** and @cite\n")
 		local header = ast[1]

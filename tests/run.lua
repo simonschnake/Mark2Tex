@@ -157,5 +157,6 @@ end
 require("tests.unit_config")(luaunit)
 require("tests.unit_core")(luaunit)
 require("tests.unit_ast")(luaunit)
+require("tests.unit_tables")(luaunit)
 
 os.exit(luaunit.LuaUnit.run())

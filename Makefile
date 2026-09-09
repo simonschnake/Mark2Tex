@@ -45,6 +45,8 @@ $(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark
 		echo "depend latex"; \
 		echo "depend luacode"; \
 		echo "depend ulem"; \
+		echo "depend tools"; \
+		echo "depend booktabs"; \
 		echo "runfiles size=1"; \
 		find "$(DIST_BUILD_DIR)/texmf-dist/tex" "$(DIST_BUILD_DIR)/texmf-dist/scripts" -type f | LC_ALL=C sort | sed 's#^$(DIST_BUILD_DIR)/# #'; \
 		echo "docfiles size=1"; \

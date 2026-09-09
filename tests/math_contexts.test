@@ -19,18 +19,17 @@
 \end{itemize}
 
 \begin{quote}
-
 \[
 y^2
 \]
 \end{quote}
 
-\begin{center}
-\begin{tabular}{ll}
-\hline
+\par\addvspace{\medskipamount}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
 inline & display \\
-\hline
+\midrule
 $z$ & $$w$$ \\
-\hline
-\end{tabular}
-\end{center}
+\bottomrule
+\end{tabularx}
+\par\addvspace{\medskipamount}

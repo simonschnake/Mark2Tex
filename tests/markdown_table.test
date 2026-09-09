@@ -18,11 +18,11 @@ Die genaue Bedeutung kann je nach Text variieren.
 ..................................................
 \subsubsection{Wiederkehrende Symbole}
 
-\begin{center}
-\begin{tabular}{ll}
-\hline
+\par\addvspace{\medskipamount}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{\dimexpr 0.1120\linewidth - 0.2240\tabcolsep\relax}>{\raggedright\arraybackslash}X@{}}
+\toprule
 Symbol & Typische Bedeutung \\
-\hline
+\midrule
 $x$ & Eingabevektor \\
 $X$ & Datenmatrix oder Folge mehrerer Eingabevektoren \\
 $w$ & Gewichtsvektor eines einzelnen Neurons \\
@@ -34,8 +34,8 @@ $f$ & Aktivierungsfunktion \\
 $y$ & beobachteter Zielwert \\
 $\hat{y}$ & Modellvorhersage \\
 $Q,K,V$ & Query-, Key- und Value-Matrizen der Attention \\
-\hline
-\end{tabular}
-\end{center}
+\bottomrule
+\end{tabularx}
+\par\addvspace{\medskipamount}
 
 Die genaue Bedeutung kann je nach Text variieren.

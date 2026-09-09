@@ -93,7 +93,7 @@ The output is LaTeX-like:
 - `[@key, p. 433]` becomes `\parencite[p. 433]{key}` by default
 - lists become `itemize` or `enumerate`
 - blockquotes become LaTeX `quote` environments
-- pipe tables become centered LaTeX `tabular` environments; delimiter colons control `l`, `c`, and `r` alignment
+- pipe tables become full-width `tabularx` environments with wrapping cells and automatic compact/text column selection; delimiter colons preserve alignment
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
@@ -132,10 +132,21 @@ A blockquote is written by starting every quoted line with `>`:
 > Eine zweite Zeile mit *Inline-Formatierung*.
 ```
 
-Mark2TeX removes the markers, applies the supported inline formatting, and
-wraps the complete block in a LaTeX `quote` environment. Blank lines inside a
-blockquote must therefore be written as `>` lines. Nested blockquotes and lazy
-continuation lines without a `>` marker are not supported.
+Mark2TeX removes the markers, parses the content as Markdown blocks, and
+wraps the complete block in a LaTeX `quote` environment. This supports paragraphs,
+tables, lists, fenced code, and nested blockquotes (`> > ...`), including the
+usual inline formatting and math. Tables use the available width inside the quote.
+Blank lines inside a blockquote must be written as `>` lines. Lazy continuation
+lines without a `>` marker are not supported.
+
+```md
+> **Tafel:** Zweispaltig sichern.
+>
+> | Daten | Modell |
+> | --- | --- |
+> | Eingabe $x$ | Parameter $w,b$ |
+> | Zielwert $y$ | Vorhersage $\hat y=wx+b$ |
+```
 
 ## Robustness rules
 
@@ -340,8 +351,31 @@ contain the supported inline Markdown and LaTeX syntax:
 | Events   | 42    | @sample |
 ```
 
-This produces a centered `tabular` with left-, center-, and right-aligned
-columns respectively.
+This produces a `tabularx` spanning `\linewidth`, with left-, center-, and
+right-aligned cells respectively. Font size stays unchanged. `mark2tex.sty`
+automatically loads `array`, `tabularx`, and `booktabs`; standalone converter
+output requires these packages in your document preamble.
+
+Column selection is automatic and includes the header: a column is compact if
+its maximum cell length is at most 18 characters and its average at most 10.
+Markdown formatting does not count toward length; Unicode characters count once.
+Math and raw TeX use source length as a conservative approximation.
+
+In mixed tables, compact columns use wrapping `p{...}` cells. Their widths are
+computed from their longest cell and capped at half an equal column share of
+the usable width (after intercolumn padding). Text columns share the remaining
+space equally using `X`. If every column is compact, all columns use `X`, so
+there is always a flexible column and no unused width. There are no weighted
+text columns or per-table settings.
+
+Tables use `\toprule`, `\midrule`, and `\bottomrule`, without outer column
+padding or a `center` wrapper. Paragraph spacing separates tables from nearby
+text. `\linewidth` also respects narrower containers such as minipages.
+
+This handles ordinary prose by wrapping instead of scaling. Unbreakable words,
+URLs, or long formulas can still overflow, and very many columns can become too
+narrow. `tabularx` does not split tables across pages. For these cases, or for
+captions and custom widths, use a raw LaTeX table.
 
 More complex LaTeX blocks can be written directly in Markdown:
 

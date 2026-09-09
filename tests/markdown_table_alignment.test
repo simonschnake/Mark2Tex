@@ -2,12 +2,12 @@
 | :--- | :----: | ----: |
 | **a** | `b` | $c$ |
 ..................................................
-\begin{center}
-\begin{tabular}{lcr}
-\hline
+\par\addvspace{\medskipamount}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\centering\arraybackslash}X>{\raggedleft\arraybackslash}X@{}}
+\toprule
 Left & Center & Right \\
-\hline
+\midrule
 \textbf{a} & \texttt{b} & $c$ \\
-\hline
-\end{tabular}
-\end{center}
+\bottomrule
+\end{tabularx}
+\par\addvspace{\medskipamount}

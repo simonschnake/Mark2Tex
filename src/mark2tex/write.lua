@@ -61,6 +61,59 @@ local function ensure_list_environment(out, stack, ast)
 	end
 end
 
+-- Estimate displayed text from inline nodes, excluding Markdown formatting.
+-- TeX commands/math are deliberately conservative: their source length is only
+-- an approximation of their typeset width.
+local function cell_length(node)
+	if type(node) == "string" then
+		local _, count = node:gsub("[^\128-\191]", "")
+		return count
+	end
+	if node.content then
+		return cell_length(node.content)
+	end
+	local length = 0
+	for _, child in ipairs(node) do
+		length = length + cell_length(child)
+	end
+	return length
+end
+
+local function table_columns(ast)
+	local count = #ast.alignments
+	local lengths, compact = {}, {}
+	local text_columns = 0
+	for index = 1, count do
+		local maximum = cell_length(ast.headers[index] or {})
+		local total = maximum
+		for _, row in ipairs(ast.rows) do
+			local length = cell_length(row[index] or {})
+			maximum = math.max(maximum, length)
+			total = total + length
+		end
+		lengths[index] = maximum
+		compact[index] = maximum <= 18 and total / (#ast.rows + 1) <= 10
+		if not compact[index] then text_columns = text_columns + 1 end
+	end
+
+	local alignment = { l = "raggedright", c = "centering", r = "raggedleft" }
+	local columns = {}
+	for index, align in ipairs(ast.alignments) do
+		local column = "X"
+		if compact[index] and text_columns > 0 then
+			-- Reserve at least half the usable width for text columns. Subtract
+			-- intercolumn padding before allocating widths; @{} removes outer padding.
+			local fraction = math.min(0.5 / count, 0.04 + lengths[index] * 0.008)
+			column = string.format("p{\\dimexpr %.4f\\linewidth - %.4f\\tabcolsep\\relax}",
+				fraction, fraction * 2 * (count - 1))
+		end
+		columns[index] = ">{\\" .. alignment[align] .. "\\arraybackslash}" .. column
+	end
+	return "@{}" .. table.concat(columns) .. "@{}"
+end
+
+local write
+
 local function walk(ast, out, config)
 	if ast.type == nil then
 		for _, v in ipairs(ast) do
@@ -90,10 +143,10 @@ local function walk(ast, out, config)
 			out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
 		elseif ast.type == "blockquote" then
 			out[1] = out[1] .. "\n\\begin{quote}\n"
-			walk(ast.content, out, config)
+			out[1] = out[1] .. write(ast.content, config)
 			out[1] = out[1] .. "\n\\end{quote}"
 		elseif ast.type == "table" then
-			out[1] = out[1] .. "\n\\begin{center}\n\\begin{tabular}{" .. table.concat(ast.alignments) .. "}\n\\hline\n"
+			out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\begin{tabularx}{\\linewidth}{" .. table_columns(ast) .. "}\n\\toprule\n"
 			for index = 1, #ast.alignments do
 				if index > 1 then
 					out[1] = out[1] .. " & "
@@ -102,7 +155,7 @@ local function walk(ast, out, config)
 					walk(ast.headers[index], out, config)
 				end
 			end
-			out[1] = out[1] .. " \\\\\n\\hline"
+			out[1] = out[1] .. " \\\\\n\\midrule"
 
 			for _, row in ipairs(ast.rows) do
 				out[1] = out[1] .. "\n"
@@ -117,7 +170,7 @@ local function walk(ast, out, config)
 				out[1] = out[1] .. " \\\\"
 			end
 
-			out[1] = out[1] .. "\n\\hline\n\\end{tabular}\n\\end{center}"
+			out[1] = out[1] .. "\n\\bottomrule\n\\end{tabularx}\n\\par\\addvspace{\\medskipamount}"
 		elseif ast.type == "other" then
 			walk(ast.content, out, config)
 		elseif ast.type == "paren_citation" then
@@ -159,7 +212,7 @@ local function walk(ast, out, config)
 	end
 end
 
-local function write(ast, config)
+write = function(ast, config)
 	local output = { "" }
 	local list_stack = {}
 
