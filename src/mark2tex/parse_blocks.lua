@@ -38,12 +38,9 @@ local end_env = P("\\end{")
 grammar.begin_end = begin_env * (V("begin_end_inner") + (1 - begin_env - end_env)) ^ 0 * end_env
 grammar.begin_end_inner = V("begin_end") + (1 - (begin_env + end_env)) ^ 1
 
-grammar.latex_env_in_double_dollar = double_dollar * S(" \n") ^ 0 * C(V("begin_end")) * S(" \n") ^ 0 * double_dollar
-grammar.latex_env_in_brackets = P("\\[") * S(" \n") ^ 0 * C(V("begin_end")) * S(" \n") ^ 0 * P("\\]")
-
 grammar.latex_env = newline
 	* space ^ 0
-	* (V("latex_env_in_double_dollar") + V("latex_env_in_brackets") + V("begin_end"))
+	* V("begin_end")
 	/ function(t)
 		return nodes.latex(t)
 	end
@@ -52,15 +49,41 @@ grammar.latex_env = newline
 -- Display Math
 --------------------
 
+local standalone_display_environments = {
+	align = true,
+	["align*"] = true,
+	alignat = true,
+	["alignat*"] = true,
+	displaymath = true,
+	equation = true,
+	["equation*"] = true,
+	eqnarray = true,
+	["eqnarray*"] = true,
+	flalign = true,
+	["flalign*"] = true,
+	gather = true,
+	["gather*"] = true,
+	multline = true,
+	["multline*"] = true,
+}
+
+local function display_node(content)
+	local environment, closing = content:match("^%s*\\begin{([^}]+)}.*\\end{([^}]+)}%s*$")
+	if environment == closing and standalone_display_environments[environment] then
+		return nodes.latex(content:match("^%s*(.-)%s*$"))
+	end
+	return nodes.display_math(content)
+end
+
 grammar.display_math_dollar = P("$$")
 	* C((P(1) - P("$$")) ^ 1)
 	* P("$$")
-	/ nodes.display_math
+	/ display_node
 
 grammar.display_math_bracket = P("\\[")
 	* C((P(1) - P("\\]")) ^ 1)
 	* P("\\]")
-	/ nodes.display_math
+	/ display_node
 
 grammar.display_math = newline
 	* space ^ 0
@@ -192,7 +215,10 @@ grammar.table = newline
 -- Other
 --------------------
 
-grammar.outer_elements = V("table") + V("header") + V("code") + V("latex_env") + V("display_math") + V("blockquote") + V("item") + V("enum")
+-- Display math must be considered before a generic raw LaTeX environment.
+-- Otherwise an environment such as `aligned` consumes its surrounding
+-- delimiters and is emitted outside math mode.
+grammar.outer_elements = V("table") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

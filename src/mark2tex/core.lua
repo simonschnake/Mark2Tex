@@ -127,7 +127,12 @@ self.convert = function (input_path, cfg)
 
 	local ast = parse(content, config)
 	for _, warning in ipairs(ast.warnings or {}) do
-		io.stderr:write("mark2tex warning [" .. warning.category .. "]: " .. warning.kind .. " delimiter " .. warning.delimiter .. " kept literal\n")
+		local subject = warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
+		if warning.kind == "mismatched" then
+			subject = subject .. " (expected \\end{" .. warning.expected_end .. "}, found \\end{" .. warning.actual_end .. "})"
+		end
+		local location = warning.line and (input_path .. ":" .. warning.line .. ":" .. warning.column .. ": ") or ""
+		io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. "; kept literal\n")
 	end
 	local tex = write(ast, config)
 

@@ -11,6 +11,18 @@ $$
 c = d
 \]
 
+$$
+\begin{aligned}
+z_1 &= w_{11}x_1+w_{12}x_2+b_1, \\
+z_2 &= w_{21}x_1+w_{22}x_2+b_2.
+\end{aligned}
+$$
+
+\[\begin{pmatrix}
+u & v \\
+w & z
+\end{pmatrix}\]
+
 \begin{equation}
 e = mc^2
 \end{equation}
