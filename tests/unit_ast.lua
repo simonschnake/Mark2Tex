@@ -185,6 +185,41 @@ Paragraph after
 		luaunit.assertEquals(ast[1].content, "\nx^2\n")
 	end
 
+	function test_ast_keeps_latex_subenvironment_inside_display_math()
+		local ast = parse("$$\\begin{aligned}x &= \\begin{cases}1 & x > 0\\\\0 & x \\leq 0\\end{cases}\\end{aligned}$$", default_config)
+
+		helpers.assert_node(luaunit, ast[1], "display_math")
+		luaunit.assertEquals(ast[1].content, "\\begin{aligned}x &= \\begin{cases}1 & x > 0\\\\0 & x \\leq 0\\end{cases}\\end{aligned}")
+	end
+
+	function test_ast_reports_unclosed_display_environment_with_source_position()
+		local ast = parse("First line\n$$\n\\begin{aligned}\nx &= y\n$$\n", default_config)
+
+		luaunit.assertEquals(#ast.warnings, 1)
+		luaunit.assertEquals(ast.warnings[1].category, "latex-environment")
+		luaunit.assertEquals(ast.warnings[1].kind, "unclosed")
+		luaunit.assertEquals(ast.warnings[1].environment, "aligned")
+		luaunit.assertEquals(ast.warnings[1].line, 3)
+		luaunit.assertEquals(ast.warnings[1].column, 1)
+	end
+
+	function test_ast_reports_unclosed_display_delimiter_with_source_position()
+		local ast = parse("First line\n$$\nx &= y\n", default_config)
+
+		luaunit.assertEquals(#ast.warnings, 1)
+		luaunit.assertEquals(ast.warnings[1].category, "math-delimiter")
+		luaunit.assertEquals(ast.warnings[1].kind, "unclosed")
+		luaunit.assertEquals(ast.warnings[1].delimiter, "$$")
+		luaunit.assertEquals(ast.warnings[1].line, 2)
+		luaunit.assertEquals(ast.warnings[1].column, 1)
+	end
+
+	function test_ast_diagnostics_ignore_code_spans_and_fences()
+		local ast = parse("`\\begin{aligned}`\n```tex\n$$\n\\begin{cases}\n```\n", default_config)
+
+		luaunit.assertEquals(#ast.warnings, 0)
+	end
+
 	function test_ast_keeps_display_math_in_tables_literal_with_warning()
 		local ast = parse("| left | right |\n|---|---|\n| $x$ | $$y$$ |\n", default_config)
 

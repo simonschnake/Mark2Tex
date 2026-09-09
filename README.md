@@ -112,15 +112,20 @@ delimiters. The supported forms and their output are:
 | `\\[x^2\\]` | display block, including lists and blockquotes | unchanged |
 | `\\begin{align}...\\end{align}` | raw LaTeX block | unchanged |
 
-Markdown syntax inside math is not interpreted. A raw LaTeX environment wrapped
-in `$$...$$` or `\\[...\\]` is emitted as the environment alone, avoiding
-invalid nested display math. Display delimiters in pipe-table cells are kept
-literal and reported as warnings; inline math is supported there.
+Markdown syntax inside math is not interpreted. LaTeX sub-environments that do
+not open math mode themselves, such as `aligned`, `cases`, and matrix
+environments, remain inside the normalized `\\[...\\]` display block. A
+self-contained display environment such as `align`, `gather`, or `equation` is
+emitted as that environment alone, avoiding an invalid nested display mode.
+Display delimiters in pipe-table cells are kept literal and reported as
+warnings; inline math is supported there.
 
 Unclosed, empty, or mismatched math delimiters are preserved literally and
-produce a `math-delimiter` warning during file conversion. A delimiter
-preceded by an odd number of backslashes is treated as escaped. Code spans,
-fenced code blocks, and `tex` blocks are never parsed as math.
+produce a `math-delimiter` warning during file conversion. Unclosed or
+mismatched LaTeX environments produce a `latex-environment` warning. These
+warnings include line and column when the position can be determined. A
+delimiter preceded by an odd number of backslashes is treated as escaped. Code
+spans, fenced code blocks, and `tex` blocks are never parsed as math.
 
 ### Blockquotes
 
@@ -169,7 +174,6 @@ following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 - reference links
 - arbitrary escaping rules
 - fully specified edge cases for nested inline elements
-- helpful parser diagnostics with line and column numbers
 
 If you need such constructs, the preferred approach at the moment is usually
 direct LaTeX, for example as a `tex` code block or a raw LaTeX environment.

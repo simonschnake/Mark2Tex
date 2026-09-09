@@ -1,9 +1,11 @@
 \[
-\begin{align}
+\begin{aligned}
 x &= y \\
-\end{align}
+\end{aligned}
 \]
 ..................................................
-\begin{align}
+\[
+\begin{aligned}
 x &= y \\
-\end{align}
+\end{aligned}
+\]
