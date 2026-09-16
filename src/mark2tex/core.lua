@@ -7,7 +7,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v5"
+local CACHE_VERSION = "v6"
 
 local function copy_table(value)
     if type(value) ~= "table" then

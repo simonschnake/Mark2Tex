@@ -1,6 +1,7 @@
 local parse_blocks = require("mark2tex.parse_blocks")
 local parse_inlines = require("mark2tex.parse_inlines")
 local diagnostics = require("mark2tex.diagnostics")
+local comments = require("mark2tex.comments")
 
 local INLINE_BLOCK_TYPES = {
 	header = true,
@@ -62,11 +63,13 @@ local function normalize_ast(ast)
 end
 
 local function parse(str, config)
-	local input = normalize_input(str)
+	local protected, comment_tokens, masked = comments.protect(str)
+	local input = normalize_input(protected)
 	local block_ast = parse_blocks(input)
-	local warnings = diagnostics.collect(str)
+	local warnings = diagnostics.collect(masked)
 	local inline_ast = add_inline_nodes(block_ast, warnings)
 	inline_ast.warnings = warnings
+	inline_ast.comments = comment_tokens
 	return normalize_ast(inline_ast)
 end
 

@@ -1,0 +1,44 @@
+<!-- Das ist ein Kommentar und wird nicht angezeigt -->
+<!--
+TODO:
+Diesen Abschnitt später ergänzen.
+# Hidden heading
+- **hidden** @citation $unclosed
+\end{hidden}
+
+Still hidden.
+-->
+Text <!-- inline --> remains visible.
+# Heading <!-- note --> visible
+- Item <!-- note --> visible
+<!-- first --><!-- second -->After
+`<!-- code -->`
+```
+<!-- literal code -->
+```
+..................................................
+% Das ist ein Kommentar und wird nicht angezeigt 
+%
+%TODO:
+%Diesen Abschnitt später ergänzen.
+%# Hidden heading
+%- **hidden** @citation $unclosed
+%\end{hidden}
+%
+%Still hidden.
+%
+Text  % inline 
+remains visible.
+\section{Heading  % note 
+visible}
+\begin{itemize}
+\item Item  % note 
+visible
+\end{itemize}
+% first 
+% second 
+After
+\texttt{<!-- code -->}
+\begin{verbatim}
+<!-- literal code -->
+\end{verbatim}
