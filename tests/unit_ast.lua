@@ -5,6 +5,19 @@ local default_config = require("mark2tex.default_config")
 local helpers = require("tests.helpers")
 
 return function(luaunit)
+	function test_ast_diagnostics_ignore_html_comments()
+		local ast = parse("<!-- $$\n\\begin{hidden}\n-->\n\\end{visible}", default_config)
+		luaunit.assertEquals(#ast.warnings, 1)
+		luaunit.assertEquals(ast.warnings[1].environment, "visible")
+		luaunit.assertEquals(ast.warnings[1].line, 4)
+	end
+
+	function test_html_comments_terminate_before_following_tex()
+		luaunit.assertEquals(helpers.transform("# Title<!-- note -->"), "\\section{Title% note \n}")
+		luaunit.assertEquals(helpers.transform("Before<!-- unfinished\nTODO"), "Before% unfinished\n%TODO\n")
+		luaunit.assertEquals(helpers.transform("<!-- MARKTWOTEXCOMMENT1END -->"), "% MARKTWOTEXCOMMENT1END \n")
+	end
+
 	function test_ast_nested_quote_table_propagates_warnings()
 		local ast = parse("> > | A | B |\n> > | --- | --- |\n> > | $x$ | $$y$$ |", default_config)
 		local quote = ast[1]

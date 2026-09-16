@@ -32,3 +32,12 @@ e = mc^2
 | Symbol | Bedeutung |
 | ------ | --------- |
 | $x$    | Eingabe   |
+
+<!-- This must not appear in the PDF: HIDDENCOMMENTMARKER -->
+<!--
+# Hidden heading
+\undefinedCommentCommand{ignored}
+
+TODO: complete later.
+-->
+Visible before<!-- inline comment --> and after.

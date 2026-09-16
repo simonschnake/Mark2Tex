@@ -16,6 +16,8 @@ elements:
 - text
 --]]
 
+local comments = require("mark2tex.comments")
+
 local function is_list_node(ast)
 	return ast.type == "item" or ast.type == "enum"
 end
@@ -228,7 +230,7 @@ write = function(ast, config)
 
 	close_all_lists(output, list_stack)
 
-	return output[1]:sub(2) -- remove first newline that was added
+	return comments.restore(output[1]:sub(2), ast.comments) -- remove first newline that was added
 end
 
 return write

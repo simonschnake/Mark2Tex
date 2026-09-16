@@ -59,12 +59,30 @@ For the final selection we use:
 \end{align}
 ```
 
+HTML comments remain in the generated `.tex` source as `%` comments and do
+not appear in the PDF. Both single-line and multiline comments are supported:
+
+```md
+<!-- This is a comment -->
+<!--
+TODO:
+Complete this section later.
+-->
+```
+
+Comments can also occur within text. Each comment line receives a `%` prefix,
+and following text resumes on a new source line so it stays visible. Markdown
+and LaTeX inside comments are not parsed. An unclosed comment extends to the
+end of the input. Comment syntax inside backtick code spans and fenced code
+blocks stays literal.
+
 ## Supported Markdown subset
 
 The current parser intentionally supports only a small, tested subset:
 
 - headings with `#`, `##`, `###`, ...
 - paragraph detection for normal text
+- HTML comments (`<!-- ... -->`), preserved as LaTeX `%` comments
 - italics with `*text*` or `_text_`
 - bold with `**text**` or `__text__`
 - strikethrough with `~~text~~`
@@ -168,7 +186,7 @@ Mark2TeX is not a full Markdown converter. In particular, do not expect the
 following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
 - links and images in Markdown syntax
-- HTML blocks
+- HTML blocks other than comments
 - footnotes
 - task lists
 - reference links
