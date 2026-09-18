@@ -108,7 +108,8 @@ grammar.display_math = newline
 --------------------
 
 local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
-local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line ^ -1
+local continuation_list_marker = S("-*+") * space + R("09") ^ 1 * S(".)") + P("#") * space
+local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 	/ function(t)
@@ -120,7 +121,7 @@ grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 --------------------
 
 local start_of_enum = newline * C(S(" \t") ^ 0) * R("09") ^ 1 * S(".)")
-local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - S("-*+#") - (R("09") ^ 1 * S(".)"))) * rest_of_line ^ -1
+local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 	/ function(t)
