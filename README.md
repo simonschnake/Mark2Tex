@@ -116,7 +116,7 @@ The output is LaTeX-like:
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
-- normal text is not automatically escaped for LaTeX special characters
+- normal text is mostly kept as written; ampersands are escaped for LaTeX
 
 ### Mathematics
 

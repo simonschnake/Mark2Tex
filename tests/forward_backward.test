@@ -1,0 +1,15 @@
+# Forward & Backward
+
+- Aus Text können wir Trainingspaare bilden: Eingabetoken → richtiges nächstes Token.
+  - Mit dem richtigen nächsten Token als Ziel können wir den Fehler berechnen.
+  - Backpropagation optimiert sowohl die Netzwerkgewichte als auch die Embeddings.
+..................................................
+\section{Forward \& Backward}
+
+\begin{itemize}
+\item Aus Text können wir Trainingspaare bilden: Eingabetoken → richtiges nächstes Token.
+\begin{itemize}
+\item Mit dem richtigen nächsten Token als Ziel können wir den Fehler berechnen.
+\item Backpropagation optimiert sowohl die Netzwerkgewichte als auch die Embeddings.
+\end{itemize}
+\end{itemize}

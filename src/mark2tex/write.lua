@@ -117,6 +117,12 @@ end
 
 local write
 
+-- An ampersand in ordinary prose is a LaTeX alignment character. Escape it
+-- here, while leaving raw LaTeX nodes untouched.
+local function write_text(text)
+	return text:gsub("&", "\\&")
+end
+
 local function walk(ast, out, config)
 	if ast.type == nil then
 		for _, v in ipairs(ast) do
@@ -210,7 +216,7 @@ local function walk(ast, out, config)
 			walk(ast.content, out, config)
 			out[1] = out[1] .. "}"
 		elseif ast.type == "text" then
-			out[1] = out[1] .. ast.content
+			out[1] = out[1] .. write_text(ast.content)
 		else
 			error("Unknown type: " .. ast.type)
 		end
