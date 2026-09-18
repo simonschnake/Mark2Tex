@@ -38,6 +38,25 @@ return function(luaunit)
 		luaunit.assertEquals(header.content, "Heading with **bold** and @cite")
 	end
 
+	function test_block_parser_supports_horizontal_rules()
+		local ast = parse_blocks("\nBefore\n\n  ---  \n\nAfter")
+
+		helpers.assert_node(luaunit, ast[1], "other")
+		helpers.assert_node(luaunit, ast[2], "horizontal_rule")
+		helpers.assert_node(luaunit, ast[3], "other")
+	end
+
+	function test_horizontal_rule_is_not_inline_text()
+		luaunit.assertEquals(
+			helpers.transform("Before\n\n---\n\nAfter"),
+			"Before\n\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}\n\nAfter"
+		)
+	end
+
+	function test_hyphens_inside_text_remain_text()
+		luaunit.assertEquals(helpers.transform("Before --- after"), "Before --- after")
+	end
+
 	function test_inline_parser_parses_inline_nodes()
 		local ast = parse_inlines("Heading with **bold** and @cite")
 

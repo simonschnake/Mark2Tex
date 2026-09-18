@@ -1,6 +1,7 @@
 --[[
 elements:
 - header
+- horizontal_rule
 - latex environment
 - item
 - enum
@@ -132,6 +133,8 @@ local function walk(ast, out, config)
 			out[1] = out[1] .. "{"
 			walk(ast.content, out, config)
 			out[1] = out[1] .. "}"
+		elseif ast.type == "horizontal_rule" then
+			out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"
 		elseif ast.type == "latex" then
 			out[1] = out[1] .. "\n" .. ast.content
 		elseif ast.type == "item" then
