@@ -302,44 +302,33 @@ can be used like it is locally:
 
 ## Configuration
 
-If a `mark2tex_config.lua` file exists in the working directory, it is used when
-the package is loaded. This lets you adjust the main LaTeX mappings:
+Configure Mark2TeX directly when loading the package:
 
-```lua
-return {
-  header = {
-    "chapter",
-    "section",
-    "subsection",
-    "subsubsection",
-    "paragraph",
-  },
-
-  citation = "autocite",
-  paren_citation = "parencite",
-
-  save_dir = "generated-mark2tex",
-}
+```tex
+\usepackage[
+  citation=autocite,
+  paren-citation=parencite,
+  save-dir=generated-mark2tex,
+  header={chapter,section,subsection,subsubsection,paragraph}
+]{mark2tex}
 ```
 
-The default configuration is:
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `citation` | `cite` | Command used for `@key` |
+| `paren-citation` | `parencite` | Command used for `[@key]` and citation groups |
+| `save-dir` | `mark2tex` | Directory for generated LaTeX files |
+| `header` | `{section,subsection,subsubsection,paragraph,subparagraph}` | Heading commands, from level 1 upward |
+| `verbose` | `false` | Log files when they are converted; use `verbose` or `verbose=true` to enable |
 
-```lua
-return {
-  header = {
-    "section",
-    "subsection",
-    "subsubsection",
-    "paragraph",
-    "subparagraph"
-  },
+Command names are written without a leading backslash. Load any package that
+provides your chosen citation commands separately. Enclose the comma-separated
+`header` list in braces; it replaces the entire mapping. Deeper headings use
+the last command in the list. Omitted or empty string options use their defaults.
 
-  paren_citation = "parencite",
-  citation = "cite",
-
-  save_dir = "mark2tex",
-}
-```
+The package no longer reads `mark2tex_config.lua`. Move existing settings into
+package options, using `save-dir` for `save_dir`, `paren-citation` for
+`paren_citation`, and a braced comma-separated list for `header`.
 
 ## Examples of LaTeX-friendly Markdown files
 

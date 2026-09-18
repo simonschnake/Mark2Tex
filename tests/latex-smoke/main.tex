@@ -1,6 +1,12 @@
 \documentclass{article}
 \usepackage{amsmath}
-\usepackage{mark2tex}
+\usepackage[
+  save-dir=mark2tex-output,
+  citation=textbf,
+  paren-citation=textit,
+  header={subsection,subsubsection,paragraph},
+  verbose
+]{mark2tex}
 \mdincludeonly{chapter.md}
 \begin{document}
 \mdinput{content.md}
