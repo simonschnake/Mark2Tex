@@ -81,6 +81,7 @@ blocks stays literal.
 The current parser intentionally supports only a small, tested subset:
 
 - headings with `#`, `##`, `###`, ...
+- horizontal rules with `---` on its own line
 - paragraph detection for normal text
 - HTML comments (`<!-- ... -->`), preserved as LaTeX `%` comments
 - italics with `*text*` or `_text_`

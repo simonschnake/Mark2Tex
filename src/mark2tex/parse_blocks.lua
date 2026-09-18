@@ -9,6 +9,7 @@ local double_dollar = P("$$")
 local newline = P("\n")
 local rest_of_line = (P(1) - newline) ^ 1
 local horizontal_space = S(" \t") ^ 0
+local line_end = #newline + -P(1)
 
 local grammar = {}
 
@@ -22,6 +23,19 @@ grammar.header = newline
 	/ function(t)
 		return nodes.header(#t[1], t[2])
 	end
+
+--------------------
+-- Horizontal Rule
+--------------------
+
+-- Keep the rule line-oriented so that hyphens inside ordinary paragraphs and
+-- table separator rows are not interpreted as horizontal rules.
+grammar.horizontal_rule = newline
+	* horizontal_space
+	* P("-") ^ 3
+	* horizontal_space
+	* line_end
+	/ nodes.horizontal_rule
 
 --------------------
 -- Latex Environment
@@ -218,7 +232,7 @@ grammar.table = newline
 -- Display math must be considered before a generic raw LaTeX environment.
 -- Otherwise an environment such as `aligned` consumes its surrounding
 -- delimiters and is emitted outside math mode.
-grammar.outer_elements = V("table") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

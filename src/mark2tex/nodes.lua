@@ -4,6 +4,10 @@ function nodes.header(level, content)
 	return { type = "header", level = level, content = content }
 end
 
+function nodes.horizontal_rule()
+	return { type = "horizontal_rule" }
+end
+
 function nodes.latex(content)
 	return { type = "latex", content = content }
 end
