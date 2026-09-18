@@ -1,6 +1,7 @@
 # Smoke
 
 This is **bold** text.
+Option checks: @single and [@group].
 The inline delimiters $x^2$ and \(y^2\) both work.
 
 $$

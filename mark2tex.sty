@@ -6,6 +6,20 @@
 \fi
 \ProvidesPackage{mark2tex}[2026/08/06 v0.2.0 Markdown-like fragments for LuaLaTeX]
 
+\RequirePackage{kvoptions}
+\SetupKeyvalOptions{family=mark2tex,prefix=marktotex@}
+\DeclareStringOption{citation}
+\DeclareStringOption{paren-citation}
+\DeclareStringOption{save-dir}
+\DeclareStringOption{header}
+\DeclareBoolOption[false]{verbose}
+\ProcessKeyvalOptions*
+\ifmarktotex@verbose
+  \def\marktotex@verbosevalue{true}
+\else
+  \def\marktotex@verbosevalue{false}
+\fi
+
 \RequirePackage[normalem]{ulem}
 \RequirePackage{luacode}
 \RequirePackage{array}
@@ -57,11 +71,32 @@
   local mark2tex = dofile(mark2tex_path)
   local cfg = {}
   local includeonly_paths = nil
+  cfg.verbose = token.get_macro("marktotex@verbosevalue") == "true"
 
-  local config_file = io.open("mark2tex_config.lua", "r")
-  if config_file then
-    config_file:close()
-    cfg = require("mark2tex_config")
+  -- Read option macros as data, without interpolating them into Lua source.
+  for option, key in pairs({
+    citation = "citation",
+    ["paren-citation"] = "paren_citation",
+    ["save-dir"] = "save_dir",
+    header = "header",
+  }) do
+    local value = token.get_macro("marktotex@" .. option)
+    if value and value ~= "" then
+      cfg[key] = value
+    end
+  end
+
+  if cfg.header then
+    local headings = {}
+    for heading in (cfg.header .. ","):gmatch("(.-),") do
+      heading = heading:match("^%s*(.-)%s*$")
+      if heading == "" then
+        tex.error("Invalid mark2tex header option", { "Provide a comma-separated list of command names without empty entries." })
+        return
+      end
+      headings[#headings + 1] = heading
+    end
+    cfg.header = headings
   end
 
   local function strip_tex_extension(path)

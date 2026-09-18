@@ -19,6 +19,9 @@ latex-smoke:
 	grep -Eq '^INPUT (\./)?content\.md$$' tests/latex-smoke/main.fls
 	grep -Eq '^INPUT (\./)?chapter\.md$$' tests/latex-smoke/main.fls
 	! grep -Eq '^INPUT (\./)?excluded\.md$$' tests/latex-smoke/main.fls
+	grep -Fq '\subsection{Smoke}' tests/latex-smoke/mark2tex-output/content_*.tex
+	grep -Fq '\textbf{single}' tests/latex-smoke/mark2tex-output/content_*.tex
+	grep -Fq '\textit{group}' tests/latex-smoke/mark2tex-output/content_*.tex
 
 dist: $(DIST_ARCHIVE)
 
@@ -44,6 +47,7 @@ $(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark
 		echo "longdesc the generated file back into the document."; \
 		echo "depend latex"; \
 		echo "depend luacode"; \
+		echo "depend kvoptions"; \
 		echo "depend ulem"; \
 		echo "depend tools"; \
 		echo "depend booktabs"; \
