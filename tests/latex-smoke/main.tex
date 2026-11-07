@@ -7,6 +7,10 @@
   header={subsection,subsubsection,paragraph},
   verbose
 ]{mark2tex}
+\usepackage{hyperref}
+% Keep annotations inspectable by the dependency-free link regression check.
+\pdfvariable compresslevel=0
+\pdfvariable objcompresslevel=0
 \mdincludeonly{chapter.md}
 \begin{document}
 \mdinput{content.md}
@@ -14,6 +18,9 @@
 \mdinput{tables.md}
 \clearpage
 \mdinput{blockquote.md}
+\clearpage
+\section{Grundlagen}\label{grundlagen}
+\mdinput{links.md}
 \mdinclude{chapter.md}
 \mdinclude{excluded.md}
 \end{document}

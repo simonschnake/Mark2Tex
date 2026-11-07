@@ -1,5 +1,9 @@
 local nodes = {}
 
+function nodes.link(destination, content, title, kind)
+	return { type = "link", destination = destination, content = content, title = title, kind = kind or "inline" }
+end
+
 function nodes.header(level, content)
 	return { type = "header", level = level, content = content }
 end

@@ -1,4 +1,5 @@
 local diagnostics = {}
+local links = require("mark2tex.links")
 
 local function source_position(source, position)
 	local prefix = source:sub(1, position - 1)
@@ -151,7 +152,7 @@ end
 
 function diagnostics.collect(source)
 	local warnings = {}
-	local scanned = mask_code(source)
+	local scanned = links.mask_destinations(mask_code(source))
 	display_warnings(scanned, source, warnings)
 	environment_warnings(scanned, source, warnings)
 	return warnings

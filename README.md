@@ -87,7 +87,8 @@ The current parser intentionally supports only a small, tested subset:
 - italics with `*text*` or `_text_`
 - bold with `**text**` or `__text__`
 - strikethrough with `~~text~~`
-- inline code with backticks, e.g. `` `code` ``
+- inline code with backticks, e.g. `` `code` ``; LaTeX special characters stay literal
+- inline links (`[label](target)`), URL autolinks, and email autolinks
 - fenced code blocks with three backticks
 - fenced `tex` blocks as raw LaTeX output
 - blockquotes with `>`
@@ -117,6 +118,30 @@ The output is LaTeX-like:
 - `tex` code blocks are emitted unchanged as LaTeX
 - `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
 - normal text is mostly kept as written; ampersands are escaped for LaTeX
+
+### Links
+
+Load `\usepackage{hyperref}` in your document preamble when using Markdown
+links. Mark2TeX reports a package error if it is missing.
+
+```md
+[Website](https://example.org/page?x=1&y=2#part)
+[PDF](<unterlagen/Auswahl der Inhalte.pdf>)
+[Section](#grundlagen)
+<https://example.org/a_b>
+<a_b@example.org>
+```
+
+Inline labels support formatting, code, and inline math. Destinations stay
+opaque to Markdown parsing. Parentheses may be balanced or escaped; angle
+brackets allow spaces in a destination. Optional quoted or parenthesized titles
+are parsed but do not appear in the output. URI spaces become `%20`; local file
+paths retain their spaces. A target beginning with `#` refers to an existing
+LaTeX label through `\hyperref`.
+
+Reference links, images, and nested links are unsupported. Bare URLs require
+angle brackets to become autolinks. Links inside code, math, and raw LaTeX
+arguments are left alone.
 
 ### Mathematics
 
@@ -186,7 +211,7 @@ before or after a list remain separate paragraphs.
 Mark2TeX is not a full Markdown converter. In particular, do not expect the
 following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
-- links and images in Markdown syntax
+- images in Markdown syntax
 - HTML blocks other than comments
 - footnotes
 - task lists

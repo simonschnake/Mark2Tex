@@ -16,12 +16,14 @@ test:
 
 latex-smoke:
 	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
+	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
 	grep -Eq '^INPUT (\./)?content\.md$$' tests/latex-smoke/main.fls
 	grep -Eq '^INPUT (\./)?chapter\.md$$' tests/latex-smoke/main.fls
 	! grep -Eq '^INPUT (\./)?excluded\.md$$' tests/latex-smoke/main.fls
 	grep -Fq '\subsection{Smoke}' tests/latex-smoke/mark2tex-output/content_*.tex
 	grep -Fq '\textbf{single}' tests/latex-smoke/mark2tex-output/content_*.tex
 	grep -Fq '\textit{group}' tests/latex-smoke/mark2tex-output/content_*.tex
+	$(LUA) tests/check_links_pdf.lua
 
 dist: $(DIST_ARCHIVE)
 

@@ -18,6 +18,7 @@ elements:
 --]]
 
 local comments = require("mark2tex.comments")
+local links = require("mark2tex.links")
 
 local function is_list_node(ast)
 	return ast.type == "item" or ast.type == "enum"
@@ -123,6 +124,19 @@ local function write_text(text)
 	return text:gsub("&", "\\&")
 end
 
+-- Inline code is literal text inside a TeX argument. Escape in one pass so
+-- generated commands are not escaped again. Raw LaTeX has its own AST nodes.
+local function write_inline_code(text)
+	local escapes = {
+		["\\"] = "\\textbackslash{}",
+		["^"] = "\\textasciicircum{}",
+		["~"] = "\\textasciitilde{}",
+	}
+	return (text:gsub("[\\%%{}#&_$^~]", function(character)
+		return escapes[character] or "\\" .. character
+	end))
+end
+
 local function walk(ast, out, config)
 	if ast.type == nil then
 		for _, v in ipairs(ast) do
@@ -154,7 +168,7 @@ local function walk(ast, out, config)
 			out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
 		elseif ast.type == "blockquote" then
 			out[1] = out[1] .. "\n\\begin{quote}\n"
-			out[1] = out[1] .. write(ast.content, config)
+			out[1] = out[1] .. write(ast.content, config, true)
 			out[1] = out[1] .. "\n\\end{quote}"
 		elseif ast.type == "table" then
 			out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\begin{tabularx}{\\linewidth}{" .. table_columns(ast) .. "}\n\\toprule\n"
@@ -190,10 +204,34 @@ local function walk(ast, out, config)
 				out[1] = out[1] .. "[" .. ast.locator .. "]"
 			end
 			out[1] = out[1] .. "{" .. table.concat(ast.content, ", ") .. "}"
+		elseif ast.type == "link" then
+			local destination = ast.destination
+			if destination:match("^[%a][%w+.-]*:") then
+				destination = destination:gsub(" ", "%%20")
+			end
+			if ast.kind == "autolink" then
+				out[1] = out[1] .. "\\url{" .. links.tex_destination(destination) .. "}"
+			else
+				if destination:sub(1, 1) == "#" and #destination > 1 then
+					out[1] = out[1] .. "\\hyperref[" .. links.tex_destination(destination:sub(2)) .. "]{"
+				else
+					out[1] = out[1] .. "\\href{" .. links.tex_destination(destination) .. "}{"
+				end
+				if ast.kind == "email" then
+					local address = ast.destination:sub(8)
+					out[1] = out[1] .. "\\nolinkurl{" .. links.tex_destination(address) .. "}"
+				else
+					walk(ast.content, out, config)
+				end
+				out[1] = out[1] .. "}"
+			end
+		elseif ast.type == "literal" then
+			local escapes = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
+			out[1] = out[1] .. (escapes[ast.content] or ast.content:gsub("[%%{}#&_$]", "\\%0"))
 		elseif ast.type == "citation" then
 			out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
 		elseif ast.type == "verbatim" then
-			out[1] = out[1] .. "\\texttt{" .. ast.content .. "}"
+			out[1] = out[1] .. "\\texttt{" .. write_inline_code(ast.content) .. "}"
 		elseif ast.type == "inline_math" or ast.type == "latex_cmd" then
 			out[1] = out[1] .. ast.content
 		elseif ast.type == "display_math" then
@@ -223,7 +261,21 @@ local function walk(ast, out, config)
 	end
 end
 
-write = function(ast, config)
+local function contains_links(ast)
+	for _, node in ipairs(ast) do
+		if node.type == "link" then return true end
+		if type(node.content) == "table" and contains_links(node.content) then return true end
+		if node.type == "table" then
+			for _, cell in ipairs(node.headers) do if contains_links(cell) then return true end end
+			for _, row in ipairs(node.rows) do
+				for _, cell in ipairs(row) do if contains_links(cell) then return true end end
+			end
+		end
+	end
+	return false
+end
+
+write = function(ast, config, nested)
 	local output = { "" }
 	local list_stack = {}
 
@@ -239,7 +291,11 @@ write = function(ast, config)
 
 	close_all_lists(output, list_stack)
 
-	return comments.restore(output[1]:sub(2), ast.comments) -- remove first newline that was added
+	local result = comments.restore(output[1]:sub(2), ast.comments)
+	if not nested and contains_links(ast) then
+		result = "\\ifcsname hyper@normalise\\endcsname\\else\\PackageError{mark2tex}{Markdown links require hyperref}{Load \\string\\usepackage{hyperref} in the document preamble.}\\fi\n" .. result
+	end
+	return result -- remove first newline that was added
 end
 
 return write

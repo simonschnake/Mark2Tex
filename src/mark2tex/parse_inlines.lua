@@ -1,6 +1,7 @@
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local math = require("mark2tex.math")
+local links = require("mark2tex.links")
 
 local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
 
@@ -8,6 +9,7 @@ local newline = P("\n")
 local escape = S("@$`*\\") + P("[@") + P("_") + P("~~")
 
 local grammar = {}
+local parse_inlines
 
 --------------------
 -- Citation
@@ -128,13 +130,18 @@ grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethro
 grammar[1] = Ct((V("elements") + V("text")) ^ 0)
 grammar = P(grammar) * -1
 
-local function parse_inlines(str, options)
-	local protected, tokens, warnings = math.protect_inlines(str, options)
+parse_inlines = function(str, options)
+	options = options or {}
+	local link_protected, link_tokens, link_warnings = links.protect(str, function(label)
+		return parse_inlines(label, { allow_display = false, disable_links = true, link_label = true })
+	end, options)
+	local protected, tokens, warnings = math.protect_inlines(link_protected, options)
+	for _, warning in ipairs(link_warnings) do warnings[#warnings + 1] = warning end
 	local parsed = grammar:match(protected)
 	if parsed == nil then
-		return { nodes.text(str) }, warnings
+		parsed = { nodes.text(protected) }
 	end
-	return math.expand_tokens(parsed, tokens), warnings
+	return links.expand(math.expand_tokens(parsed, tokens), link_tokens), warnings
 end
 
 return parse_inlines

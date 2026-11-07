@@ -1,0 +1,11 @@
+*Quelle: `Beispiel_Datei_2000-01-01.pdf`.*
+
+Literal code: `a_b % # & $ {x} ^ ~ path\file`.
+
+**Nested `key_value`** and `\LaTeX` stays a command.
+..................................................
+\emph{Quelle: \texttt{Beispiel\_Datei\_2000-01-01.pdf}.}
+
+Literal code: \texttt{a\_b \% \# \& \$ \{x\} \textasciicircum{} \textasciitilde{} path\textbackslash{}file}.
+
+\textbf{Nested \texttt{key\_value}} and \LaTeX stays a command.

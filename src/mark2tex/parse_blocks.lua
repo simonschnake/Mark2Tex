@@ -1,5 +1,6 @@
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
+local links = require("mark2tex.links")
 
 local P, S, R, C, Ct, V = lpeg.P, lpeg.S, lpeg.R, lpeg.C, lpeg.Ct, lpeg.V
 
@@ -176,10 +177,11 @@ local function split_table_row(line)
 	local cells = {}
 	local cell_start = 1
 	local in_math = false
+	local scanned = links.mask_destinations(line)
 	local in_code = false
 
 	for index = 1, #line do
-		local character = line:sub(index, index)
+		local character = scanned:sub(index, index)
 		local previous = index > 1 and line:sub(index - 1, index - 1) or ""
 
 		if character == "`" and previous ~= "\\" and not in_math then
