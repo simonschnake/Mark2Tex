@@ -14,6 +14,18 @@ local line_end = #newline + -P(1)
 
 local grammar = {}
 
+-- Definitions are blocks, so fenced code and raw LaTeX remain untouched.
+local footnote_indent = P("    ") + P("\t")
+local footnote_continuation = newline * (horizontal_space * newline) ^ 0
+	* footnote_indent * (P(1) - newline) ^ 0
+grammar.footnote_definition = newline * P(" ") ^ -3 * P("[^")
+	* C((P(1) - S("[] \t\r\n")) ^ 1) * P("]:")
+	* C((P(1) - newline) ^ 0 * footnote_continuation ^ 0)
+	/ function(identifier, content)
+		content = content:gsub("\n    ", "\n"):gsub("\n\t", "\n")
+		return nodes.footnote_definition(identifier, content:match("^%s*(.-)%s*$"))
+	end
+
 --------------------
 -- Header
 --------------------
@@ -235,7 +247,7 @@ grammar.table = newline
 -- Display math must be considered before a generic raw LaTeX environment.
 -- Otherwise an environment such as `aligned` consumes its surrounding
 -- delimiters and is emitted outside math mode.
-grammar.outer_elements = V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("footnote_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
 	return nodes.other(t)

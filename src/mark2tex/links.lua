@@ -295,4 +295,7 @@ function links.tex_destination(value)
 	return table.concat(output)
 end
 
+-- Shared by inline extensions so code, math and TeX stay opaque.
+links.protected_end = protected_end
+
 return links

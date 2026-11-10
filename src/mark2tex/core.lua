@@ -7,7 +7,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v10"
+local CACHE_VERSION = "v11"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -125,14 +125,16 @@ self.convert = function (input_path, cfg)
         return output_path
     end
 
-	local ast = parse(content, config)
+	local ast = parse(content, config, input_path)
 	for _, warning in ipairs(ast.warnings or {}) do
-		local subject = warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
+		local subject = warning.identifier and ("footnote " .. warning.identifier)
+			or warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
 		if warning.kind == "mismatched" then
 			subject = subject .. " (expected \\end{" .. warning.expected_end .. "}, found \\end{" .. warning.actual_end .. "})"
 		end
 		local location = warning.line and (input_path .. ":" .. warning.line .. ":" .. warning.column .. ": ") or ""
-		io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. "; kept literal\n")
+		local action = warning.kind == "duplicate" and "; first definition used" or "; kept literal"
+		io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. action .. "\n")
 	end
 	local tex = write(ast, config)
 

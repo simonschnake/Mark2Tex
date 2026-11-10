@@ -24,6 +24,7 @@ latex-smoke:
 	grep -Fq '\textbf{single}' tests/latex-smoke/mark2tex-output/content_*.tex
 	grep -Fq '\textit{group}' tests/latex-smoke/mark2tex-output/content_*.tex
 	$(LUA) tests/check_links_pdf.lua
+	$(LUA) tests/check_footnotes.lua
 
 dist: $(DIST_ARCHIVE)
 

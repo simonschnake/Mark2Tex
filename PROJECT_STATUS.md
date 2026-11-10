@@ -1,6 +1,6 @@
 # Mark2TeX Projektstatus
 
-Stand: 7. November 2026. Die genaue Syntax und Installation stehen in README.md.
+Stand: 10. November 2026. Die genaue Syntax und Installation stehen in README.md.
 
 ## Aktueller Stand
 
@@ -15,6 +15,8 @@ HTML-Kommentare bleiben als Kommentare im generierten TeX erhalten.
 
 Die aktuellen Ergänzungen:
 
+- Referenzierte und Inline-Fußnoten mit Formatierung, mehrzeiligen Definitionen
+  und wiederholten Verweisen auf dieselbe Nummer; Warnungen bei ungültigen Markern.
 - Inline-Links, URL- und E-Mail-Autolinks mit geschützten Linkzielen.
 - Formatierung, Inline-Code und Mathematik in Linkbeschriftungen.
 - Lokale Dateiziele mit Leerzeichen und Verweise auf bestehende LaTeX-Labels.
@@ -47,8 +49,8 @@ ausgeschlossen.
   sinnvolle größere Umbauten.
 - Diagnosen existieren für Mathematik und LaTeX-Umgebungen; Positionsangaben
   und Warnungen für weitere Parserfälle können verbessert werden.
-- Vollständige CommonMark-Kompatibilität ist kein Ziel. Bilder, Referenzlinks,
-  Fußnoten und Task-Listen sind weiterhin nicht unterstützt.
+- Vollständige CommonMark-Kompatibilität ist kein Ziel. Bilder, Referenzlinks
+  und Task-Listen sind weiterhin nicht unterstützt.
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.
 - Weitere Grenzfälle für verschachtelte Inlines, Include-Pfade und große

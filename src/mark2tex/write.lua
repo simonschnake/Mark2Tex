@@ -225,6 +225,16 @@ local function walk(ast, out, config)
 				end
 				out[1] = out[1] .. "}"
 			end
+		elseif ast.type == "footnote" then
+			if ast.repeated then
+				out[1] = out[1] .. "\\footref{" .. ast.label .. "}"
+			else
+				out[1] = out[1] .. "\\footnote{"
+				if ast.label then out[1] = out[1] .. "\\label{" .. ast.label .. "}" end
+				if ast.inline then walk(ast.content, out, config)
+				else out[1] = out[1] .. write(ast.content, config, true) end
+				out[1] = out[1] .. "}"
+			end
 		elseif ast.type == "literal" then
 			local escapes = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
 			out[1] = out[1] .. (escapes[ast.content] or ast.content:gsub("[%%{}#&_$]", "\\%0"))

@@ -101,6 +101,7 @@ The current parser intentionally supports only a small, tested subset:
 - some nested list forms
 - single citations such as `@key`
 - Pandoc-style citation groups such as `[@key1; @key2]`, including locators such as `[@key, p. 433]`
+- referenced footnotes (`[^name]` with `[^name]: ...`) and inline footnotes (`^[...]`)
 - raw LaTeX environments with `\begin{...}` and `\end{...}`
 - raw LaTeX environments with optional `$$ ... $$` or `\\[ ... \\]` wrappers
 
@@ -142,6 +143,40 @@ LaTeX label through `\hyperref`.
 Reference links, images, and nested links are unsupported. Bare URLs require
 angle brackets to become autolinks. Links inside code, math, and raw LaTeX
 arguments are left alone.
+
+### Footnotes
+
+Use a named definition or write a short footnote directly in the text:
+
+```md
+Text with a footnote[^note] and an inline note^[An *inline* footnote.].
+Another reference to the same note[^note].
+
+[^note]: A footnote with **formatting**, `code`, $x^2$, and @citation.
+    Continue a line with four spaces or a tab.
+
+    Indented paragraphs and lists are supported too.
+```
+
+Definitions may appear before or after their references. Identifiers are
+case-sensitive, contain no whitespace or brackets, and are scoped to one
+Markdown input file, including its blockquotes. Unused definitions are omitted;
+for duplicate definitions the first wins and a `footnote` warning is emitted.
+The first reference emits a LaTeX `\footnote`; later references use `\footref`
+with the same number. Compile twice to resolve repeated references. Numbering
+uses the document's normal LaTeX footnote counter.
+
+Notes support inline formatting, code, math, citations, links, and raw LaTeX.
+Referenced definitions also support paragraphs and lists. Fenced code in a
+definition is rendered as literal `\texttt` text, with ordinary TeX whitespace,
+because a `verbatim` environment cannot be used inside a footnote argument.
+Links still require `hyperref`. Footnote markers work in paragraphs, list items,
+blockquotes, and pipe-table cells. Nested footnotes and footnotes in headings
+or link labels are unsupported: their markers are displayed literally and
+reported as warnings. Undefined references and unclosed markers also produce
+warnings; their carets are escaped for safe LaTeX output. Code, math, and raw
+LaTeX arguments are not scanned for footnote syntax. Direct `\footnote{...}`
+commands remain unchanged and use LaTeX syntax inside their arguments.
 
 ### Mathematics
 
@@ -213,7 +248,6 @@ following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
 - images in Markdown syntax
 - HTML blocks other than comments
-- footnotes
 - task lists
 - reference links
 - arbitrary escaping rules

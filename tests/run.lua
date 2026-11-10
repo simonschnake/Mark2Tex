@@ -159,5 +159,6 @@ require("tests.unit_core")(luaunit)
 require("tests.unit_ast")(luaunit)
 require("tests.unit_tables")(luaunit)
 require("tests.unit_links")(luaunit)
+require("tests.unit_footnotes")(luaunit)
 
 os.exit(luaunit.LuaUnit.run())

@@ -1,5 +1,13 @@
 local nodes = {}
 
+function nodes.footnote(content, label, repeated)
+	return { type = "footnote", content = content, label = label, repeated = repeated }
+end
+
+function nodes.footnote_definition(identifier, content)
+	return { type = "footnote_definition", identifier = identifier, content = content }
+end
+
 function nodes.link(destination, content, title, kind)
 	return { type = "link", destination = destination, content = content, title = title, kind = kind or "inline" }
 end
