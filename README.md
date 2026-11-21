@@ -1,12 +1,179 @@
 # Mark2TeX
 
-Mark2TeX compiles Markdown to PDF from the command line and reads Markdown-like
-fragments inside LuaLaTeX documents. Both use the same Lua converter.
+Mark2TeX lets me write scientific material in Markdown and use LaTeX wherever I need it. The same Lua converter supports two ways of working.
 
-The focus is on a LaTeX-friendly writing style for scientific documents, not
-on full Markdown or CommonMark compatibility. If compatibility with common
-Markdown tools happens as a side effect, that is welcome, but it is not the
-primary project goal.
+1. **Markdown chapters inside a LaTeX project.** The main document controls the class, bibliography, layout, and chapter order. Each chapter can live in a Markdown file, with TeX equations, citations, commands, and environments alongside the prose.
+2. **A PDF from a standalone Markdown file.** The command-line tool supplies a consistent layout or uses a template of my choice. From one lecture source, I can build a handout and presentation slides. Both can have an instructor edition with teaching notes or solutions.
+
+## How it got here
+
+I wrote the first version for my PhD thesis. It was a large LaTeX project, and I wanted to write each chapter as a Markdown file while keeping all the possibilities of TeX. Embedding Markdown in the existing document let me keep the preamble and the typesetting decisions I had already made. The first parser handled just the syntax my thesis needed. The LaTeX package `markdown` was an inspiration, though its design choices did not fit the way I wanted to write.
+
+I kept using Mark2TeX after the thesis. Its Markdown support grew as I needed new constructs in real documents. The way I develop it has changed as well. I wrote the original thesis version myself. Since then, AI has written an increasing share of the code.
+
+The CLI came later, when most of my everyday writing had become individual documents. I wanted to start with one Markdown file and get a consistently formatted PDF without setting up a LaTeX project each time. Lectures are the current focus of that workflow. I want to explain a derivation in the script, present it in stages on slides, and keep a solution in the instructor edition, while editing the shared equations and prose only once.
+
+## Compatibility and scope
+
+I am currently the only user, so my day-to-day work shapes what gets built. There is no fixed roadmap. Other people's use cases could change the direction. I want to keep writing new LaTeX projects with Markdown chapters, so direct integration remains a core use case. My thesis is a concrete compatibility benchmark for the package. Lecture profiles and slide layout options are opt-in.
+
+I use Mark2TeX daily and maintain automated parser, LaTeX, and CLI tests. Security has received less attention. Source files can contain executable TeX, and custom templates are complete LaTeX documents compiled with LuaLaTeX. I use this workflow for trusted inputs. Compiling a stranger's document calls for an isolated environment with restricted file access.
+
+## Usage and reference
+
+- [Include Markdown in a LaTeX project](#latex-usage)
+- [Compile a standalone PDF or use a custom template](#compile-markdown-to-pdf)
+- [Prepare lecture scripts and slides](#lectures-as-handouts-and-slides)
+- [Look up supported Markdown syntax](#supported-markdown-subset)
+
+## LaTeX usage
+
+With the package installed, put these two files in the same directory.
+
+`main.tex`
+
+```tex
+\documentclass{article}
+\usepackage{mark2tex}
+
+\begin{document}
+
+\mdinput{content.md}
+
+\end{document}
+```
+
+`content.md`
+
+```md
+# Introduction
+
+This chapter combines **Markdown prose** with TeX math such as $E = mc^2$.
+```
+
+Build `main.pdf` with:
+
+```sh
+latexmk -lualatex main.tex
+```
+
+`\mdinput{...}` converts the given Markdown file to LaTeX and inputs the
+generated file via `\input`. Generated files are placed in the `mark2tex/`
+directory by default.
+
+For chapter-like files there is also:
+
+```tex
+\mdinclude{chapter.md}
+```
+
+This inputs the generated file via `\include`.
+
+To compile only selected Markdown includes, use `\mdincludeonly` in the
+preamble with the same Markdown paths passed to `\mdinclude`:
+
+```tex
+\mdincludeonly{introduction.md,conclusion.md}
+```
+
+Like LaTeX's `\includeonly`, excluded files retain their auxiliary data. They
+are not converted or registered as inputs during that run. An empty
+`\mdincludeonly{}` excludes all `\mdinclude` files. `\mdinput` is unaffected.
+
+Both `\mdinput` and `\mdinclude` register their Markdown source files with
+LuaTeX's recorder. Build tools such as `latexmk` can therefore detect Markdown
+changes from the generated `.fls` file and rebuild the document automatically.
+
+Important: Mark2TeX requires LuaLaTeX. Other engines such as pdfLaTeX are not
+supported.
+
+## Install the LaTeX package
+
+You can build a TeX Live package archive from this repository:
+
+```sh
+make dist
+```
+
+This produces `dist/mark2tex.tar.xz`. The archive contains a TDS structure and
+an embedded `tlpobj`, so it can be installed directly with `tlmgr`:
+
+```sh
+tlmgr install --file dist/mark2tex.tar.xz
+```
+
+To check the archive without installing it, use:
+
+```sh
+make tlmgr-install-dry-run
+```
+
+The package installs `mark2tex.sty` under `tex/latex/mark2tex/` and the Lua
+implementation under `scripts/mark2tex/`.
+
+### Overleaf
+
+Overleaf usually does not allow project-local installation via `tlmgr`.
+For Overleaf there is therefore a separate bundle:
+
+```sh
+make overleaf-zip
+```
+
+This produces `dist/mark2tex-overleaf.zip`. That archive is not a TeX Live
+installation; instead it contains the files in a form that can be uploaded
+directly into an Overleaf project:
+
+```text
+mark2tex.sty
+mark2tex.lua
+src/mark2tex/*.lua
+README.md
+LICENSE
+```
+
+In Overleaf, `mark2tex.sty` and `mark2tex.lua` must live at the top level of the
+project; the `src/mark2tex/` directory must remain relative to them. In the
+Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
+can be used like it is locally:
+
+```tex
+\usepackage{mark2tex}
+
+\begin{document}
+\mdinput{content.md}
+\end{document}
+```
+
+## Configuration
+
+Configure Mark2TeX directly when loading the package:
+
+```tex
+\usepackage[
+  citation=autocite,
+  paren-citation=parencite,
+  save-dir=generated-mark2tex,
+  header={chapter,section,subsection,subsubsection,paragraph}
+]{mark2tex}
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `citation` | `cite` | Command used for `@key` |
+| `paren-citation` | `parencite` | Command used for `[@key]` and citation groups |
+| `save-dir` | `mark2tex` | Directory for generated LaTeX files |
+| `header` | `{section,subsection,subsubsection,paragraph,subparagraph}` | Heading commands, from level 1 upward |
+| `verbose` | `false` | Log files when they are converted; use `verbose` or `verbose=true` to enable |
+
+Command names are written without a leading backslash. Load any package that
+provides your chosen citation commands separately. Enclose the comma-separated
+`header` list in braces; it replaces the entire mapping. Deeper headings use
+the last command in the list. Omitted or empty string options use their defaults.
+
+The package no longer reads `mark2tex_config.lua`. Move existing settings into
+package options, using `save-dir` for `save_dir`, `paren-citation` for
+`paren_citation`, and a braced comma-separated list for `header`.
 
 ## Compile Markdown to PDF
 
@@ -18,8 +185,9 @@ The TeX Live and Overleaf archives can still be used independently with
 `\usepackage{mark2tex}` and `\mdinput`.
 
 ```sh
-mark2tex lecture.md                                                    # lecture.pdf
+mark2tex notes.md                                                      # notes.pdf
 mark2tex lecture.md --format handout --writing-margin                    # lecture-handout.pdf
+mark2tex lecture.md --format handout --instructor                        # lecture-handout-dozent.pdf
 mark2tex lecture.md --format slides                                      # lecture-slides.pdf
 mark2tex lecture.md --format slides --dozent                             # lecture-slides-dozent.pdf
 mark2tex lecture.md --format slides --speaker-notes                      # lecture-slides-speaker-notes.pdf
@@ -28,11 +196,20 @@ mark2tex lecture.md --format slides --speaker-notes                      # lectu
 Pass `-o path/to/file.pdf` to choose a destination. Relative TeX graphics
 paths are resolved from the Markdown file's directory. Use `--title`,
 `--author`, and `--date` for metadata. The author and date default to empty.
-Text and handout builds support `--paper a4|letter`, `--toc`, and
-`--numbered`. Handouts and slides accept `--slide-level` (default 2).
-For raw TeX learning blocks, `\begin{Lernblock}{Title}` begins a section
-or a slide. The starred form continues the previous section in text and
-handouts.
+With the built-in template, text and handout builds support
+`--paper a4|letter`, `--toc`, and `--numbered`. Handouts and slides accept
+`--slide-level` (default 2). Slides also accept `--h1 section|frame|hide`
+and `--speaker-notes`. Use `--instructor` or its alias `--dozent` in any
+format to select the instructor edition and add `-dozent` to the default
+filename.
+
+Mark2TeX converts Markdown citations into LaTeX citation commands. The CLI
+disables automatic BibTeX and Biber runs. To build a bibliography from a
+`.bib` file, use the LaTeX package workflow with your bibliography setup.
+
+For raw TeX learning blocks, the built-in templates define
+`\begin{Lernblock}{Title}` to begin a section or a slide. The starred form
+continues the previous section in text and handouts.
 
 Use `--watch` to build immediately and rebuild when the Markdown source
 changes. `--watch-delay` sets the quiet period before rebuilding (default
@@ -43,12 +220,70 @@ a fresh regular build if it cannot use the format. A failed build preserves
 the last PDF and prints the build directory. `--log`, `--log-file`,
 `--verbose`, and `--keep-build` expose build diagnostics.
 
-### Migrate from md2pdf
+### Use a complete LaTeX template
 
-Replace `md2pdf datei.md` with `mark2tex datei.md`. The format flags and
-their PDF filenames carry over. The neutral STIX layout is the default.
-Pass `--author` to supply an author. Use md2pdf for existing documents that
-still require its institution-specific layouts.
+```sh
+mark2tex lecture.md --format slides --template path/to/lecture.tex \
+  --title "Lecture 5" --title-image images/cover.png --dozent --speaker-notes
+```
+
+The UTF-8 `.tex` template supplies the document class, preamble, fonts, theme,
+and body. Paths passed to `--template` and `--title-image` are relative to
+the working directory. Title images can be PNG, JPEG, or PDF.
+Load the generated `mark2tex-template.tex` before using the interface. Insert
+the converted Markdown with `\MarkTwoTeXContent` inside the document body.
+
+```latex
+\documentclass[aspectratio=169]{beamer}
+\input{mark2tex-template.tex}
+\usepackage{mark2tex}
+\providecommand{\SlideFooter}[1]{}
+\MarkTwoTeXHideDozent
+\ifMarkTwoTeXSpeakerNotes
+  \setbeameroption{show notes on second screen=right}
+\fi
+\title{\MarkTwoTeXTitle}
+\author{\MarkTwoTeXAuthor}
+\date{\MarkTwoTeXDate}
+\ifMarkTwoTeXHasTitleImage
+  \titlegraphic{\includegraphics[height=1.5cm]{\MarkTwoTeXTitleImage}}
+\fi
+\begin{document}
+\ifMarkTwoTeXHasTitle
+  \begin{frame}\titlepage\end{frame}
+\fi
+\MarkTwoTeXContent
+\end{document}
+```
+
+- `\MarkTwoTeXTitle`, `\MarkTwoTeXAuthor`, and `\MarkTwoTeXDate` contain escaped text.
+  `\ifMarkTwoTeXHasTitle` indicates whether `--title` was supplied.
+- `\MarkTwoTeXFormat`, `\MarkTwoTeXSlideLevel`, `\MarkTwoTeXLanguage`,
+  `\MarkTwoTeXPaper`, and `\MarkTwoTeXFontSize` expose the CLI settings.
+  Font size is empty by default. Load the template data before
+  `\documentclass` if the class options depend on these settings.
+- `\ifMarkTwoTeXDozent`, `\ifMarkTwoTeXSpeakerNotes`, `\ifMarkTwoTeXNoFooter`,
+  `\ifMarkTwoTeXWritingMargin`, `\ifMarkTwoTeXNumbered`, and `\ifMarkTwoTeXTOC`
+  let the template apply those presentation choices. After loading
+  `mark2tex` in Beamer, call `\MarkTwoTeXHideDozent` to reserve space for
+  instructor content on regular slides. A template can also define its own
+  `MarkTwoTeXDozent` environment.
+- `\ifMarkTwoTeXHasTitleImage` indicates whether `--title-image` supplied an
+  image. Pass `\MarkTwoTeXTitleImage` to the template's image command.
+
+The template applies layout flags itself. If the Markdown uses raw TeX
+environments such as `Lernblock`, define them in the template.
+
+The Markdown and template directories are both searched for relative input
+files, with the Markdown directory first. Set `TEXINPUTS` for additional
+class, theme, or asset directories. The build cache checks the template,
+title image, and recorded TeX dependencies. Watch mode monitors the Markdown,
+main template, and title image. `--cache-format` also precompiles the template
+prefix if it contains a line `% mark2tex runtime`. Keep the generated template
+data, runtime Lua initialization, and document body after that marker. Without
+the marker, the CLI uses the regular build and PDF cache.
+
+### Offline installation and standalone conversion
 
 To build a wheel for offline installation, run
 `python -m pip wheel --no-deps -w dist .` from the checkout. Install that
@@ -64,12 +299,136 @@ prints the generated TeX fragment path. It accepts optional Lua profile
 settings such as `profile=slides slide_level=2`. An explicit `document_id`
 keeps generated footnote label prefixes stable across source edits.
 
-## What Mark2TeX is for
+## Lectures as handouts and slides
 
-Mark2TeX is useful when larger chunks of text are more convenient to write in a
-Markdown-like syntax, while the target document should still remain a real
-LaTeX document. LaTeX commands, mathematical expressions, citations, and raw
-LaTeX environments are therefore intentionally allowed inside the Markdown.
+Both LuaLaTeX documents read the same Markdown file with
+`\mdinput{lecture.md}`. For an `article` handout, load
+`\usepackage[profile=handout,slide-level=2]{mark2tex}`. For Beamer slides,
+load `\usepackage[profile=slides,slide-level=2]{mark2tex}`. The standard
+conversion is the default. Direct Lua calls use `profile` and `slide_level`.
+
+- Unindented headings at the selected level start a titled slide. Higher-level
+  headings create section title slides. Lower-level headings appear as
+  subheadings within a slide. In handouts, `header` controls heading formatting.
+- A line of at least three hyphens with a blank line on each side starts a
+  continuation slide. In handouts, it adds paragraph spacing.
+- Place `<!-- mark2tex: slide-title="Custom title" -->` immediately after
+  the separator as the first block to give the continuation slide a plain-text title.
+- A standalone `. . .` paragraph creates a Beamer overlay. In handouts, the
+  blocks appear in sequence.
+
+Headings, separators, and pauses follow the conventions of
+[Pandoc's Beamer output](https://pandoc.org/MANUAL.html#structuring-the-slide-show).
+A standard Markdown preview displays the pauses as three dots and the
+separators as horizontal rules.
+
+The [black hole example](tests/lecture/lecture.md) includes an
+[A4 template](tests/lecture/handout.tex) and a
+[16:9 template](tests/lecture/folien.tex). The
+[shared style](tests/lecture/satzstil.tex) sets a 155 mm text column and
+12.75 bp body type, with STIX Two fonts and Latin Modern Sans for titles.
+Run `make -j2 latex-lecture` to build and check the PDFs in `tests/lecture/`.
+The test uses LuaLaTeX, Beamer, STIX Two, and Poppler's `pdfinfo` and `pdftotext`.
+
+### Content visibility and top-level headings
+
+`<!-- script: begin -->` selects text and handout output.
+`<!-- slides: begin -->` selects slides.
+`<!-- instructor: begin -->` selects the instructor edition.
+`<!-- student: begin -->` selects the regular edition.
+Put each marker on its own line. `<!-- end -->` closes the innermost open
+block. Nested content appears when every enclosing condition matches.
+Mark2TeX filters the content before laying out slides, so excluded blocks
+take up no space. A standard Markdown preview shows all blocks.
+A missing or extra closing marker stops conversion with a line number.
+
+Use `--instructor` or `--dozent` in the CLI. Direct Lua calls and package
+options use `audience=instructor`. The default is `audience=student`.
+Use the `dozent` comments below to reserve space for a solution on regular
+slides.
+
+Use `--h1 section|frame|hide` to control top-level headings on slides.
+The default `section` follows the slide-level rule. `frame` uses the heading
+as the title of a regular content slide. `hide` drops the heading, keeps
+its content, and skips the slide break. Direct Lua calls and package options
+use `h1`. The handout preserves the heading levels of visible content.
+
+In this example, the derivation gets a third-level heading in the handout
+and a continuation slide in the presentation. The teaching reminder
+appears in the instructor handout.
+
+```markdown
+## Energy balance
+
+The balance follows from the first law of thermodynamics.
+
+<!-- script: begin -->
+
+### Derivation
+
+<!-- instructor: begin -->
+
+Review the sign convention here.
+
+<!-- end -->
+
+<!-- end -->
+
+<!-- slides: begin -->
+
+---
+
+<!-- title: Derivation -->
+
+<!-- end -->
+
+For a closed system, $\Delta U = Q + W$.
+```
+
+### Lecture comments
+
+- `<!-- footer: Handout section 5 -->` sets the current slide's footer.
+  The first footer on a slide takes precedence.
+- `<!-- note: Draw the pipe first. -->` adds a speaker note. Notes can span
+  multiple lines and appear in source order.
+- `<!-- dozent -->` at the end of a paragraph or list item marks it and
+  its continuation lines as instructor content.
+- `<!-- title: Continued -->` directly after `---` sets the continuation
+  slide title. The longer title syntax above also works.
+
+Mark2TeX wraps instructor content in the `MarkTwoTeXDozent` environment.
+The default definition shows the content. A Beamer template can define the
+environment with `\begin{visibleenv}<0>` and `\end{visibleenv}` to hide
+the content while reserving its space. The built-in CLI template uses this
+definition on regular slides. Instructor slides and handouts show the content.
+Handouts place footers and speaker notes at the end of each slide section.
+
+For display equations, place the marker after the closing delimiter, as in
+`$$ <!-- dozent -->` or `\] <!-- dozent -->`. For tables and code blocks,
+place it on the following line.
+
+A Beamer theme can implement `\SlideFooter{…}` to display footers.
+Use `\providecommand{\SlideFooter}[1]{}` to suppress them.
+Use `\setbeameroption{show notes}` to show speaker notes on separate pages
+in either slide edition.
+
+Use paired markers to group paragraphs, equations, or a list.
+
+    <!-- dozent:begin -->
+
+    The pressure force is
+
+    $$
+    F = p A.
+    $$
+
+    <!-- dozent:end -->
+
+Put both markers on their own lines within the same slide. Keep headings,
+slide breaks, overlays, and slide metadata outside the block. An unmatched
+marker is treated as an ordinary comment, and the content stays visible.
+
+## Markdown and LaTeX in one source
 
 A typical snippet:
 
@@ -181,7 +540,7 @@ links. Mark2TeX reports a package error if it is missing.
 
 ```md
 [Website](https://example.org/page?x=1&y=2#part)
-[PDF](<unterlagen/Auswahl der Inhalte.pdf>)
+[PDF](<materials/Selected readings.pdf>)
 [Section](#grundlagen)
 <https://example.org/a_b>
 <a_b@example.org>
@@ -265,9 +624,9 @@ spans, fenced code blocks, and `tex` blocks are never parsed as math.
 A blockquote is written by starting every quoted line with `>`:
 
 ```md
-> **Beobachtungen** → Daten → erkennbare Zusammenhänge → Modell → Anwendung auf neue Fälle
+> **Observations** → data → patterns → model → application to new cases
 >
-> Eine zweite Zeile mit *Inline-Formatierung*.
+> A second line with *inline formatting*.
 ```
 
 Mark2TeX removes the markers, parses the content as Markdown blocks, and
@@ -278,12 +637,12 @@ Blank lines inside a blockquote must be written as `>` lines. Lazy continuation
 lines without a `>` marker are not supported.
 
 ```md
-> **Tafel:** Zweispaltig sichern.
+> **Board:** Organize the results in two columns.
 >
-> | Daten | Modell |
+> | Data | Model |
 > | --- | --- |
-> | Eingabe $x$ | Parameter $w,b$ |
-> | Zielwert $y$ | Vorhersage $\hat y=wx+b$ |
+> | Input $x$ | Parameter $w,b$ |
+> | Target $y$ | Prediction $\hat y=wx+b$ |
 ```
 
 ## Robustness rules
@@ -309,139 +668,6 @@ following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
 If you need such constructs, the preferred approach at the moment is usually
 direct LaTeX, for example as a `tex` code block or a raw LaTeX environment.
-
-## LaTeX usage
-
-In a LuaLaTeX document, Mark2TeX is loaded as a package:
-
-```tex
-\documentclass{article}
-\usepackage{mark2tex}
-
-\begin{document}
-
-\mdinput{content.md}
-
-\end{document}
-```
-
-`\mdinput{...}` converts the given Markdown file to LaTeX and inputs the
-generated file via `\input`. Generated files are placed in the `mark2tex/`
-directory by default.
-
-For chapter-like files there is also:
-
-```tex
-\mdinclude{chapter.md}
-```
-
-This inputs the generated file via `\include`.
-
-To compile only selected Markdown includes, use `\mdincludeonly` in the
-preamble with the same Markdown paths passed to `\mdinclude`:
-
-```tex
-\mdincludeonly{introduction.md,conclusion.md}
-```
-
-Like LaTeX's `\includeonly`, excluded files retain their auxiliary data. They
-are not converted or registered as inputs during that run. An empty
-`\mdincludeonly{}` excludes all `\mdinclude` files. `\mdinput` is unaffected.
-
-Both `\mdinput` and `\mdinclude` register their Markdown source files with
-LuaTeX's recorder. Build tools such as `latexmk` can therefore detect Markdown
-changes from the generated `.fls` file and rebuild the document automatically.
-
-Important: Mark2TeX requires LuaLaTeX. Other engines such as pdfLaTeX are not
-supported.
-
-## Installation
-
-You can build a TeX Live package archive from this repository:
-
-```sh
-make dist
-```
-
-This produces `dist/mark2tex.tar.xz`. The archive contains a TDS structure and
-an embedded `tlpobj`, so it can be installed directly with `tlmgr`:
-
-```sh
-tlmgr install --file dist/mark2tex.tar.xz
-```
-
-To check the archive without installing it, use:
-
-```sh
-make tlmgr-install-dry-run
-```
-
-The package installs `mark2tex.sty` under `tex/latex/mark2tex/` and the Lua
-implementation under `scripts/mark2tex/`.
-
-### Overleaf
-
-Overleaf usually does not allow project-local installation via `tlmgr`.
-For Overleaf there is therefore a separate bundle:
-
-```sh
-make overleaf-zip
-```
-
-This produces `dist/mark2tex-overleaf.zip`. That archive is not a TeX Live
-installation; instead it contains the files in a form that can be uploaded
-directly into an Overleaf project:
-
-```text
-mark2tex.sty
-mark2tex.lua
-src/mark2tex/*.lua
-README.md
-LICENSE
-```
-
-In Overleaf, `mark2tex.sty` and `mark2tex.lua` must live at the top level of the
-project; the `src/mark2tex/` directory must remain relative to them. In the
-Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
-can be used like it is locally:
-
-```tex
-\usepackage{mark2tex}
-
-\begin{document}
-\mdinput{content.md}
-\end{document}
-```
-
-## Configuration
-
-Configure Mark2TeX directly when loading the package:
-
-```tex
-\usepackage[
-  citation=autocite,
-  paren-citation=parencite,
-  save-dir=generated-mark2tex,
-  header={chapter,section,subsection,subsubsection,paragraph}
-]{mark2tex}
-```
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `citation` | `cite` | Command used for `@key` |
-| `paren-citation` | `parencite` | Command used for `[@key]` and citation groups |
-| `save-dir` | `mark2tex` | Directory for generated LaTeX files |
-| `header` | `{section,subsection,subsubsection,paragraph,subparagraph}` | Heading commands, from level 1 upward |
-| `verbose` | `false` | Log files when they are converted; use `verbose` or `verbose=true` to enable |
-
-Command names are written without a leading backslash. Load any package that
-provides your chosen citation commands separately. Enclose the comma-separated
-`header` list in braces; it replaces the entire mapping. Deeper headings use
-the last command in the list. Omitted or empty string options use their defaults.
-
-The package no longer reads `mark2tex_config.lua`. Move existing settings into
-package options, using `save-dir` for `save_dir`, `paren-citation` for
-`paren_citation`, and a braced comma-separated list for `header`.
 
 ## Examples of LaTeX-friendly Markdown files
 
@@ -572,87 +798,3 @@ and MD5:
 
 A working LuaLaTeX installation is required for the LaTeX integration.
 `luaunit` is optional for tests.
-
-## Vorlesung als Handout und Folien
-
-Beide LuaLaTeX-Hauptdateien lesen dieselbe Markdown-Datei mit
-`\mdinput{lecture.md}`. Für ein Handout in der Dokumentklasse
-`article` lädst du Mark2Tex mit
-`\usepackage[profile=handout,slide-level=2]{mark2tex}`. In der
-Dokumentklasse `beamer` wählst du
-`\usepackage[profile=slides,slide-level=2]{mark2tex}`.
-Das klassische Verhalten ist die Voreinstellung. Die Optionen stehen
-in Lua als `profile` und `slide_level` zur Verfügung.
-
-- Linksbündige Überschriften auf der gewählten Ebene beginnen eine betitelte Folie.
-  Höherrangige Überschriften ergeben Abschnittstitelfolien, tiefere
-  erscheinen als Zwischenüberschriften innerhalb der Folie. Im Handout
-  bestimmt die übliche `header`-Option den Satz der Überschriften.
-- Eine Zeile aus mindestens drei Bindestrichen mit Leerzeilen davor
-  und danach beginnt eine Fortsetzungsfolie. Im Handout setzt sich der
-  Abschnitt mit einem Absatzabstand fort.
-- `<!-- mark2tex: slide-title="Eigener Titel" -->` kann direkt nach
-  einem solchen Trenner als erster Block stehen. Der einzeilige
-  Klartexttitel erscheint ausschließlich in Mark2Tex-Folien.
-- `. . .` als eigener Absatz zwischen Inhaltsblöcken erzeugt eine
-  Beamer-Einblendung. Im Handout erscheinen die Inhaltsblöcke hintereinander.
-
-Überschriften, Bindestrichtrenner und Pausen orientieren sich an
-[Pandocs Beamer-Ausgabe](https://pandoc.org/MANUAL.html#structuring-the-slide-show).
-In einer gewöhnlichen Markdown-Vorschau sind Pausen als drei Punkte
-und Trenner als horizontale Linien sichtbar.
-
-Das [Schwarzloch-Beispiel](tests/lecture/lecture.md) hat eine
-[A4-Vorlage](tests/lecture/handout.tex) und eine
-[16:9-Vorlage](tests/lecture/folien.tex). Beide nutzen
-[den gemeinsamen Satzstil](tests/lecture/satzstil.tex) mit 155 mm
-Lesespalte und 12,75 bp Grundschrift. `make -j2 latex-lecture`
-erstellt und prüft die PDFs in `tests/lecture/`. Der Test verwendet
-LuaLaTeX, Beamer, STIX Two und Popplers `pdfinfo` und `pdftotext`.
-Der Satzstil verwendet installierte STIX-Two-Schriften und Latin Modern
-Sans für Titel.
-
-### Steuerkommentare für Vorlesungen
-
-- `<!-- footer: Skriptabschnitt 5 -->` setzt den Footer der aktuellen Folie.
-  Pro Folie gilt der erste Footer.
-- `<!-- note: Erst das Rohr einzeichnen. -->` setzt eine Vortragsnotiz.
-  Mehrzeilige Notizen sind möglich. Mehrere Notizen erscheinen in Quellreihenfolge.
-- `<!-- dozent -->` am Ende eines Absatzes oder Listenpunkts markiert ihn samt
-  seinen Fortsetzungszeilen für die Dozentenfassung.
-- `<!-- title: Fortsetzung -->` direkt nach `---` setzt den Titel der
-  Fortsetzungsfolie. Die bisherige längere Titelsyntax bleibt gültig.
-
-Mark2TeX setzt markierte Inhaltsblöcke in die Umgebung `MarkTwoTeXDozent`.
-Die Standarddefinition lässt den Inhalt sichtbar. Ein Beamer-Template kann die
-Umgebung mit `\begin{visibleenv}<0>` und `\end{visibleenv}` definieren, damit
-der Inhalt unsichtbar gesetzt wird und seine Fläche behält. In der Mark2TeX-CLI verwenden
-reguläre Folien diese Beamer-Definition. Dozentenfolien und Handout zeigen
-den Inhalt. Footer und Vortragsnotizen stehen im Handout am Ende des
-jeweiligen Folienabschnitts.
-
-Bei abgesetzten Gleichungen steht der Kommentar hinter dem schließenden
-`$$ <!-- dozent -->` oder `\] <!-- dozent -->`. Bei Tabellen und Codeblöcken
-kann der Kommentar direkt in der nächsten Zeile stehen.
-
-Beamer-Themes mit Folienfooter stellen `\SlideFooter{…}` bereit. Für Dokumente,
-die diese Angabe ausblenden sollen, genügt `\providecommand{\SlideFooter}[1]{}`.
-Beamer zeigt Vortragsnotizen mit `\setbeameroption{show notes}` auf eigenen
-Seiten. Diese Einstellung lässt sich mit beiden Folienfassungen verwenden.
-
-Mehrere Absätze, Gleichungen oder eine Liste lassen sich gemeinsam markieren:
-
-    <!-- dozent:begin -->
-
-    Die Druckkraft folgt aus
-
-    $$
-    F = p A.
-    $$
-
-    <!-- dozent:end -->
-
-Beide Marker stehen auf eigenen Zeilen innerhalb derselben Folie.
-Überschriften, Folienwechsel, Einblendmarken und Folienmetadaten bleiben
-außerhalb des Blocks. Ein unvollständiges Paar bleibt ein gewöhnlicher
-Kommentar. Der Inhalt bleibt in diesem Fall sichtbar.
