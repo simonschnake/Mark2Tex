@@ -177,7 +177,15 @@ package options, using `save-dir` for `save_dir`, `paren-citation` for
 
 ## Compile Markdown to PDF
 
-Install the Python package from this repository with `python -m pip install .`.
+From the repository checkout, install the CLI with `uv` in an isolated tool
+environment:
+
+```sh
+uv tool install .
+```
+
+You can also install the Python package into your current environment with
+`python -m pip install .`.
 The command requires Python 3.9 or newer and a TeX installation with
 `latexmk`, `texlua`, LuaLaTeX, Beamer, STIX Two and Latin Modern. The wheel
 bundles Mark2TeX's Lua and TeX sources and its document templates.
