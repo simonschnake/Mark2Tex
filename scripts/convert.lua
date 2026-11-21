@@ -4,7 +4,7 @@ local function convert()
     assert(arg[1] and arg[2], "expected input path and output directory")
     local config = { save_dir = arg[2] }
     local options = {
-        profile = true, slide_level = true, slide_audience = true,
+        profile = true, slide_level = true, slide_audience = true, audience = true, h1 = true,
         document_id = true, citation = true, paren_citation = true, header = true,
     }
     for index = 3, #arg do

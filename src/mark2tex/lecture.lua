@@ -138,6 +138,8 @@ function lecture.structure(ast, config)
 	end
 
 	for _, node in ipairs(ast) do
+		local h1 = not handout and node.type == "header" and not node.indented and node.level == 1
+		if h1 and config.h1 == "hide" then goto continue end
 		if section_only and node.type ~= "slide_footer" and node.type ~= "slide_note"
 			and not is_whitespace(node) then finish() end
 		if node.type == "slide_footer" then
@@ -150,7 +152,7 @@ function lecture.structure(ast, config)
 			finish()
 			title = node.content
 			if handout then output[#output + 1] = node end
-			section_only = node.level < config.slide_level
+			section_only = node.level < config.slide_level and not (h1 and config.h1 == "frame")
 		elseif node.type == "slide_break" then
 			finish()
 			if handout then output[#output + 1] = { type = "slide_paragraph" } end
@@ -178,6 +180,7 @@ function lecture.structure(ast, config)
 			body[#body + 1] = node
 		end
 		if not is_whitespace(node) then after_break = node.type == "slide_break" end
+		::continue::
 	end
 
 	finish()

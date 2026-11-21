@@ -97,7 +97,11 @@ end
 
 local function parse(str, config, source_id)
 	local lecture_profile = config and (config.profile == "slides" or config.profile == "handout")
-	local protected, comment_tokens, masked = comments.protect(str, lecture_profile)
+	local protected, comment_tokens, masked, markers = comments.protect(str, lecture_profile)
+	if #markers > 0 then
+		local selected = comments.select(str, markers, config, source_id)
+		protected, comment_tokens, masked = comments.protect(selected, lecture_profile)
+	end
 	local directives
 	if lecture_profile then
 		protected = protected:gsub("\r\n", "\n")

@@ -84,13 +84,17 @@ def parser():
     cli.add_argument("--paper", choices=("a4", "letter"), default="a4")
     cli.add_argument("--language", default="ngerman", help="Babel language (default: ngerman)")
     cli.add_argument("--font-size", choices=("10", "11", "12"), help="body size in points")
-    cli.add_argument("--template", choices=("stix",), default="stix", help="use the neutral STIX layout")
+    cli.add_argument("--template", default="stix", metavar="STIX|FILE",
+                     help="use the built-in STIX layout or a complete LaTeX template")
+    cli.add_argument("--title-image", type=Path, help="title image for a custom LaTeX template")
     cli.add_argument("--toc", action="store_true", help="insert a table of contents")
     cli.add_argument("--numbered", action="store_true", help="number section headings")
     cli.add_argument("--writing-margin", action="store_true", help="reserve a 72 mm right margin")
     cli.add_argument("--no-footer", action="store_true", help="hide the footer and page numbers")
     cli.add_argument("--slide-level", type=int, choices=range(1, 7), help="slide heading level (default: 2)")
-    cli.add_argument("--dozent", action="store_true", help="show instructor-only content on slides")
+    cli.add_argument("--h1", choices=("section", "frame", "hide"), help="H1 handling on slides (default: section)")
+    cli.add_argument("--instructor", "--dozent", dest="dozent", action="store_true",
+                     help="build the instructor edition")
     cli.add_argument("--speaker-notes", action="store_true", help="show presenter notes on a second screen")
     cli.add_argument("--cache", action="store_true", help="reuse successful builds in .mark2tex-cache")
     cli.add_argument("--cache-format", action="store_true", help="cache the static preamble (implies --cache)")
@@ -160,12 +164,29 @@ def prepare_format(build, static, env, directory, identity, args):
     return None
 
 
+def custom_template(args):
+    if args.template == "stix":
+        return None
+    path = Path(args.template).expanduser().absolute()
+    if path.suffix.lower() != ".tex":
+        raise ValueError("--template expects stix or a .tex file")
+    return path
+
+
 def validate(args):
-    if args.format == "slides":
+    template = custom_template(args)
+    if args.title_image is not None:
+        if template is None:
+            raise ValueError("--title-image requires a custom LaTeX template")
+        if args.title_image.suffix.lower() not in (".png", ".jpg", ".jpeg", ".pdf"):
+            raise ValueError("--title-image expects a PNG, JPEG or PDF file")
+    if args.format == "slides" and template is None:
         if args.paper != "a4" or args.writing_margin or args.numbered or args.toc:
             raise ValueError("--paper letter, --writing-margin, --numbered and --toc apply to text and handout")
-    elif args.dozent or args.speaker_notes:
-        raise ValueError("--dozent and --speaker-notes require --format slides")
+    if args.format != "slides" and args.speaker_notes:
+        raise ValueError("--speaker-notes requires --format slides")
+    if args.format != "slides" and args.h1 is not None:
+        raise ValueError("--h1 requires --format slides")
     if args.slide_level is not None and args.format == "text":
         raise ValueError("--slide-level requires --format handout or slides")
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", args.language):
@@ -195,15 +216,21 @@ def paths(args):
         if path and (path.suffix.lower() != extension or path.is_dir() or not path.parent.is_dir()
                      or path == source.resolve()):
             raise ValueError(f"expected a separate {extension} file in an existing directory: {path}")
+    for dependency in (custom_template(args), args.title_image):
+        if dependency is not None and dependency.expanduser().resolve() == output:
+            raise ValueError("output PDF must be separate from template inputs")
     return source, output, logfile
 
 
-def environment(source):
+def environment(source, template):
     env = os.environ.copy()
+    local_dirs = [str(source.parent)]
+    if template is not None and template.parent != source.parent:
+        local_dirs.append(str(template.parent))
     # Relative entries in inherited search paths refer to the caller's working directory.
     for key, prefix in (
-        ("TEXINPUTS", [".", str(TEX), str(source.parent)]),
-        ("LUAINPUTS", [str(TEX), str(source.parent)]),
+        ("TEXINPUTS", [".", str(TEX), *local_dirs]),
+        ("LUAINPUTS", [str(TEX), *local_dirs]),
     ):
         inherited = [os.path.join(os.getcwd(), entry) if entry and not os.path.isabs(entry) else entry
                      for entry in env.get(key, "").split(os.pathsep)]
@@ -214,7 +241,7 @@ def environment(source):
 
 def cache_identity(env, executables):
     relevant = {key: value for key, value in env.items()
-                if key.startswith(("TEX", "LUA", "KPATHSEA", "FONTCONFIG"))
+                if key.startswith(("TEX", "LUA", "KPATHSEA", "FONTCONFIG")) or key.endswith("FONTS")
                 or key in ("PATH", "HOME", "SOURCE_DATE_EPOCH", "FORCE_SOURCE_DATE")}
     identity = hashlib.sha256(json.dumps(relevant, sort_keys=True).encode())
     for name, executable in executables.items():
@@ -239,7 +266,9 @@ def convert(build, source, content, args, executable, env):
     if args.format != "text":
         command.extend([f"profile={args.format}", f"slide_level={args.slide_level or 2}"])
     if args.dozent:
-        command.append("slide_audience=dozent")
+        command.append("audience=instructor")
+    if args.h1 is not None:
+        command.append(f"h1={args.h1}")
     result = subprocess.run(command, cwd=build, env=env, capture_output=True,
                             text=True, encoding="utf-8", errors="replace")
     (build / "convert.log").write_text(result.stderr, encoding="utf-8")
@@ -275,6 +304,35 @@ def stage_document(build, args, fragment):
     return render(template.read_text(encoding="utf-8"), values)
 
 
+def stage_custom_document(build, args, fragment, document, title_image):
+    image_name = ""
+    if title_image is not None:
+        image_name = "mark2tex-title-image" + args.title_image.suffix.lower()
+        (build / image_name).write_bytes(title_image)
+    values = {
+        "Title": latex_text(args.title or ""), "Author": latex_text(args.author), "Date": latex_text(args.date),
+        "Format": args.format, "Paper": args.paper, "Language": args.language,
+        "FontSize": args.font_size or "", "SlideLevel": str(args.slide_level or 2),
+        "TitleImage": image_name, "Content": rf"\input{{{fragment}}}",
+    }
+    switches = {
+        "HasTitle": args.title is not None, "HasTitleImage": bool(image_name),
+        "Dozent": args.dozent, "SpeakerNotes": args.speaker_notes, "NoFooter": args.no_footer,
+        "WritingMargin": args.writing_margin, "Numbered": args.numbered, "TOC": args.toc,
+    }
+    lines = [rf"\newcommand{{\MarkTwoTeX{name}}}{{{value}}}" for name, value in values.items()]
+    for name, enabled in switches.items():
+        lines.append(rf"\newif\ifMarkTwoTeX{name}")
+        if enabled:
+            lines.append(rf"\MarkTwoTeX{name}true")
+    if args.format == "slides" and not args.dozent:
+        lines.extend([r"\newcommand{\MarkTwoTeXHideDozent}{%", HIDE_DOZENT.replace("#", "##"), "}"])
+    else:
+        lines.append(r"\newcommand{\MarkTwoTeXHideDozent}{}")
+    (build / "mark2tex-template.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return document
+
+
 def diagnostics(build, args, logfile, failed):
     log = build / "document.log"
     if not log.is_file():
@@ -292,18 +350,24 @@ def diagnostics(build, args, logfile, failed):
 def compile_pdf(args, executables, current=lambda: True):
     source, output, logfile = paths(args)
     content = source.read_bytes()
-    env = environment(source)
+    template = custom_template(args)
+    custom_document = template.read_text(encoding="utf-8") if template is not None else None
+    image = args.title_image.expanduser().absolute() if args.title_image is not None else None
+    title_image = image.read_bytes() if image is not None else None
+    env = environment(source, template)
     env["TEXMFCACHE"] = os.path.abspath(env["TEXMFCACHE"]) if env.get("TEXMFCACHE") else "tex-cache"
     directory = Path.cwd() / ".mark2tex-cache"
     use_cache = (args.cache or args.cache_format) and not args.keep_build and not args.verbose
     identity = cache_identity(env, executables) if args.cache or args.cache_format else b""
     # Operational flags and output destinations do not change the rendered PDF.
     render_options = ("format", "title", "author", "date", "paper", "language", "font_size",
-                      "toc", "numbered", "writing_margin", "no_footer", "slide_level", "dozent", "speaker_notes")
-    options = json.dumps([str(source), *(getattr(args, option) for option in render_options)])
+                      "toc", "numbered", "writing_margin", "no_footer", "slide_level", "h1", "dozent", "speaker_notes")
+    options = json.dumps([str(source), str(template), custom_document, str(image),
+                          hashlib.sha256(title_image).hexdigest() if title_image is not None else None,
+                          *(getattr(args, option) for option in render_options)])
     key = hashlib.sha256(identity + options.encode() + b"\0" + content).hexdigest()
     entry = directory / "builds" / (key + ".zip")
-    try_format = args.cache_format
+    try_format = args.cache_format and (custom_document is None or RUNTIME_BOUNDARY in custom_document)
     allow_cache_hit = use_cache
 
     while True:
@@ -318,9 +382,14 @@ def compile_pdf(args, executables, current=lambda: True):
                 except ValueError:
                     diagnostics(build, args, logfile, failed=True)
                     raise
-                document = stage_document(build, args, fragment)
-                static, dynamic = document.split(RUNTIME_BOUNDARY, 1)
-                format_inputs = prepare_format(build, static, env, directory, identity, args) if try_format else None
+                if custom_document is None:
+                    document = stage_document(build, args, fragment)
+                else:
+                    document = stage_custom_document(build, args, fragment, custom_document, title_image)
+                format_inputs = None
+                if try_format:
+                    static, dynamic = document.split(RUNTIME_BOUNDARY, 1)
+                    format_inputs = prepare_format(build, static, env, directory, identity, args)
                 if try_format and format_inputs is None:
                     retry = True
                     continue
@@ -377,20 +446,26 @@ def signature(source):
 
 def watch(args, executables):
     source, _, _ = paths(args)
-    previous = signature(source)
+    watched = [source]
+    watched.extend(path for path in (custom_template(args), args.title_image) if path is not None)
+
+    def snapshot():
+        return tuple(signature(path.expanduser()) for path in watched)
+
+    previous = snapshot()
     print(f"Watching {source} (delay: {args.watch_delay:g}s).", file=sys.stderr)
     while True:
         try:
-            compile_pdf(args, executables, lambda: signature(source) == previous)
+            compile_pdf(args, executables, lambda: snapshot() == previous)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             print(f"mark2tex: {error}", file=sys.stderr)
-        while signature(source) == previous:
+        while snapshot() == previous:
             time.sleep(0.05)
-        previous = signature(source)
+        previous = snapshot()
         changed = time.monotonic()
         while time.monotonic() - changed < args.watch_delay:
             time.sleep(min(0.05, args.watch_delay))
-            current = signature(source)
+            current = snapshot()
             if current != previous:
                 previous, changed = current, time.monotonic()
 

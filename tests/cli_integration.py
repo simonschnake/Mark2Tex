@@ -29,6 +29,30 @@ Public measurement. See [reference](https://example.org).[^instrument]
 
 Updated reading.
 
+<!-- script: begin -->
+
+ScriptVariant
+
+<!-- instructor: begin -->
+
+InstructorScriptVariant
+
+<!-- end -->
+
+<!-- end -->
+
+<!-- slides: begin -->
+
+SlidesVariant
+
+<!-- end -->
+
+<!-- student: begin -->
+
+StudentVariant
+
+<!-- end -->
+
 <!-- dozent:begin -->
 
 InstructorOnly
@@ -82,7 +106,8 @@ def integration(binary, work):
     for suffix, options in (
         ("", []),
         ("-handout", ["--format", "handout", "--paper", "letter", "--writing-margin", "--toc"]),
-        ("-slides", ["--format", "slides"]),
+        ("-handout-dozent", ["--format", "handout", "--instructor"]),
+        ("-slides", ["--format", "slides", "--h1", "hide"]),
         ("-slides-dozent", ["--format", "slides", "--dozent"]),
         ("-slides-speaker-notes", ["--format", "slides", "--speaker-notes"]),
     ):
@@ -92,7 +117,15 @@ def integration(binary, work):
         text = pdf_text(pdf)
         assert "Calibration & results" in text and "Worked Example" in text, text
         assert "Instrument reference" in text, text
-        if suffix.startswith("-slides"):
+        slides = suffix.startswith("-slides")
+        instructor = suffix.endswith("-dozent")
+        assert ("ScriptVariant" in text.replace("InstructorScriptVariant", "")) == (not slides), text
+        assert ("InstructorScriptVariant" in text) == (instructor and not slides), text
+        assert ("SlidesVariant" in text) == slides, text
+        assert ("StudentVariant" in text) == (not instructor), text
+        if suffix == "-slides":
+            assert "Measurement" not in text, text
+        if slides:
             assert "Continuation" in text, text
             assert ("InstructorOnly" in text) == suffix.endswith("-dozent"), text
             assert ("PresenterOnly" in text) == suffix.endswith("-speaker-notes"), text
@@ -139,6 +172,50 @@ def integration(binary, work):
             assert "Compiling" in build(*options).stderr
         finally:
             asset.write_bytes(original)
+
+    # A complete external wrapper controls layout and receives CLI variant data.
+    template = work / "custom layout" / "layout.tex"
+    template.parent.mkdir()
+    template.with_name("header.tex").write_text(r"\newcommand{\CustomHeader}{Custom layout}")
+    template.write_text(r"""
+\documentclass[aspectratio=169]{beamer}
+\input{mark2tex-template.tex}
+\input{header.tex}
+\usepackage{mark2tex}
+\MarkTwoTeXHideDozent
+\ifMarkTwoTeXSpeakerNotes
+  \setbeameroption{show notes on second screen=right}
+\fi
+\NewDocumentEnvironment{Lernblock}{s m +b}{\begin{frame}{#2}#3\end{frame}}{}
+\begin{document}
+\begin{frame}{\CustomHeader}
+  \MarkTwoTeXTitle\par
+  \ifMarkTwoTeXHasTitleImage
+    \includegraphics[width=8mm]{\MarkTwoTeXTitleImage}
+  \fi
+\end{frame}
+\MarkTwoTeXContent
+\end{document}
+""")
+    cover = work / "cover picture.png"
+    png(cover, b"\x00\x00\xff")
+    custom_pdf = work / "custom.pdf"
+    custom_options = [
+        "--format", "slides", "--template", str(template), "--title", "Built & supplied",
+        "--title-image", str(cover), "--cache-format", "-o", str(custom_pdf),
+    ]
+    source.write_text(DOCUMENT)
+    regular = build(*custom_options)
+    assert "Preparing LuaLaTeX format" not in regular.stderr
+    text = pdf_text(custom_pdf)
+    assert "Custom layout" in text and "InstructorOnly" not in text, text
+    warm = build(*custom_options)
+    assert "Reusing cached build" in warm.stderr, (regular.stderr, warm.stderr)
+    png(cover, b"\xff\x00\xff")
+    assert "Compiling" in build(*custom_options).stderr
+    build(*custom_options, "--dozent", "--speaker-notes")
+    text = pdf_text(custom_pdf)
+    assert "InstructorOnly" in text and "PresenterOnly" in text, text
 
     # Watch must recover from failure and discard a build overtaken by an edit.
     watcher_pdf = work / "watch.pdf"

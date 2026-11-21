@@ -6,8 +6,10 @@ local files = require("mark2tex.fileutils")
 
 local source = "tests/lecture/lecture.md"
 
-local function render(markdown, profile, audience)
-	local config = assert(mark2tex.resolve_config({ profile = profile, slide_audience = audience }))
+local function render(markdown, profile, audience, options)
+	local config = options or {}
+	config.profile, config.slide_audience = profile, audience
+	config = assert(mark2tex.resolve_config(config))
 	local ast = parse(markdown, config)
 	return write(profile and lecture.structure(ast, config) or ast, config)
 end
@@ -18,6 +20,95 @@ local function count(text, pattern)
 end
 
 return function(assertions)
+	function test_variant_blocks_and_local_slide_boundary()
+		local markdown = [=[
+## Common
+
+<!-- script: begin -->
+### ScriptHeading
+<!-- instructor: begin -->
+InstructorScript
+<!-- end -->
+AfterInner
+<!-- end -->
+
+<!-- slides: begin -->
+
+---
+
+<!-- title: SlideHeading -->
+
+<!-- end -->
+
+SharedBody
+
+<!-- student: begin -->
+StudentText
+<!-- end -->
+
+<!-- instructor: begin -->
+InstructorText
+
+---
+
+<!-- title: InstructorContinuation -->
+
+RestrictedBody
+<!-- end -->
+]=]
+		for _, profile in ipairs({ "text", "handout", "slides" }) do
+			for _, audience in ipairs({ "student", "instructor" }) do
+				local actual_profile = profile ~= "text" and profile or nil
+				local output = render(markdown, actual_profile, nil, { audience = audience })
+				local slides, instructor = profile == "slides", audience == "instructor"
+				assertions.assertEquals(count(output, "ScriptHeading"), slides and 0 or 1)
+				assertions.assertEquals(count(output, "SlideHeading"), slides and 1 or 0)
+				assertions.assertEquals(count(output, "InstructorScript"), not slides and instructor and 1 or 0)
+				assertions.assertEquals(count(output, "AfterInner"), slides and 0 or 1)
+				assertions.assertEquals(count(output, "StudentText"), instructor and 0 or 1)
+				assertions.assertEquals(count(output, "InstructorText"), instructor and 1 or 0)
+				assertions.assertEquals(count(output, "SharedBody"), 1)
+				assertions.assertEquals(count(output, "\\frametitle{InstructorContinuation}"), slides and instructor and 1 or 0)
+				assertions.assertEquals(count(output, "RestrictedBody"), instructor and 1 or 0)
+				if slides then
+					assertions.assertEquals(count(output, "\\begin{frame}"), instructor and 3 or 2)
+				end
+			end
+		end
+	end
+
+	function test_variant_markers_report_errors_and_preserve_code()
+		for _, example in ipairs({
+			{ "Intro\n<!-- end -->", "Markdown:2: unexpected" },
+			{ "Intro\r\n<!-- script: begin -->", "Markdown:2: unclosed script" },
+		}) do
+			local ok, err = pcall(render, example[1])
+			assertions.assertEquals(ok, false)
+			assertions.assertEquals(err:sub(1, #example[2]), example[2])
+		end
+		local output = render("Before\n\n```markdown\n<!-- end -->\n```\n")
+		assertions.assertEquals(count(output, "<!%-%- end %-%->"), 1)
+	end
+
+	function test_h1_slide_modes_and_heading_levels()
+		local markdown = "# Top\n\nLead\n\n## Middle\n\n### Detail\n\nBody\n"
+		for _, mode in ipairs({ "section", "frame", "hide" }) do
+			local output = render(markdown, "slides", nil, { h1 = mode })
+			assertions.assertEquals(count(output, "\\begin{frame}"), mode == "section" and 3 or 2)
+			assertions.assertEquals(count(output, "\\frametitle{Top}"), mode == "hide" and 0 or 1)
+			local immediate = render("# Top\n\n## Middle\n\nBody", "slides", nil, { h1 = mode })
+			assertions.assertEquals(count(immediate, "\\begin{frame}"), mode == "hide" and 1 or 2)
+		end
+		local deeper = render(markdown, "slides", nil, { slide_level = 3 })
+		assertions.assertEquals(count(deeper, "\\frametitle{Detail}"), 1)
+		local first = render(markdown, "slides", nil, { slide_level = 1 })
+		assertions.assertEquals(count(first, "\\begin{frame}"), 1)
+		local script = render(markdown, "handout")
+		assertions.assertEquals(count(script, "\\section{Top}"), 1)
+		assertions.assertEquals(count(script, "\\subsection{Middle}"), 1)
+		assertions.assertEquals(count(script, "\\subsubsection{Detail}"), 1)
+	end
+
 	function test_lecture_classic_output_matches_original()
 		assertions.assertEquals(render(assert(files.read_file(source))),
 			assert(files.read_file("tests/lecture/classic.expected.tex")))

@@ -15,6 +15,8 @@
 \DeclareStringOption{profile}
 \DeclareStringOption{slide-level}
 \DeclareStringOption{slide-audience}
+\DeclareStringOption{audience}
+\DeclareStringOption{h1}
 \DeclareBoolOption[false]{verbose}
 \ProcessKeyvalOptions*
 \ifmarktotex@verbose
@@ -98,6 +100,8 @@
     profile = "profile",
     ["slide-level"] = "slide_level",
     ["slide-audience"] = "slide_audience",
+    audience = "audience",
+    h1 = "h1",
   }) do
     local value = token.get_macro("marktotex@" .. option)
     if value and value ~= "" then

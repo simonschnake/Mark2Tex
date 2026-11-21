@@ -8,7 +8,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v15"
+local CACHE_VERSION = "v16"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -54,6 +54,17 @@ local function resolve_config(cfg)
         if config.slide_audience == "regular" then config.slide_audience = nil end
     end
 
+    if config.h1 ~= nil then
+        if config.profile ~= "slides" then return nil, "h1 requires the slides profile" end
+        if config.h1 ~= "section" and config.h1 ~= "frame" and config.h1 ~= "hide" then
+            return nil, "h1 must be section, frame or hide"
+        end
+        if config.h1 == "section" then config.h1 = nil end
+    end
+    if config.audience ~= nil and config.audience ~= "instructor" and config.audience ~= "student" then
+        return nil, "audience must be student or instructor"
+    end
+
     return config
 end
 
@@ -63,11 +74,11 @@ self.get_output_path = function(input_path, cfg)
     local config, err = resolve_config(cfg)
     if not config then return nil, err end
     local path = fu.get_output_filename(input_path, config.save_dir)
-    if config.profile then
-        local audience = config.slide_audience == "dozent" and "-dozent" or ""
-        return (path:gsub("%.tex$", "-" .. config.profile .. "-" .. config.slide_level .. audience .. ".tex"))
-    end
-    return path
+    local variant = config.audience == "instructor" or config.slide_audience == "dozent"
+    local suffix = config.profile and ("-" .. config.profile .. "-" .. config.slide_level) or ""
+    if variant then suffix = suffix .. "-dozent" end
+    if config.h1 then suffix = suffix .. "-h1-" .. config.h1 end
+    return (path:gsub("%.tex$", suffix .. ".tex"))
 end
 
 local function sort_keys(left, right)
@@ -156,7 +167,8 @@ self.convert = function (input_path, cfg)
         return output_path
     end
 
-	local ast = parse(content, config, input_path)
+	local ok, ast = pcall(parse, content, config, input_path)
+	if not ok then return nil, ast end
 	for _, warning in ipairs(ast.warnings or {}) do
 		local subject = warning.identifier and ("footnote " .. warning.identifier)
 			or warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
