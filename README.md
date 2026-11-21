@@ -228,7 +228,30 @@ a fresh regular build if it cannot use the format. A failed build preserves
 the last PDF and prints the build directory. `--log`, `--log-file`,
 `--verbose`, and `--keep-build` expose build diagnostics.
 
+LuaLaTeX reuses its font cache in `.mark2tex-cache/tex-cache/` in the working
+directory, including in watch mode and without `--cache`. An explicit
+`TEXMFCACHE` overrides this location. Each build uses a local copy and
+publishes updated cache files atomically for parallel builds.
+
 ### Use a complete LaTeX template
+
+The commented examples show how a template can read CLI options and turn
+them into LaTeX settings. Both use the same [sample Markdown](examples/cli/beispiel.md).
+
+| Output | Template | CLI format |
+| --- | --- | --- |
+| Text | [Article template](examples/cli/text.tex) | `text` (default) |
+| Lecture handout | [Article template](examples/cli/text.tex) | `handout` |
+| Lecture slides | [Beamer template](examples/cli/vorlesung.tex) | `slides` |
+
+Run these commands from the repository root:
+
+```sh
+mark2tex examples/cli/beispiel.md --template examples/cli/text.tex --title "Wärmelehre"
+mark2tex examples/cli/beispiel.md --template examples/cli/text.tex --format handout --title "Wärmelehre" --writing-margin
+mark2tex examples/cli/beispiel.md --template examples/cli/vorlesung.tex --format slides --title "Wärmelehre"
+```
+
 
 ```sh
 mark2tex lecture.md --format slides --template path/to/lecture.tex \

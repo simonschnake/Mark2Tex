@@ -355,8 +355,14 @@ def compile_pdf(args, executables, current=lambda: True):
     image = args.title_image.expanduser().absolute() if args.title_image is not None else None
     title_image = image.read_bytes() if image is not None else None
     env = environment(source, template)
-    env["TEXMFCACHE"] = os.path.abspath(env["TEXMFCACHE"]) if env.get("TEXMFCACHE") else "tex-cache"
     directory = Path.cwd() / ".mark2tex-cache"
+    use_project_font_cache = not env.get("TEXMFCACHE")
+    font_cache = directory / "tex-cache"
+    if use_project_font_cache:
+        # TeX may refuse writes to an absolute TEXMFCACHE path.
+        env["TEXMFCACHE"] = "tex-cache"
+    else:
+        env["TEXMFCACHE"] = os.path.abspath(env["TEXMFCACHE"])
     use_cache = (args.cache or args.cache_format) and not args.keep_build and not args.verbose
     identity = cache_identity(env, executables) if args.cache or args.cache_format else b""
     # Operational flags and output destinations do not change the rendered PDF.
@@ -376,7 +382,15 @@ def compile_pdf(args, executables, current=lambda: True):
         retry = False
         try:
             if not allow_cache_hit or cache.restore(entry, build, BUILD_FILES) is None:
-                (build / "tex-cache").mkdir()
+                if use_project_font_cache:
+                    local_font_cache = build / env["TEXMFCACHE"]
+                    local_font_cache.mkdir()
+                    if font_cache.is_dir():
+                        try:
+                            shutil.copytree(font_cache, local_font_cache, dirs_exist_ok=True,
+                                            ignore=shutil.ignore_patterns(cache.TEMP_PREFIX + "*"))
+                        except OSError as error:
+                            print(f"Could not restore the font cache: {error}", file=sys.stderr)
                 try:
                     fragment = convert(build, source, content, args, executables["texlua"], env)
                 except ValueError:
@@ -408,6 +422,11 @@ def compile_pdf(args, executables, current=lambda: True):
                         continue
                     log = diagnostics(build, args, logfile, failed=True)
                     raise ValueError(f"LaTeX compilation failed; see {log}")
+                if use_project_font_cache:
+                    try:
+                        cache.save_font_cache(local_font_cache, font_cache)
+                    except OSError as error:
+                        print(f"Could not update the font cache: {error}", file=sys.stderr)
                 if args.cache or args.cache_format:
                     try:
                         inputs = cache.recorded_inputs(build / "document.fls", started)

@@ -1,5 +1,6 @@
 """Build artifacts and recorder-based cache validation."""
 
+import filecmp
 import hashlib
 import json
 import os
@@ -9,13 +10,15 @@ import tempfile
 import zipfile
 import zlib
 
+TEMP_PREFIX = ".mark2tex-"
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def publish(source, destination, current=lambda: True):
-    with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as stream:
+    with tempfile.NamedTemporaryFile(dir=destination.parent, prefix=TEMP_PREFIX, delete=False) as stream:
         temporary = Path(stream.name)
     try:
         shutil.copyfile(source, temporary)
@@ -25,6 +28,16 @@ def publish(source, destination, current=lambda: True):
         return False
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def save_font_cache(source, directory):
+    """Publish font cache files atomically so parallel builds can share them."""
+    for path in source.rglob("*"):
+        if path.is_file() and not path.is_symlink():
+            target = directory / path.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.is_file() or not filecmp.cmp(path, target, shallow=False):
+                publish(path, target)
 
 
 def recorded_inputs(recorder, started):

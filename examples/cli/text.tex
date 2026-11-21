@@ -1,0 +1,53 @@
+% Im Repository ausführen:
+% mark2tex examples/cli/beispiel.md --template examples/cli/text.tex --title "Ein kurzer Text"
+% Für ein Vorlesungshandout: --format handout --slide-level 2 --writing-margin
+% Mit -o DATEI.pdf lässt sich der Ausgabepfad festlegen.
+
+% Die CLI erzeugt diese Datei. Klassenoptionen brauchen sie vor \documentclass.
+\input{mark2tex-template.tex}
+\ifx\MarkTwoTeXFontSize\empty
+  \PassOptionsToClass{11pt}{article}% Standard, wenn --font-size fehlt
+\else
+  \PassOptionsToClass{\MarkTwoTeXFontSize pt}{article}% --font-size 10|11|12
+\fi
+\PassOptionsToClass{\MarkTwoTeXPaper paper}{article}% --paper a4|letter
+\documentclass{article}
+
+\usepackage[\MarkTwoTeXLanguage]{babel}% --language, z. B. ngerman oder english
+\usepackage{geometry}
+\ifMarkTwoTeXWritingMargin % --writing-margin
+  \geometry{left=18mm,right=72mm,top=25mm,bottom=25mm}
+\else
+  \geometry{margin=25mm}
+\fi
+\usepackage{amsmath,tabularx,booktabs,graphicx}
+\usepackage{mark2tex}
+\usepackage{hyperref}
+
+\ifMarkTwoTeXNumbered % --numbered
+  \setcounter{secnumdepth}{3}
+\else
+  \setcounter{secnumdepth}{0}
+\fi
+\ifMarkTwoTeXNoFooter % --no-footer, auch auf der Titelseite
+  \pagestyle{empty}
+\fi
+\title{\MarkTwoTeXTitle}% --title
+\author{\MarkTwoTeXAuthor}% --author
+\date{\MarkTwoTeXDate}% --date, standardmäßig leer
+
+\begin{document}
+\ifMarkTwoTeXHasTitle
+  \maketitle
+  \ifMarkTwoTeXNoFooter\thispagestyle{empty}\fi
+\fi
+\ifMarkTwoTeXTOC % --toc
+  \tableofcontents
+\fi
+% Mit --format handout ändern sich Überschriften und Vorlesungsblöcke.
+% --instructor (auch --dozent) aktiviert Blöcke mit <!-- instructor: begin -->.
+% Die dozent:-Markierung im Beispiel reserviert Platz auf Publikumsfolien.
+% Ihre Lösung erscheint im Text und im Handout.
+% Hier fügt die CLI das bereits umgewandelte Markdown ein.
+\MarkTwoTeXContent
+\end{document}

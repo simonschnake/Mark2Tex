@@ -1,0 +1,55 @@
+% Im Repository ausführen:
+% mark2tex examples/cli/beispiel.md --format slides --template examples/cli/vorlesung.tex --title "Wärmekapazität"
+% Dieselbe Markdown-Datei ergibt mit --format handout und text.tex ein Handout.
+%
+% --slide-level 2     ## beginnt eine Folie (Vorgabe, zulässig: 1 bis 6).
+% --h1 section       # eröffnet einen Abschnitt mit eigener Titelfolie (Vorgabe).
+% --h1 frame         # erzeugt eine reguläre Folie.
+% --h1 hide          # wird ausgeblendet.
+% Diese Optionen steuern die Markdown-Umwandlung in der CLI.
+
+\documentclass[aspectratio=169,t]{beamer}% Seitenverhältnis und Ausrichtung
+\input{mark2tex-template.tex}% Wird beim CLI-Aufruf erzeugt.
+\usepackage[\MarkTwoTeXLanguage]{babel}% --language
+\usepackage{amsmath,tabularx,booktabs}
+\usepackage{mark2tex}
+\usetheme{default}% Hier kann ein anderes Beamer-Theme stehen.
+
+% Für Publikumsfolien bleibt der Platz der Dozentenblöcke reserviert.
+% Mit --instructor (auch --dozent) erscheinen die Inhalte.
+\MarkTwoTeXHideDozent
+\ifMarkTwoTeXSpeakerNotes % --speaker-notes, für Markdown-Kommentare <!-- note: ... -->
+  \setbeameroption{show notes on second screen=right}
+\fi
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\ifMarkTwoTeXNoFooter % --no-footer
+  \setbeamertemplate{footline}{}
+\fi
+\ifx\MarkTwoTeXFontSize\empty % Ohne --font-size gilt die Größe des Themes.
+\else
+  \newlength{\FolienZeilenabstand}
+  \setlength{\FolienZeilenabstand}{\dimexpr\MarkTwoTeXFontSize pt*5/4\relax}
+  \setbeamerfont{normal text}{size=\fontsize{\MarkTwoTeXFontSize pt}{\FolienZeilenabstand}\selectfont}
+  \AtBeginDocument{\usebeamerfont{normal text}}
+\fi
+% Befehle für rohe TeX-Blöcke im Markdown können hier definiert werden.
+\NewDocumentEnvironment{Lernblock}{s m +b}
+  {\begin{frame}{#2}#3\end{frame}}
+  {}
+\providecommand{\SlideFooter}[1]{}% Optional: im eigenen Fußzeilenstil auswerten.
+
+\title{\MarkTwoTeXTitle}% --title
+\author{\MarkTwoTeXAuthor}% --author
+\date{\MarkTwoTeXDate}% --date
+\ifMarkTwoTeXHasTitleImage % --title-image PFAD (PNG, JPEG oder PDF)
+  \titlegraphic{\includegraphics[height=1.5cm]{\MarkTwoTeXTitleImage}}
+\fi
+
+\begin{document}
+\ifMarkTwoTeXHasTitle
+  \begin{frame}\titlepage\end{frame}
+\fi
+\MarkTwoTeXContent% Die CLI hat die Folienstruktur schon erzeugt.
+\end{document}
