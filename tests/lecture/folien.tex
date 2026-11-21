@@ -1,0 +1,30 @@
+\documentclass[aspectratio=169,t]{beamer}
+\usepackage[ngerman]{babel}
+\usepackage[profile=slides,slide-level=2]{mark2tex}
+\usefonttheme{serif}
+\usefonttheme{professionalfonts}
+\input{satzstil}
+
+\setbeamersize{text margin left=10mm,text margin right=10mm}
+\newlength{\Folienbreite}
+\setlength{\Folienbreite}{\dimexpr\Lesespalte+20mm\relax}
+\geometry{paperwidth=\Folienbreite,paperheight=\dimexpr\Folienbreite*9/16\relax}
+\setbeamercolor{normal text}{fg=Vorlesungsblau,bg=white}
+\setbeamercolor{frametitle}{fg=Vorlesungsblau,bg=white}
+\setbeamercolor{structure}{fg=Vorlesungsblau}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{frametitle}{%
+  \vskip7mm%
+  {\usebeamercolor[fg]{frametitle}%
+    \Titelschrift\fontsize{24bp}{27.36bp}\selectfont
+    \raggedright\insertframetitle\par}%
+  \vskip3mm%
+}
+\setbeamerfont{normal text}{size=\Leseschrift}
+\AtBeginDocument{\usebeamerfont{normal text}}
+
+\begin{document}
+\raggedright\Leseschrift\Formelabstaende
+\setlength{\parskip}{10bp}
+\mdinput{lecture.md}
+\end{document}

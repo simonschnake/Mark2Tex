@@ -1,14 +1,68 @@
 # Mark2TeX
 
-Mark2TeX is a LuaLaTeX package for Markdown-like text fragments inside
-LaTeX documents. It reads `.md` files during LaTeX compilation, translates
-the currently supported dialect to LaTeX, and inputs the generated `.tex`
-file back into the document.
+Mark2TeX compiles Markdown to PDF from the command line and reads Markdown-like
+fragments inside LuaLaTeX documents. Both use the same Lua converter.
 
 The focus is on a LaTeX-friendly writing style for scientific documents, not
 on full Markdown or CommonMark compatibility. If compatibility with common
 Markdown tools happens as a side effect, that is welcome, but it is not the
 primary project goal.
+
+## Compile Markdown to PDF
+
+Install the Python package from this repository with `python -m pip install .`.
+The command requires Python 3.9 or newer and a TeX installation with
+`latexmk`, `texlua`, LuaLaTeX, Beamer, STIX Two and Latin Modern. The wheel
+bundles Mark2TeX's Lua and TeX sources and its document templates.
+The TeX Live and Overleaf archives can still be used independently with
+`\usepackage{mark2tex}` and `\mdinput`.
+
+```sh
+mark2tex lecture.md                                                    # lecture.pdf
+mark2tex lecture.md --format handout --writing-margin                    # lecture-handout.pdf
+mark2tex lecture.md --format slides                                      # lecture-slides.pdf
+mark2tex lecture.md --format slides --dozent                             # lecture-slides-dozent.pdf
+mark2tex lecture.md --format slides --speaker-notes                      # lecture-slides-speaker-notes.pdf
+```
+
+Pass `-o path/to/file.pdf` to choose a destination. Relative TeX graphics
+paths are resolved from the Markdown file's directory. Use `--title`,
+`--author`, and `--date` for metadata. The author and date default to empty.
+Text and handout builds support `--paper a4|letter`, `--toc`, and
+`--numbered`. Handouts and slides accept `--slide-level` (default 2).
+For raw TeX learning blocks, `\begin{Lernblock}{Title}` begins a section
+or a slide. The starred form continues the previous section in text and
+handouts.
+
+Use `--watch` to build immediately and rebuild when the Markdown source
+changes. `--watch-delay` sets the quiet period before rebuilding (default
+0.5 seconds). `--cache` reuses successful builds from `.mark2tex-cache/`
+in the working directory and checks the TeX recorder's inputs, including
+graphics. `--cache-format` also caches the static preamble and retries with
+a fresh regular build if it cannot use the format. A failed build preserves
+the last PDF and prints the build directory. `--log`, `--log-file`,
+`--verbose`, and `--keep-build` expose build diagnostics.
+
+### Migrate from md2pdf
+
+Replace `md2pdf datei.md` with `mark2tex datei.md`. The format flags and
+their PDF filenames carry over. The neutral STIX layout is the default.
+Pass `--author` to supply an author. Use md2pdf for existing documents that
+still require its institution-specific layouts.
+
+To build a wheel for offline installation, run
+`python -m pip wheel --no-deps -w dist .` from the checkout. Install that
+wheel with `python -m pip install dist/mark2tex-*.whl`. The installed-wheel
+integration test uses a temporary working directory and needs Poppler:
+
+```sh
+python tests/cli_integration.py "$(command -v mark2tex)"
+```
+
+The standalone `texlua scripts/convert.lua INPUT OUTPUT_DIR` entry point
+prints the generated TeX fragment path. It accepts optional Lua profile
+settings such as `profile=slides slide_level=2`. An explicit `document_id`
+keeps generated footnote label prefixes stable across source edits.
 
 ## What Mark2TeX is for
 
@@ -518,3 +572,87 @@ and MD5:
 
 A working LuaLaTeX installation is required for the LaTeX integration.
 `luaunit` is optional for tests.
+
+## Vorlesung als Handout und Folien
+
+Beide LuaLaTeX-Hauptdateien lesen dieselbe Markdown-Datei mit
+`\mdinput{lecture.md}`. Für ein Handout in der Dokumentklasse
+`article` lädst du Mark2Tex mit
+`\usepackage[profile=handout,slide-level=2]{mark2tex}`. In der
+Dokumentklasse `beamer` wählst du
+`\usepackage[profile=slides,slide-level=2]{mark2tex}`.
+Das klassische Verhalten ist die Voreinstellung. Die Optionen stehen
+in Lua als `profile` und `slide_level` zur Verfügung.
+
+- Linksbündige Überschriften auf der gewählten Ebene beginnen eine betitelte Folie.
+  Höherrangige Überschriften ergeben Abschnittstitelfolien, tiefere
+  erscheinen als Zwischenüberschriften innerhalb der Folie. Im Handout
+  bestimmt die übliche `header`-Option den Satz der Überschriften.
+- Eine Zeile aus mindestens drei Bindestrichen mit Leerzeilen davor
+  und danach beginnt eine Fortsetzungsfolie. Im Handout setzt sich der
+  Abschnitt mit einem Absatzabstand fort.
+- `<!-- mark2tex: slide-title="Eigener Titel" -->` kann direkt nach
+  einem solchen Trenner als erster Block stehen. Der einzeilige
+  Klartexttitel erscheint ausschließlich in Mark2Tex-Folien.
+- `. . .` als eigener Absatz zwischen Inhaltsblöcken erzeugt eine
+  Beamer-Einblendung. Im Handout erscheinen die Inhaltsblöcke hintereinander.
+
+Überschriften, Bindestrichtrenner und Pausen orientieren sich an
+[Pandocs Beamer-Ausgabe](https://pandoc.org/MANUAL.html#structuring-the-slide-show).
+In einer gewöhnlichen Markdown-Vorschau sind Pausen als drei Punkte
+und Trenner als horizontale Linien sichtbar.
+
+Das [Schwarzloch-Beispiel](tests/lecture/lecture.md) hat eine
+[A4-Vorlage](tests/lecture/handout.tex) und eine
+[16:9-Vorlage](tests/lecture/folien.tex). Beide nutzen
+[den gemeinsamen Satzstil](tests/lecture/satzstil.tex) mit 155 mm
+Lesespalte und 12,75 bp Grundschrift. `make -j2 latex-lecture`
+erstellt und prüft die PDFs in `tests/lecture/`. Der Test verwendet
+LuaLaTeX, Beamer, STIX Two und Popplers `pdfinfo` und `pdftotext`.
+Der Satzstil verwendet installierte STIX-Two-Schriften und Latin Modern
+Sans für Titel.
+
+### Steuerkommentare für Vorlesungen
+
+- `<!-- footer: Skriptabschnitt 5 -->` setzt den Footer der aktuellen Folie.
+  Pro Folie gilt der erste Footer.
+- `<!-- note: Erst das Rohr einzeichnen. -->` setzt eine Vortragsnotiz.
+  Mehrzeilige Notizen sind möglich. Mehrere Notizen erscheinen in Quellreihenfolge.
+- `<!-- dozent -->` am Ende eines Absatzes oder Listenpunkts markiert ihn samt
+  seinen Fortsetzungszeilen für die Dozentenfassung.
+- `<!-- title: Fortsetzung -->` direkt nach `---` setzt den Titel der
+  Fortsetzungsfolie. Die bisherige längere Titelsyntax bleibt gültig.
+
+Mark2TeX setzt markierte Inhaltsblöcke in die Umgebung `MarkTwoTeXDozent`.
+Die Standarddefinition lässt den Inhalt sichtbar. Ein Beamer-Template kann die
+Umgebung mit `\begin{visibleenv}<0>` und `\end{visibleenv}` definieren, damit
+der Inhalt unsichtbar gesetzt wird und seine Fläche behält. In der Mark2TeX-CLI verwenden
+reguläre Folien diese Beamer-Definition. Dozentenfolien und Handout zeigen
+den Inhalt. Footer und Vortragsnotizen stehen im Handout am Ende des
+jeweiligen Folienabschnitts.
+
+Bei abgesetzten Gleichungen steht der Kommentar hinter dem schließenden
+`$$ <!-- dozent -->` oder `\] <!-- dozent -->`. Bei Tabellen und Codeblöcken
+kann der Kommentar direkt in der nächsten Zeile stehen.
+
+Beamer-Themes mit Folienfooter stellen `\SlideFooter{…}` bereit. Für Dokumente,
+die diese Angabe ausblenden sollen, genügt `\providecommand{\SlideFooter}[1]{}`.
+Beamer zeigt Vortragsnotizen mit `\setbeameroption{show notes}` auf eigenen
+Seiten. Diese Einstellung lässt sich mit beiden Folienfassungen verwenden.
+
+Mehrere Absätze, Gleichungen oder eine Liste lassen sich gemeinsam markieren:
+
+    <!-- dozent:begin -->
+
+    Die Druckkraft folgt aus
+
+    $$
+    F = p A.
+    $$
+
+    <!-- dozent:end -->
+
+Beide Marker stehen auf eigenen Zeilen innerhalb derselben Folie.
+Überschriften, Folienwechsel, Einblendmarken und Folienmetadaten bleiben
+außerhalb des Blocks. Ein unvollständiges Paar bleibt ein gewöhnlicher
+Kommentar. Der Inhalt bleibt in diesem Fall sichtbar.

@@ -1,5 +1,6 @@
 local parse = require "mark2tex.parse"
 local write = require "mark2tex.write"
+local lecture = require "mark2tex.lecture"
 local default_config = require "mark2tex.default_config"
 local fu = require "mark2tex.fileutils"
 local md5 = require("md5")
@@ -7,7 +8,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v11"
+local CACHE_VERSION = "v15"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -30,14 +31,43 @@ local function resolve_config(cfg)
         end
     end
 
+    if config.profile ~= nil then
+        if config.profile ~= "handout" and config.profile ~= "slides" then
+            return nil, "profile must be handout or slides"
+        end
+        local level = config.slide_level == nil and 2 or tonumber(config.slide_level)
+        if not level or level % 1 ~= 0 or level < 1 or level > 6 then
+            return nil, "slide-level must be an integer from 1 to 6"
+        end
+        config.slide_level = math.floor(level)
+    elseif config.slide_level ~= nil then
+        return nil, "slide-level requires a handout or slides profile"
+    end
+
+    if config.slide_audience ~= nil then
+        if config.profile ~= "slides" then
+            return nil, "slide-audience requires the slides profile"
+        end
+        if config.slide_audience ~= "regular" and config.slide_audience ~= "dozent" then
+            return nil, "slide-audience must be regular or dozent"
+        end
+        if config.slide_audience == "regular" then config.slide_audience = nil end
+    end
+
     return config
 end
 
 self.resolve_config = resolve_config
 
 self.get_output_path = function(input_path, cfg)
-    local config = resolve_config(cfg)
-    return fu.get_output_filename(input_path, config.save_dir)
+    local config, err = resolve_config(cfg)
+    if not config then return nil, err end
+    local path = fu.get_output_filename(input_path, config.save_dir)
+    if config.profile then
+        local audience = config.slide_audience == "dozent" and "-dozent" or ""
+        return (path:gsub("%.tex$", "-" .. config.profile .. "-" .. config.slide_level .. audience .. ".tex"))
+    end
+    return path
 end
 
 local function sort_keys(left, right)
@@ -97,7 +127,8 @@ end
 
 -- Main function
 self.convert = function (input_path, cfg)
-    local config = resolve_config(cfg)
+    local config, config_error = resolve_config(cfg)
+    if not config then return nil, config_error end
 
     -- Create mdtex directory if it does not exist
     local success, err = fu.create_directory(config.save_dir)
@@ -136,6 +167,7 @@ self.convert = function (input_path, cfg)
 		local action = warning.kind == "duplicate" and "; first definition used" or "; kept literal"
 		io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. action .. "\n")
 	end
+	if config.profile then ast = lecture.structure(ast, config) end
 	local tex = write(ast, config)
 
     -- Add a cache fingerprint to the first line of the output file.

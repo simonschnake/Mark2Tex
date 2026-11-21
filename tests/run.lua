@@ -160,5 +160,6 @@ require("tests.unit_ast")(luaunit)
 require("tests.unit_tables")(luaunit)
 require("tests.unit_links")(luaunit)
 require("tests.unit_footnotes")(luaunit)
+require("tests.unit_lecture")(luaunit)
 
 os.exit(luaunit.LuaUnit.run())

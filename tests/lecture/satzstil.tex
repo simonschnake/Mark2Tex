@@ -1,0 +1,19 @@
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{STIXTwoText-Regular.otf}[
+  BoldFont=STIXTwoText-Bold.otf,ItalicFont=STIXTwoText-Italic.otf,
+  BoldItalicFont=STIXTwoText-BoldItalic.otf]
+\setmathfont{STIXTwoMath-Regular.otf}
+\newfontface\Titelschrift{lmsans10-bold.otf}
+\definecolor{Vorlesungsblau}{gray}{.12}
+\newlength{\Lesespalte}
+\setlength{\Lesespalte}{155mm}
+\newcommand{\Leseschrift}{\fontsize{12.75bp}{19.125bp}\selectfont}
+\DeclareMathSizes{12.75bp}{12.75bp}{9bp}{6.75bp}
+\newcommand{\Formelabstaende}{%
+  \setlength{\abovedisplayskip}{10bp plus 2bp minus 2bp}%
+  \setlength{\belowdisplayskip}{10bp plus 2bp minus 2bp}%
+  \setlength{\abovedisplayshortskip}{6bp plus 2bp}%
+  \setlength{\belowdisplayshortskip}{8bp plus 2bp}%
+  \setlength{\jot}{4bp}%
+}

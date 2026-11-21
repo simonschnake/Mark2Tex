@@ -12,6 +12,9 @@
 \DeclareStringOption{paren-citation}
 \DeclareStringOption{save-dir}
 \DeclareStringOption{header}
+\DeclareStringOption{profile}
+\DeclareStringOption{slide-level}
+\DeclareStringOption{slide-audience}
 \DeclareBoolOption[false]{verbose}
 \ProcessKeyvalOptions*
 \ifmarktotex@verbose
@@ -20,6 +23,7 @@
   \def\marktotex@verbosevalue{false}
 \fi
 
+\ProvideDocumentEnvironment{MarkTwoTeXDozent}{}{}{}
 \RequirePackage[normalem]{ulem}
 \RequirePackage{luacode}
 \RequirePackage{array}
@@ -72,6 +76,9 @@
     package.preload["mark2tex.write"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/write.lua")
     end
+    package.preload["mark2tex.lecture"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/lecture.lua")
+    end
     package.preload["mark2tex.core"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/core.lua")
     end
@@ -88,6 +95,9 @@
     ["paren-citation"] = "paren_citation",
     ["save-dir"] = "save_dir",
     header = "header",
+    profile = "profile",
+    ["slide-level"] = "slide_level",
+    ["slide-audience"] = "slide_audience",
   }) do
     local value = token.get_macro("marktotex@" .. option)
     if value and value ~= "" then
@@ -106,6 +116,12 @@
       headings[#headings + 1] = heading
     end
     cfg.header = headings
+  end
+
+  local resolved, config_error = mark2tex.resolve_config(cfg)
+  if not resolved then
+    tex.error("Invalid mark2tex options", { config_error })
+    return
   end
 
   local function strip_tex_extension(path)

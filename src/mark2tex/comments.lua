@@ -1,7 +1,7 @@
 -- Hide HTML comments from Markdown parsing, then restore them as TeX comments.
 local comments = {}
 
-function comments.protect(source)
+function comments.protect(source, track_closure)
 	local prefix = "MARKTWOTEXCOMMENT"
 	while source:find(prefix, 1, true) do
 		prefix = prefix .. "X"
@@ -25,6 +25,7 @@ function comments.protect(source)
 			tokens[#tokens + 1] = {
 				token = token,
 				content = source:sub(position + 4, closing and closing - 1 or #source),
+				closed = track_closure and closing ~= nil or nil,
 			}
 			output[#output + 1] = token
 			-- Preserve locations for diagnostics in the remaining source.

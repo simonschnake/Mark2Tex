@@ -1,0 +1,24 @@
+\documentclass[a4paper]{article}
+\usepackage[ngerman]{babel}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage[profile=handout,slide-level=2,header={section,section,subsection}]{mark2tex}
+\input{satzstil}
+
+\geometry{textwidth=\Lesespalte,top=27mm,bottom=25mm}
+\pagestyle{empty}
+\setcounter{secnumdepth}{0}
+\setlength{\parskip}{18bp}
+\titleformat{\section}
+  {\color{Vorlesungsblau}\Titelschrift\fontsize{19.5bp}{23.4bp}\selectfont\raggedright}
+  {}{0pt}{}
+\titlespacing*{\section}{0pt}{18bp}{0pt}
+
+\begin{document}
+\color{Vorlesungsblau}
+\raggedright\Leseschrift\Formelabstaende
+{\Titelschrift\fontsize{24bp}{27.36bp}\selectfont
+  Wie sich ein schwarzes Loch beschreiben lässt\par}
+\mdinput{lecture.md}
+\end{document}

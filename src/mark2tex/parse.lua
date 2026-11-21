@@ -2,6 +2,7 @@ local parse_blocks = require("mark2tex.parse_blocks")
 local parse_inlines = require("mark2tex.parse_inlines")
 local diagnostics = require("mark2tex.diagnostics")
 local comments = require("mark2tex.comments")
+local lecture = require("mark2tex.lecture")
 local nodes = require("mark2tex.nodes")
 local md5 = require("md5")
 
@@ -49,7 +50,7 @@ local function add_inline_nodes(ast, warnings, context, disabled)
 		if element.type == "code" and disabled then
 			-- verbatim environments cannot occur inside a \footnote argument.
 			element.type, element.content = "other", { nodes.text("\n"), nodes.verbatim(element.content) }
-		elseif element.type == "blockquote" then
+		elseif element.type == "blockquote" or element.type == "dozent_group" then
 			element.content = add_inline_nodes(element.content, warnings, context, disabled)
 		elseif element.type == "table" then
 			for index, cell in ipairs(element.headers) do
@@ -95,13 +96,41 @@ local function normalize_ast(ast)
 end
 
 local function parse(str, config, source_id)
-	local protected, comment_tokens, masked = comments.protect(str)
-	local input = normalize_input(protected)
-	local block_ast = parse_blocks(input)
+	local lecture_profile = config and (config.profile == "slides" or config.profile == "handout")
+	local protected, comment_tokens, masked = comments.protect(str, lecture_profile)
+	local directives
+	if lecture_profile then
+		protected = protected:gsub("\r\n", "\n")
+		directives = {}
+		for _, comment in ipairs(comment_tokens) do
+			if comment.closed then
+				local content = comment.content:match("^%s*(.-)%s*$")
+				local key, value = content:match("^([a-z]+):%s*(.+)$")
+				local legacy = content:match('^mark2tex:[ \t]+slide%-title="([^"\r\n]+)"$')
+				if legacy then key, value = "title", legacy end
+				if key == "title" or key == "footer" or key == "note" then
+					directives[comment.token] = { type = "slide_" .. key, token = comment.token, title = value }
+				elseif key == "dozent" and (value == "begin" or value == "end") then
+					directives[comment.token] = { type = "dozent_" .. value, token = comment.token }
+				elseif content == "dozent" then
+					directives[comment.token] = { type = "dozent" }
+				end
+			end
+		end
+	end
+	local block_ast = parse_blocks(normalize_input(protected), directives)
 	local warnings = diagnostics.collect(masked)
-	local fingerprint = md5.sumhexa(source_id and (source_id .. "\0" .. str) or str)
+	local fingerprint
+	if config and config.document_id then
+		fingerprint = md5.sumhexa(config.document_id)
+	else
+		fingerprint = md5.sumhexa(source_id and (source_id .. "\0" .. str) or str)
+	end
 	local context = { definitions = {}, seen = {}, count = 0 }
 	block_ast = collect_definitions(block_ast, context, warnings)
+	if directives then
+		block_ast = lecture.group_dozent_blocks(lecture.mark_dozent_blocks(block_ast, directives))
+	end
 	context.resolve = function(identifier)
 		local definition = context.definitions[identifier]
 		if definition == nil then return nil end

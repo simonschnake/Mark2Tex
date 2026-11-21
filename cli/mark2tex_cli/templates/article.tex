@@ -1,0 +1,45 @@
+\documentclass[@PAPER@paper,@SIZE@pt]{article}
+\usepackage[@MARGINS@]{geometry}
+\usepackage{array,tabularx,booktabs,amsmath}
+% mark2tex runtime
+\usepackage[@LANGUAGE@]{babel}
+\input{common.tex}
+\usepackage{microtype,titlesec}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue!55!black]{hyperref}
+\usepackage{mark2tex}
+\usepackage[most]{tcolorbox}
+\RenewDocumentEnvironment{quote}{}
+  {\begin{tcolorbox}[enhanced,breakable,frame hidden,boxrule=0pt,
+     colback=black!4,borderline west={.75bp}{0pt}{black!40},
+     boxsep=0pt,left=12bp,right=4bp,top=4bp,bottom=4bp,fontupper=\itshape]}
+  {\end{tcolorbox}}
+\NewDocumentEnvironment{Lernblock}{s m}
+  {\IfBooleanF{#1}{\section{#2}}\ignorespaces}
+  {\ignorespacesafterend}
+\hypersetup{pdftitle={@TITLE@},pdfauthor={@AUTHOR@}}
+\titleformat{\section}{\sffamily\bfseries\fontsize{19.5bp}{23.4bp}\selectfont}{\thesection}{.65em}{}
+\titleformat{\subsection}{\sffamily\bfseries\fontsize{15bp}{19.125bp}\selectfont}{\thesubsection}{.65em}{}
+\titleformat{\subsubsection}{\sffamily\bfseries\fontsize{13bp}{17bp}\selectfont}{\thesubsubsection}{.65em}{}
+\setcounter{secnumdepth}{@NUMBERING@}
+\setcounter{tocdepth}{2}
+\makeatletter
+\renewcommand{\maketitle}{%
+  \par\begingroup\centering
+  {\sffamily\bfseries\fontsize{24bp}{27.36bp}\selectfont\@title\par}
+  {\small
+    \ifx\@author\@empty\else\smallskip\@author\par\fi
+    \ifx\@date\@empty\else\smallskip\@date\par\fi}
+  \endgroup\medskip}
+\makeatother
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{.65\baselineskip}
+@FOOTER@
+\title{@TITLE@}
+\author{@AUTHOR@}
+\date{@DATE@}
+\begin{document}
+\MarkTwoTeXBody\MarkTwoTeXMathSpacing
+@TITLEPAGE@
+@TOC@
+\input{@FRAGMENT@}
+\end{document}

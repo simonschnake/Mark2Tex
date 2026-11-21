@@ -1,0 +1,44 @@
+\documentclass[aspectratio=169,t]{beamer}
+\usepackage{array,tabularx,booktabs,amsmath}
+% mark2tex runtime
+\usepackage[@LANGUAGE@]{babel}
+\usepackage{mark2tex}
+\usefonttheme{serif}
+\usefonttheme{professionalfonts}
+\input{common.tex}
+\providecommand{\footref}[1]{}
+\renewcommand{\footref}[1]{\textsuperscript{\usebeamercolor[fg]{footnote mark}\ref{#1}}}
+@DOZENT@
+\setbeamersize{text margin left=10mm,text margin right=10mm}
+\geometry{paperwidth=175mm,paperheight=98.4375mm}
+\setbeamercolor{normal text}{fg=black,bg=white}
+\setbeamercolor{structure}{fg=black}
+\setbeamerfont{frametitle}{family=\sffamily,series=\bfseries,size=\fontsize{24bp}{27.36bp}\selectfont}
+\setbeamertemplate{frametitle}{%
+  \vskip7mm%
+  {\usebeamercolor[fg]{frametitle}\usebeamerfont{frametitle}%
+   \raggedright\insertframetitle\par}%
+  \vskip3mm}
+\setbeamertemplate{navigation symbols}{}
+\setbeamerfont{normal text}{size=\MarkTwoTeXBody}
+\AtBeginDocument{\usebeamerfont{normal text}}
+\NewDocumentEnvironment{Lernblock}{s m +b}
+  {\begin{frame}[t]{#2}
+     \raggedright\MarkTwoTeXBody\MarkTwoTeXMathSpacing
+     \setlength{\parskip}{10bp}#3
+   \end{frame}}
+  {}
+\providecommand{\SlideFooter}[1]{\gdef\MarkTwoTeXFooter{#1}}
+\newcommand{\MarkTwoTeXFooter}{}
+\AddToHook{env/frame/begin}{\gdef\MarkTwoTeXFooter{}}
+@FOOTER@
+@NOTES@
+\title{@TITLE@}
+\author{@AUTHOR@}
+\date{@DATE@}
+\begin{document}
+\raggedright\MarkTwoTeXBody\MarkTwoTeXMathSpacing
+\setlength{\parskip}{10bp}
+@TITLEPAGE@
+\input{@FRAGMENT@}
+\end{document}

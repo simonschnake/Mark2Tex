@@ -321,3 +321,15 @@ TSWLatexianTemp*
 
 # Local editor metadata
 .obsidian/
+
+/tests/lecture/mark2tex/
+/tests/lecture/fonts/
+/tests/lecture/tex-cache/
+/tests/latex-smoke/tex-cache/
+/tests/lecture/*.pdf
+
+# Python CLI builds and cache
+/build/
+*.egg-info/
+__pycache__/
+.mark2tex-cache/

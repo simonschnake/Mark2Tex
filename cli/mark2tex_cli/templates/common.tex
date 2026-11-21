@@ -1,0 +1,33 @@
+\usepackage{fontspec}
+\setmainfont{STIXTwoText}[
+  Extension=.otf,UprightFont=*-Regular,ItalicFont=*-Italic,
+  BoldFont=*-Bold,BoldItalicFont=*-BoldItalic,Ligatures=TeX]
+\setsansfont{lmsans10-regular.otf}[
+  BoldFont=lmsans10-bold.otf,ItalicFont=lmsans10-oblique.otf,
+  BoldItalicFont=lmsans10-boldoblique.otf]
+\setmonofont{lmmono10-regular.otf}[
+  BoldFont=lmmonolt10-bold.otf,ItalicFont=lmmono10-italic.otf,
+  BoldItalicFont=lmmonolt10-boldoblique.otf,Scale=MatchLowercase]
+\usepackage{amsmath,unicode-math}
+\setmathfont{STIXTwoMath-Regular.otf}
+\usepackage{cancel,graphicx,adjustbox,newunicodechar,pifont}
+\newunicodechar{★}{\ding{72}}
+\newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{←}{\ensuremath{\leftarrow}}
+\NewCommandCopy{\MarkTwoTeXTabular}{\tabular}
+\NewCommandCopy{\EndMarkTwoTeXTabular}{\endtabular}
+\RenewDocumentEnvironment{tabular}{O{c} m +b}
+  {\begin{adjustbox}{max width=\linewidth}%
+     \MarkTwoTeXTabular[#1]{#2}#3\EndMarkTwoTeXTabular
+   \end{adjustbox}}{}
+\AddToHook{env/tabularx/begin}{%
+  \let\tabular\MarkTwoTeXTabular
+  \let\endtabular\EndMarkTwoTeXTabular}
+\providecommand{\diff}{\mathop{}\!\mathrm{d}}
+\DeclareMathSizes{12.75bp}{12.75bp}{9bp}{6.75bp}
+\newcommand{\MarkTwoTeXBody}{@BODY@}
+\newcommand{\MarkTwoTeXMathSpacing}{%
+  \setlength{\abovedisplayskip}{9bp}%
+  \setlength{\belowdisplayskip}{9bp}%
+  \setlength{\abovedisplayshortskip}{5bp}%
+  \setlength{\belowdisplayshortskip}{6bp}}

@@ -60,7 +60,7 @@ self.create_directory = function (path)
         local mode = lfs.attributes(current, "mode")
         if mode == nil then
             local ok, err = lfs.mkdir(current)
-            if not ok then
+            if not ok and lfs.attributes(current, "mode") ~= "directory" then
                 return nil, "Unable to create directory '" .. current .. "': " .. tostring(err)
             end
         elseif mode ~= "directory" then

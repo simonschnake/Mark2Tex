@@ -259,10 +259,52 @@ end
 
 grammar.outer = Ct((V("outer_elements") + V("other")) ^ 0)
 grammar[1] = V("outer")
-grammar = P(grammar) * -1
 
-local function parse_blocks(str)
-	return grammar:match(str)
+local lecture = {}
+for key, pattern in pairs(grammar) do
+	lecture[key] = pattern
+end
+
+local Cp, Cmt, Carg = lpeg.Cp, lpeg.Cmt, lpeg.Carg
+local end_of_paragraph = #(newline * horizontal_space * (newline + -P(1)) + -P(1))
+local function standalone(pattern)
+	return Cmt(Cp() * newline * pattern * horizontal_space * end_of_paragraph,
+		function(subject, ending, start, node)
+			local previous = start - 1
+			while previous > 0 and subject:sub(previous, previous):match("[ \t\r]") do
+				previous = previous - 1
+			end
+			if previous == 0 or subject:sub(previous, previous) == "\n" then
+				return ending, node
+			end
+		end)
+end
+
+lecture.header = newline * C(P(" ") ^ 0) * C(hash ^ 1) * space * C(rest_of_line)
+	/ function(indent, hashes, content)
+		local heading = nodes.header(#hashes, content)
+		heading.indented = indent ~= ""
+		return heading
+	end
+lecture.slide_break = standalone(P("-") ^ 3 / function() return { type = "slide_break" } end)
+lecture.slide_pause = standalone(P(". . .") / function() return { type = "slide_pause" } end)
+lecture.slide_directive = newline * Cmt(
+	C(P("MARKTWOTEXCOMMENT") * P("X") ^ 0 * R("09") ^ 1 * P("END")) * horizontal_space * line_end * Carg(1),
+	function(_, ending, token, directives)
+		if directives[token] and directives[token].type ~= "dozent" then
+			return ending, directives[token]
+		end
+	end)
+lecture.outer_elements = V("slide_break") + V("slide_pause") + V("slide_directive") + grammar.outer_elements
+
+local classic_grammar = P(grammar) * -1
+local lecture_grammar = P(lecture) * -1
+
+local function parse_blocks(str, directives)
+	if directives then
+		return lecture_grammar:match(str, 1, directives)
+	end
+	return classic_grammar:match(str)
 end
 
 return parse_blocks

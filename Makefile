@@ -9,7 +9,7 @@ OVERLEAF_BUILD_DIR := $(DIST_DIR)/build/$(PACKAGE)-overleaf
 OVERLEAF_ARCHIVE := $(DIST_DIR)/$(PACKAGE)-overleaf.zip
 TLMGR_USER_TREE ?= $(abspath $(DIST_DIR)/tlmgr-usertree)
 
-.PHONY: test latex-smoke dist overleaf-zip clean-dist tlmgr-install-dry-run
+.PHONY: test latex-smoke latex-lecture lecture-handout lecture-slides lecture-blocks dist overleaf-zip clean-dist tlmgr-install-dry-run
 
 test:
 	$(LUA) tests/run.lua
@@ -25,6 +25,18 @@ latex-smoke:
 	grep -Fq '\textit{group}' tests/latex-smoke/mark2tex-output/content_*.tex
 	$(LUA) tests/check_links_pdf.lua
 	$(LUA) tests/check_footnotes.lua
+
+latex-lecture: lecture-handout lecture-slides lecture-blocks
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error annotations.tex
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-dozent '\def\LectureDozent{}\input{annotations.tex}'
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-handout '\def\LectureHandout{}\input{annotations.tex}'
+	cd tests/lecture && sh check-pdfs.sh
+
+lecture-handout: LECTURE_JOB = handout
+lecture-slides: LECTURE_JOB = folien
+lecture-blocks: LECTURE_JOB = blocks
+lecture-handout lecture-slides lecture-blocks:
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
 
 dist: $(DIST_ARCHIVE)
 
@@ -61,7 +73,7 @@ $(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark
 		echo "catalogue-license mit"; \
 		echo "catalogue-version $(VERSION)"; \
 	} > "$(DIST_BUILD_DIR)/tlpkg/tlpobj/$(PACKAGE).tlpobj"
-	@tar -C "$(DIST_BUILD_DIR)" -cf - texmf-dist tlpkg | xz -9e > "$(DIST_ARCHIVE)"
+	@COPYFILE_DISABLE=1 tar -C "$(DIST_BUILD_DIR)" -cf - texmf-dist tlpkg | xz -9e > "$(DIST_ARCHIVE)"
 	@echo "Built $(DIST_ARCHIVE)"
 
 $(OVERLEAF_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark2tex/*.lua)
