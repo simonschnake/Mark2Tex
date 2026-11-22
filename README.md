@@ -541,7 +541,11 @@ The current parser intentionally supports only a small, tested subset:
 - pipe tables, including inline formatting and math inside cells
 - LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
 - unordered lists with `-`, `*`, or `+`
-- ordered lists with `1.` or `1)`
+- ordered lists with `1.`, `1)`, or lowercase letters followed by a closing
+  parenthesis and whitespace, as in `a) First item`. The first marker sets
+  the starting number or letter (for example, `4.` or `c)`). Subsequent
+  items count consecutively. Switching between alphabetic and numeric
+  markers at the same indentation starts a new list.
 - some nested list forms
 - single citations such as `@key`
 - Pandoc-style citation groups such as `[@key1; @key2]`, including locators such as `[@key, p. 433]`

@@ -121,7 +121,9 @@ grammar.display_math = newline
 --------------------
 
 local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
-local continuation_list_marker = S("-*+") * space + R("09") ^ 1 * S(".)") + P("#") * space
+local decimal_marker = R("09") ^ 1 * S(".)")
+local alpha_marker = R("az") * P(")") * #S(" \t")
+local continuation_list_marker = S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
 local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
@@ -133,12 +135,18 @@ grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 -- Enum
 --------------------
 
-local start_of_enum = newline * C(S(" \t") ^ 0) * R("09") ^ 1 * S(".)")
+local start_of_enum = newline * C(horizontal_space) * C(decimal_marker + alpha_marker)
 local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 	/ function(t)
-		return nodes.enum(#t[1], t[2])
+		local marker = t[2]:sub(1, -2)
+		local start = tonumber(marker)
+		if start then
+			-- TeX counters are signed 32-bit integers.
+			return nodes.enum(#t[1], t[3], "decimal", start <= 2147483647 and start or 1)
+		end
+		return nodes.enum(#t[1], t[3]:gsub("^\t+", " "), "alpha", marker:byte() - string.byte("a") + 1)
 	end
 
 --------------------

@@ -1,0 +1,47 @@
+a) First
+  Continuation
+f) Consecutive
+4. Fourth
+  c) Nested
+  d) Next nested
+5) Fifth
+z) Last single letter
+z) First double letter
+
+a)Text
+
+4) Fourth again
+..................................................
+\begin{enumerate}
+\expandafter\edef\csname the\csname @enumctr\endcsname\endcsname{\expandafter\noexpand\csname int_to_alph:n\endcsname{\noexpand\value{\csname @enumctr\endcsname}}}
+\expandafter\def\csname @itemlabel\endcsname{\csname the\csname @enumctr\endcsname\endcsname)}
+\item First
+  Continuation
+\item Consecutive
+\end{enumerate}
+\begin{enumerate}
+\setcounter{\csname @enumctr\endcsname}{3}
+\item Fourth
+\begin{enumerate}
+\expandafter\edef\csname the\csname @enumctr\endcsname\endcsname{\expandafter\noexpand\csname int_to_alph:n\endcsname{\noexpand\value{\csname @enumctr\endcsname}}}
+\expandafter\def\csname @itemlabel\endcsname{\csname the\csname @enumctr\endcsname\endcsname)}
+\setcounter{\csname @enumctr\endcsname}{2}
+\item Nested
+\item Next nested
+\end{enumerate}
+\item Fifth
+\end{enumerate}
+\begin{enumerate}
+\expandafter\edef\csname the\csname @enumctr\endcsname\endcsname{\expandafter\noexpand\csname int_to_alph:n\endcsname{\noexpand\value{\csname @enumctr\endcsname}}}
+\expandafter\def\csname @itemlabel\endcsname{\csname the\csname @enumctr\endcsname\endcsname)}
+\setcounter{\csname @enumctr\endcsname}{25}
+\item Last single letter
+\item First double letter
+\end{enumerate}
+
+a)Text
+
+\begin{enumerate}
+\setcounter{\csname @enumctr\endcsname}{3}
+\item Fourth again
+\end{enumerate}

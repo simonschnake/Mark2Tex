@@ -49,14 +49,30 @@ local function close_all_lists(out, stack)
 end
 
 local function open_list(out, stack, ast)
-	table.insert(stack, { type = ast.type, level = ast.level })
+	table.insert(stack, { type = ast.type, level = ast.level, style = ast.style or "decimal" })
 	out[1] = out[1] .. "\n\\begin{" .. list_environment(ast.type) .. "}"
+	if ast.type == "enum" then
+		local counter = "\\csname @enumctr\\endcsname"
+		if ast.style == "alpha" then
+			-- Capture the counter name for references from nested lists.
+			out[1] = out[1] .. "\n\\expandafter\\edef\\csname the" .. counter .. "\\endcsname{"
+				.. "\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname"
+				.. "{\\noexpand\\value{" .. counter .. "}}}"
+				.. "\n\\expandafter\\def\\csname @itemlabel\\endcsname{"
+				.. "\\csname the" .. counter .. "\\endcsname)}"
+		end
+		if ast.start and ast.start ~= 1 then
+			out[1] = out[1] .. "\n\\setcounter{" .. counter .. "}{" .. tostring(ast.start - 1) .. "}"
+		end
+	end
 end
 
 local function ensure_list_environment(out, stack, ast)
 	close_lists_until(out, stack, ast.level)
 
-	if #stack > 0 and stack[#stack].level == ast.level and stack[#stack].type ~= ast.type then
+	local style = ast.style or "decimal"
+	if #stack > 0 and stack[#stack].level == ast.level
+		and (stack[#stack].type ~= ast.type or stack[#stack].style ~= style) then
 		close_list(out, stack)
 	end
 

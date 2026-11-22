@@ -28,8 +28,8 @@ function nodes.item(level, content)
 	return { type = "item", level = level, content = content }
 end
 
-function nodes.enum(level, content)
-	return { type = "enum", level = level, content = content }
+function nodes.enum(level, content, style, start)
+	return { type = "enum", level = level, content = content, style = style, start = start }
 end
 
 function nodes.code(code_type, content)
