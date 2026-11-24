@@ -24,37 +24,33 @@ return function(assertions)
 		local markdown = [=[
 ## Common
 
-<!-- script: begin -->
+::: script
 ### ScriptHeading
-<!-- instructor: begin -->
+:::: instructor
 InstructorScript
-<!-- end -->
+::::
 AfterInner
-<!-- end -->
+:::
 
-<!-- slides: begin -->
+::: slides
 
----
+## SlideHeading
 
-<!-- title: SlideHeading -->
-
-<!-- end -->
+:::
 
 SharedBody
 
-<!-- student: begin -->
+::: student
 StudentText
-<!-- end -->
+:::
 
-<!-- instructor: begin -->
+::: instructor
 InstructorText
 
----
-
-<!-- title: InstructorContinuation -->
+## InstructorContinuation
 
 RestrictedBody
-<!-- end -->
+:::
 ]=]
 		for _, profile in ipairs({ "text", "handout", "slides" }) do
 			for _, audience in ipairs({ "student", "instructor" }) do
@@ -79,15 +75,105 @@ RestrictedBody
 
 	function test_variant_markers_report_errors_and_preserve_code()
 		for _, example in ipairs({
-			{ "Intro\n<!-- end -->", "Markdown:2: unexpected" },
-			{ "Intro\r\n<!-- script: begin -->", "Markdown:2: unclosed script" },
+			{ "Intro\n:::", "Markdown:2: unexpected" },
+			{ "Intro\r\n::: script", "Markdown:2: unclosed div" },
 		}) do
 			local ok, err = pcall(render, example[1])
 			assertions.assertEquals(ok, false)
 			assertions.assertEquals(err:sub(1, #example[2]), example[2])
 		end
-		local output = render("Before\n\n```markdown\n<!-- end -->\n```\n")
-		assertions.assertEquals(count(output, "<!%-%- end %-%->"), 1)
+		local output = render("Before\n\n```markdown\n:::\n```\n")
+		assertions.assertEquals(count(output, ":::"), 1)
+	end
+
+	function test_div_warnings_keep_nested_content_and_source_locations()
+		local markdown = [=[
+<!-- a
+multiline comment -->
+::: {.slides .instructor}
+::: slides
+Restricted
+::::
+:::
+]=]
+		local config = assert(mark2tex.resolve_config({ profile = "slides", audience = "instructor" }))
+		local ast = parse(markdown, config, "lecture.md")
+		assertions.assertEquals(#ast.warnings, 2)
+		assertions.assertEquals(ast.warnings[1].category, "div-fence")
+		assertions.assertEquals(ast.warnings[1].line, 4)
+		assertions.assertEquals(ast.warnings[2].line, 6)
+		assertions.assertEquals(count(write(lecture.structure(ast, config), config), "Restricted"), 1)
+		assertions.assertEquals(count(render(markdown, "slides"), "Restricted"), 0)
+		assertions.assertEquals(count(render(markdown, "handout", nil, { audience = "instructor" }), "Restricted"), 0)
+	end
+
+	function test_titleless_separator_and_slide_only_heading()
+		local markdown = "## Start\n\nFirst.\n\n---\n\nSecond.\n\n::: slides\n## Third\n:::\n\nThird body."
+		local slides = render(markdown, "slides")
+		assertions.assertEquals(count(slides, "\\begin{frame}"), 3)
+		assertions.assertEquals(count(slides, "\\frametitle"), 2)
+		assertions.assertEquals(count(slides, "\\frametitle{Third}[^}]*Third body"), 1)
+		local handout = render(markdown, "handout")
+		assertions.assertEquals(count(handout, "\\subsection"), 1)
+		assertions.assertEquals(count(handout, "Second%.%s*Third body"), 1)
+	end
+
+	function test_divs_filter_list_items_and_footnote_definitions()
+		local markdown = [=[
+1. Visible
+::: instructor
+2. Restricted
+:::
+3. Also visible
+
+Shared.[^source]
+
+::: instructor
+[^source]: Hidden definition
+:::
+]=]
+		local student = render(markdown)
+		local instructor = render(markdown, nil, nil, { audience = "instructor" })
+		assertions.assertEquals(count(student, "\\begin{enumerate}"), 1)
+		assertions.assertEquals(count(instructor, "\\begin{enumerate}"), 1)
+		assertions.assertEquals(count(student, "Restricted"), 0)
+		assertions.assertEquals(count(instructor, "Restricted"), 1)
+		assertions.assertEquals(count(student, "Hidden definition"), 0)
+		assertions.assertEquals(count(instructor, "\\footnote{\\label{[^}]+}Hidden definition}"), 1)
+	end
+
+	function test_compact_divs_keep_paragraph_boundaries()
+		local markdown = "Before.\n::: instructor\nRestricted.\n:::\nAfter."
+		local student = render(markdown)
+		local instructor = render(markdown, nil, nil, { audience = "instructor" })
+		assertions.assertEquals(count(student, "Before%.\n\nAfter%."), 1)
+		assertions.assertEquals(count(instructor, "Before%.\n\nRestricted%.\n\nAfter%."), 1)
+	end
+
+	function test_old_comment_directives_are_ordinary_comments()
+		local markdown = [=[
+## Visible
+
+<!-- instructor: begin -->
+Still visible. <!-- dozent -->
+<!-- end -->
+
+<!-- footer: Old footer -->
+<!-- note: Old note -->
+
+---
+
+<!-- title: Old title -->
+<!-- mark2tex: slide-title="Legacy title" -->
+
+Continuation.
+]=]
+		local output = render(markdown, "slides")
+		assertions.assertEquals(count(output, "Still visible"), 1)
+		assertions.assertEquals(count(output, "%% instructor: begin"), 1)
+		assertions.assertEquals(count(output, "\\frametitle"), 1)
+		assertions.assertEquals(count(output, "\\SlideFooter"), 0)
+		assertions.assertEquals(count(output, "\\note{"), 0)
 	end
 
 	function test_h1_slide_modes_and_heading_levels()
@@ -173,28 +259,38 @@ Text
 		local markdown = [=[
 ## Frage
 
-<!-- footer: Quelle & Kontext -->
+::: footer
+Quelle & Kontext
+:::
 
 Frage.
 
 . . .
 
+::: instructor
 Erste Zeile der Lösung
-mit Fußnote.[^quelle] <!-- dozent -->
+mit Fußnote.[^quelle]
+:::
 
 - Sichtbarer Punkt
+::: instructor
 - Interner Punkt
-  mit Fortsetzung. <!-- dozent -->
+  mit Fortsetzung.
+:::
 
 Sichtbarer Verweis.[^quelle]
 
-<!-- note: Erste Zeile
-zweite Zeile. -->
-<!-- note: Weitere Notiz. -->
+::: notes
+Erste Zeile
+zweite Zeile.
+:::
+::: notes
+Weitere Notiz.
+:::
 
----
-
-<!-- title: Weiter -->
+::: slides
+## Weiter
+:::
 
 Nächster Inhalt.
 
@@ -203,82 +299,28 @@ Nächster Inhalt.
 		local slides = render(markdown:gsub("\n", "\r\n"), "slides")
 		local dozent = render(markdown, "slides", "dozent")
 		local handout = render(markdown, "handout")
-		assertions.assertEquals(count(slides, "Lösung"), 1)
-		assertions.assertEquals(count(slides, "Interner Punkt"), 1)
+		assertions.assertEquals(count(slides, "Lösung"), 0)
+		assertions.assertEquals(count(slides, "Interner Punkt"), 0)
 		assertions.assertEquals(count(slides, "\\footnote{"), 1)
-		assertions.assertEquals(count(slides, "\\footref{"), 1)
+		assertions.assertEquals(count(slides, "\\footref{"), 0)
 		assertions.assertEquals(count(slides, "\\SlideFooter{Quelle \\& Kontext}"), 1)
 		assertions.assertEquals(count(slides, "\\frametitle{Weiter}"), 1)
 		assertions.assertEquals(count(slides, "Erste Zeile zweite Zeile"), 1)
 		assertions.assertEquals(count(dozent, "Lösung"), 1)
 		assertions.assertEquals(count(dozent, "Interner Punkt"), 1)
-		assertions.assertEquals(count(handout, "Interner Punkt"), 1)
+		assertions.assertEquals(count(handout, "Interner Punkt"), 0)
 		assertions.assertEquals(count(handout, "Vortragsnotiz:"), 2)
 		assertions.assertEquals(count(handout, "Quelle \\& Kontext"), 1)
 	end
 
-	function test_lecture_dozent_blocks_keep_space_and_pauses()
-		local markdown = "## Frage\n\nSichtbar.\n\n. . .\n\nIntern. <!-- dozent -->\n"
-		assertions.assertEquals(count(render(markdown, "slides"), "\\pause"), 1)
-		assertions.assertEquals(count(render(markdown, "slides", "dozent"), "\\pause"), 1)
-	end
-
-	function test_lecture_dozent_display_math_is_wrapped()
-		local markdown = "## Formel\n\n$$\nx = y\n$$ <!-- dozent -->\n\nDanach.\n"
-		for _, profile in ipairs({ "slides", "handout" }) do
-			local tex = render(markdown, profile)
-			assertions.assertEquals(count(tex, "\\begin{MarkTwoTeXDozent}"), 1)
-			assertions.assertEquals(count(tex, "\\end{MarkTwoTeXDozent}"), 1)
-			assertions.assertEquals(count(tex, "x = y"), 1)
-		end
-	end
-
-	function test_lecture_dozent_comment_group()
-		local markdown = [=[
-## Frage
-
-<!-- dozent:begin -->
-
-Lösung.[^quelle]
-
-$$
-x = y
-$$
-
-1. Erster Schritt
-2. Zweiter Schritt
-
-<!-- dozent:end -->
-
-Danach.
-
-[^quelle]: Quelle.
-]=]
-		for _, profile in ipairs({ "slides", "handout" }) do
-			local tex = render(markdown, profile)
-			assertions.assertEquals(count(tex, "\\begin{MarkTwoTeXDozent}"), 1)
-			assertions.assertEquals(count(tex, "\\end{MarkTwoTeXDozent}"), 1)
-			assertions.assertEquals(count(tex, "Lösung%.\\footnote{"), 1)
-			assertions.assertEquals(count(tex, "x = y"), 1)
-			assertions.assertEquals(count(tex, "\\end{enumerate}%s*\\par%s*\\end{MarkTwoTeXDozent}"), 1)
-			assertions.assertEquals(count(tex, "\\end{MarkTwoTeXDozent}%s*Danach%."), 1)
-		end
-	end
-
-	function test_lecture_dozent_group_does_not_cross_frames()
-		local markdown = "## A\n\n<!-- dozent:begin -->\n\nText.\n\n## B\n\n<!-- dozent:end -->"
-		local tex = render(markdown, "slides")
-		assertions.assertEquals(count(tex, "\\begin{frame}"), 2)
-		assertions.assertEquals(count(tex, "\\begin{MarkTwoTeXDozent}"), 0)
-		assertions.assertEquals(count(tex, "Text%."), 1)
-	end
-
 	function test_lecture_directives_in_code_are_literal()
 		local markdown = "## Code\n\n" .. string.rep("\x60", 3)
-			.. "\n<!-- footer: Im Code -->\nAusgabe <!-- dozent -->\n" .. string.rep("\x60", 3) .. "\n"
+			.. "\n::: footer\nAusgabe\n:::\n" .. string.rep("\x60", 3) .. "\n"
+			.. "\n\\begin{verbatim}\n::: instructor\n\\end{verbatim}\n"
 		local slides = render(markdown, "slides")
 		assertions.assertEquals(count(slides, "\\SlideFooter"), 0)
 		assertions.assertEquals(count(slides, "Ausgabe"), 1)
+		assertions.assertEquals(count(slides, "::: instructor"), 1)
 	end
 
 	function test_lecture_output_paths_and_validation()

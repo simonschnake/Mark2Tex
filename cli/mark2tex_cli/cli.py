@@ -46,13 +46,6 @@ FORMAT_RUNTIME = r"""\makeatletter
 }
 \makeatother
 """
-HIDE_DOZENT = r"""\NewCommandCopy{\MarkTwoTeXBeamerFootnote}{\footnote}
-\RenewDocumentEnvironment{MarkTwoTeXDozent}{}{%
-  \begin{visibleenv}<0>%
-  \RenewDocumentCommand{\footnote}{o +m}{%
-    \IfNoValueTF{##1}{\MarkTwoTeXBeamerFootnote<0>{##2}}{\MarkTwoTeXBeamerFootnote<0>[##1]{##2}}}%
-}{\end{visibleenv}}
-"""
 SLIDE_FOOTER = r"""\setbeamertemplate{footline}{%
   \leavevmode\hbox to \paperwidth{\hskip10mm\sffamily\scriptsize
     \MarkTwoTeXFooter\hfil\insertframenumber\hskip10mm}\vskip3mm}
@@ -298,7 +291,6 @@ def stage_document(build, args, fragment):
         "TITLE": latex_text(args.title or ""), "AUTHOR": latex_text(args.author), "DATE": latex_text(args.date),
         "TITLEPAGE": titlepage if args.title is not None else "", "FRAGMENT": fragment, "FOOTER": footer,
         "NOTES": r"\setbeameroption{show notes on second screen=right}" if args.speaker_notes else "",
-        "DOZENT": "" if args.dozent else HIDE_DOZENT,
     }
     template = TEMPLATES / ("slides.tex" if slides else "article.tex")
     return render(template.read_text(encoding="utf-8"), values)
@@ -325,10 +317,7 @@ def stage_custom_document(build, args, fragment, document, title_image):
         lines.append(rf"\newif\ifMarkTwoTeX{name}")
         if enabled:
             lines.append(rf"\MarkTwoTeX{name}true")
-    if args.format == "slides" and not args.dozent:
-        lines.extend([r"\newcommand{\MarkTwoTeXHideDozent}{%", HIDE_DOZENT.replace("#", "##"), "}"])
-    else:
-        lines.append(r"\newcommand{\MarkTwoTeXHideDozent}{}")
+    lines.append(r"\newcommand{\MarkTwoTeXHideDozent}{}")
     (build / "mark2tex-template.tex").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return document
 

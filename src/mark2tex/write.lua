@@ -157,7 +157,7 @@ local function has_verbatim(blocks)
 	for _, node in ipairs(blocks) do
 		if node.type == "code"
 			or (node.type == "latex" and node.content:find("\\begin{verbatim", 1, true))
-			or ((node.type == "blockquote" or node.type == "dozent_group") and has_verbatim(node.content)) then
+			or (node.type == "blockquote" and has_verbatim(node.content)) then
 			return true
 		end
 	end
@@ -183,13 +183,9 @@ local function walk(ast, out, config)
 		elseif ast.type == "slide_frame" then
 			local options = has_verbatim(ast.content) and "t,fragile" or "t"
 			out[1] = out[1] .. "\n\\begin{frame}[" .. options .. "]\n"
-			if ast.title or ast.plain_title then
+			if ast.title then
 				out[1] = out[1] .. "\\frametitle{"
-				if ast.title then
-					walk(ast.title, out, config)
-				else
-					out[1] = out[1] .. write_inline_code(ast.plain_title)
-				end
+				walk(ast.title, out, config)
 				out[1] = out[1] .. "}\n"
 			end
 			if ast.footer then
@@ -209,8 +205,6 @@ local function walk(ast, out, config)
 			out[1] = out[1] .. "\n\\par\\medskip\\noindent\\textbf{"
 			walk(ast.content, out, config)
 			out[1] = out[1] .. "}\\par\n"
-		elseif ast.type == "dozent_group" then
-			out[1] = out[1] .. "\n" .. write(ast.content, config, true)
 		elseif ast.type == "lecture_annotations" then
 			if ast.footer then
 				out[1] = out[1] .. "\n\\par\\noindent{\\small " .. write_inline_code(ast.footer:gsub("%s+", " ")) .. "}\\par\n"
@@ -221,8 +215,6 @@ local function walk(ast, out, config)
 			end
 		elseif ast.type == "slide_paragraph" then
 			out[1] = out[1] .. "\n\\par\n"
-		elseif ast.type == "slide_title" then
-			out[1] = out[1] .. "\n" .. ast.token
 		elseif ast.type == "horizontal_rule" then
 			out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"
 		elseif ast.type == "latex" then
@@ -356,12 +348,6 @@ local function contains_links(ast)
 	return false
 end
 
-local function write_block(node, out, config)
-	if node.dozent then out[1] = out[1] .. "\n\\begin{MarkTwoTeXDozent}" end
-	walk(node, out, config)
-	if node.dozent then out[1] = out[1] .. "\n\\par\n\\end{MarkTwoTeXDozent}" end
-end
-
 write = function(ast, config, nested)
 	local output = { "" }
 	local list_stack = {}
@@ -369,10 +355,10 @@ write = function(ast, config, nested)
 	for _, node in ipairs(ast) do
 		if is_list_node(node) then
 			ensure_list_environment(output, list_stack, node)
-			write_block(node, output, config)
+			walk(node, output, config)
 		else
 			close_all_lists(output, list_stack)
-			write_block(node, output, config)
+			walk(node, output, config)
 		end
 	end
 

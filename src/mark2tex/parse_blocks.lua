@@ -12,12 +12,20 @@ local rest_of_line = (P(1) - newline) ^ 1
 local horizontal_space = S(" \t") ^ 0
 local line_end = #newline + -P(1)
 
+local Cp, Cmt = lpeg.Cp, lpeg.Cmt
+local colons = P(":") ^ 3
+local name = (R("az", "AZ", "09") + S("_-")) ^ 1
+local attributes = C(P("{") * (P(1) - S("}\n")) ^ 1 * P("}") + name)
+local fence_body = horizontal_space * Cp() * C(colons)
+	* horizontal_space * (attributes + C(P(""))) * horizontal_space * line_end
+local fence = newline * fence_body
+
 local grammar = {}
 
 -- Definitions are blocks, so fenced code and raw LaTeX remain untouched.
 local footnote_indent = P("    ") + P("\t")
 local footnote_continuation = newline * (horizontal_space * newline) ^ 0
-	* footnote_indent * (P(1) - newline) ^ 0
+	* -fence_body * footnote_indent * (P(1) - newline) ^ 0
 grammar.footnote_definition = newline * P(" ") ^ -3 * P("[^")
 	* C((P(1) - S("[] \t\r\n")) ^ 1) * P("]:")
 	* C((P(1) - newline) ^ 0 * footnote_continuation ^ 0)
@@ -123,7 +131,7 @@ grammar.display_math = newline
 local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
 local decimal_marker = R("09") ^ 1 * S(".)")
 local alpha_marker = R("az") * P(")") * #S(" \t")
-local continuation_list_marker = S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
+local continuation_list_marker = fence_body + S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
 local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
@@ -252,6 +260,11 @@ grammar.table = newline
 -- Other
 --------------------
 
+grammar.div_fence = (fence * Cp()) / function(position, delimiter, attributes_text, ending)
+	return { type = "div_fence", position = position, ending = ending,
+		length = #delimiter, attributes = attributes_text }
+end
+
 -- Display math must be considered before a generic raw LaTeX environment.
 -- Otherwise an environment such as `aligned` consumes its surrounding
 -- delimiters and is emitted outside math mode.
@@ -273,8 +286,7 @@ for key, pattern in pairs(grammar) do
 	lecture[key] = pattern
 end
 
-local Cp, Cmt, Carg = lpeg.Cp, lpeg.Cmt, lpeg.Carg
-local end_of_paragraph = #(newline * horizontal_space * (newline + -P(1)) + -P(1))
+local end_of_paragraph = #(newline * horizontal_space * (newline + -P(1)) + fence + -P(1))
 local function standalone(pattern)
 	return Cmt(Cp() * newline * pattern * horizontal_space * end_of_paragraph,
 		function(subject, ending, start, node)
@@ -282,7 +294,9 @@ local function standalone(pattern)
 			while previous > 0 and subject:sub(previous, previous):match("[ \t\r]") do
 				previous = previous - 1
 			end
-			if previous == 0 or subject:sub(previous, previous) == "\n" then
+			local before = subject:sub(1, start - 1):match("([^\n]*)$")
+			if previous == 0 or subject:sub(previous, previous) == "\n"
+				or lpeg.match(fence, "\n" .. before) then
 				return ending, node
 			end
 		end)
@@ -296,21 +310,17 @@ lecture.header = newline * C(P(" ") ^ 0) * C(hash ^ 1) * space * C(rest_of_line)
 	end
 lecture.slide_break = standalone(P("-") ^ 3 / function() return { type = "slide_break" } end)
 lecture.slide_pause = standalone(P(". . .") / function() return { type = "slide_pause" } end)
-lecture.slide_directive = newline * Cmt(
-	C(P("MARKTWOTEXCOMMENT") * P("X") ^ 0 * R("09") ^ 1 * P("END")) * horizontal_space * line_end * Carg(1),
-	function(_, ending, token, directives)
-		if directives[token] and directives[token].type ~= "dozent" then
-			return ending, directives[token]
-		end
-	end)
-lecture.outer_elements = V("slide_break") + V("slide_pause") + V("slide_directive") + grammar.outer_elements
+local nested_grammar = P(grammar) * -1
+grammar.outer_elements = V("div_fence") + grammar.outer_elements
+lecture.outer_elements = V("slide_break") + V("slide_pause") + grammar.outer_elements
 
 local classic_grammar = P(grammar) * -1
 local lecture_grammar = P(lecture) * -1
 
-local function parse_blocks(str, directives)
-	if directives then
-		return lecture_grammar:match(str, 1, directives)
+local function parse_blocks(str, lecture_profile, nested)
+	if nested then return nested_grammar:match(str) end
+	if lecture_profile then
+		return lecture_grammar:match(str)
 	end
 	return classic_grammar:match(str)
 end

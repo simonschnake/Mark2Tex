@@ -8,7 +8,7 @@ local md5 = require("md5")
 local self = {}
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v17"
+local CACHE_VERSION = "v18"
 
 local function copy_table(value)
     if type(value) ~= "table" then
@@ -170,14 +170,18 @@ self.convert = function (input_path, cfg)
 	local ok, ast = pcall(parse, content, config, input_path)
 	if not ok then return nil, ast end
 	for _, warning in ipairs(ast.warnings or {}) do
-		local subject = warning.identifier and ("footnote " .. warning.identifier)
-			or warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
-		if warning.kind == "mismatched" then
-			subject = subject .. " (expected \\end{" .. warning.expected_end .. "}, found \\end{" .. warning.actual_end .. "})"
-		end
 		local location = warning.line and (input_path .. ":" .. warning.line .. ":" .. warning.column .. ": ") or ""
-		local action = warning.kind == "duplicate" and "; first definition used" or "; kept literal"
-		io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. action .. "\n")
+		if warning.message then
+			io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.message .. "\n")
+		else
+			local subject = warning.identifier and ("footnote " .. warning.identifier)
+				or warning.delimiter and ("delimiter " .. warning.delimiter) or ("environment " .. warning.environment)
+			if warning.kind == "mismatched" then
+				subject = subject .. " (expected \\end{" .. warning.expected_end .. "}, found \\end{" .. warning.actual_end .. "})"
+			end
+			local action = warning.kind == "duplicate" and "; first definition used" or "; kept literal"
+			io.stderr:write("mark2tex warning [" .. warning.category .. "] " .. location .. warning.kind .. " " .. subject .. action .. "\n")
+		end
 	end
 	if config.profile then ast = lecture.structure(ast, config) end
 	local tex = write(ast, config)

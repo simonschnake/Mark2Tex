@@ -295,10 +295,7 @@ the converted Markdown with `\MarkTwoTeXContent` inside the document body.
   `\documentclass` if the class options depend on these settings.
 - `\ifMarkTwoTeXDozent`, `\ifMarkTwoTeXSpeakerNotes`, `\ifMarkTwoTeXNoFooter`,
   `\ifMarkTwoTeXWritingMargin`, `\ifMarkTwoTeXNumbered`, and `\ifMarkTwoTeXTOC`
-  let the template apply those presentation choices. After loading
-  `mark2tex` in Beamer, call `\MarkTwoTeXHideDozent` to reserve space for
-  instructor content on regular slides. A template can also define its own
-  `MarkTwoTeXDozent` environment.
+  let the template apply those presentation choices.
 - `\ifMarkTwoTeXHasTitleImage` indicates whether `--title-image` supplied an
   image. Pass `\MarkTwoTeXTitleImage` to the template's image command.
 
@@ -343,8 +340,9 @@ conversion is the default. Direct Lua calls use `profile` and `slide_level`.
   subheadings within a slide. In handouts, `header` controls heading formatting.
 - A line of at least three hyphens with a blank line on each side starts a
   continuation slide. In handouts, it adds paragraph spacing.
-- Place `<!-- mark2tex: slide-title="Custom title" -->` immediately after
-  the separator as the first block to give the continuation slide a plain-text title.
+- A continuation slide started by a separator has no title. For a titled
+  slide whose heading is omitted from the handout, put a heading at the
+  slide level inside a `slides` block.
 - A standalone `. . .` paragraph creates a Beamer overlay. In handouts, the
   blocks appear in sequence.
 
@@ -363,20 +361,20 @@ The test uses LuaLaTeX, Beamer, STIX Two, and Poppler's `pdfinfo` and `pdftotext
 
 ### Content visibility and top-level headings
 
-`<!-- script: begin -->` selects text and handout output.
-`<!-- slides: begin -->` selects slides.
-`<!-- instructor: begin -->` selects the instructor edition.
-`<!-- student: begin -->` selects the regular edition.
-Put each marker on its own line. `<!-- end -->` closes the innermost open
-block. Nested content appears when every enclosing condition matches.
-Mark2TeX filters the content before laying out slides, so excluded blocks
-take up no space. A standard Markdown preview shows all blocks.
-A missing or extra closing marker stops conversion with a line number.
+Use `::: script` for standard and handout output, `::: slides` for slides,
+`::: instructor` for the instructor edition, and `::: student` for the
+regular edition. Close each block with a line containing only colons.
+Nested blocks require every enclosing condition to match. The attribute
+form `::: {.slides .instructor}` combines both conditions in one block.
+
+Use matching fence lengths and add one colon at each nesting level.
+An unmatched length or a nested fence that is no longer than its parent
+produces a warning. Missing and extra closing fences stop conversion with
+a line number. Mark2TeX filters these blocks before laying out slides or
+resolving footnotes. Excluded content takes up no space.
 
 Use `--instructor` or `--dozent` in the CLI. Direct Lua calls and package
 options use `audience=instructor`. The default is `audience=student`.
-Use the `dozent` comments below to reserve space for a solution on regular
-slides.
 
 Use `--h1 section|frame|hide` to control top-level headings on slides.
 The default `section` follows the slide-level rule. `frame` uses the heading
@@ -384,80 +382,46 @@ as the title of a regular content slide. `hide` drops the heading, keeps
 its content, and skips the slide break. Direct Lua calls and package options
 use `h1`. The handout preserves the heading levels of visible content.
 
-In this example, the derivation gets a third-level heading in the handout
-and a continuation slide in the presentation. The teaching reminder
-appears in the instructor handout.
-
 ```markdown
 ## Energy balance
 
 The balance follows from the first law of thermodynamics.
 
-<!-- script: begin -->
-
+::: script
 ### Derivation
 
-<!-- instructor: begin -->
-
+:::: instructor
 Review the sign convention here.
+::::
+:::
 
-<!-- end -->
-
-<!-- end -->
-
-<!-- slides: begin -->
-
----
-
-<!-- title: Derivation -->
-
-<!-- end -->
+::: slides
+## Derivation
+:::
 
 For a closed system, $\Delta U = Q + W$.
 ```
 
-### Lecture comments
+### Footers and speaker notes
 
-- `<!-- footer: Handout section 5 -->` sets the current slide's footer.
-  The first footer on a slide takes precedence.
-- `<!-- note: Draw the pipe first. -->` adds a speaker note. Notes can span
-  multiple lines and appear in source order.
-- `<!-- dozent -->` at the end of a paragraph or list item marks it and
-  its continuation lines as instructor content.
-- `<!-- title: Continued -->` directly after `---` sets the continuation
-  slide title. The longer title syntax above also works.
+```markdown
+::: footer
+Handout section 5
+:::
 
-Mark2TeX wraps instructor content in the `MarkTwoTeXDozent` environment.
-The default definition shows the content. A Beamer template can define the
-environment with `\begin{visibleenv}<0>` and `\end{visibleenv}` to hide
-the content while reserving its space. The built-in CLI template uses this
-definition on regular slides. Instructor slides and handouts show the content.
-Handouts place footers and speaker notes at the end of each slide section.
+::: notes
+Draw the pipe first.
+:::
+```
 
-For display equations, place the marker after the closing delimiter, as in
-`$$ <!-- dozent -->` or `\] <!-- dozent -->`. For tables and code blocks,
-place it on the following line.
+The first footer on a slide takes precedence. Notes can span multiple lines
+and appear in source order. In handouts, both annotations appear at the end
+of the current slide section. A Beamer theme can use `\SlideFooter{…}`
+to display footers. Define `\providecommand{\SlideFooter}[1]{}` to suppress them.
 
-A Beamer theme can implement `\SlideFooter{…}` to display footers.
-Use `\providecommand{\SlideFooter}[1]{}` to suppress them.
-Use `\setbeameroption{show notes}` to show speaker notes on separate pages
-in either slide edition.
-
-Use paired markers to group paragraphs, equations, or a list.
-
-    <!-- dozent:begin -->
-
-    The pressure force is
-
-    $$
-    F = p A.
-    $$
-
-    <!-- dozent:end -->
-
-Put both markers on their own lines within the same slide. Keep headings,
-slide breaks, overlays, and slide metadata outside the block. An unmatched
-marker is treated as an ordinary comment, and the content stays visible.
+The colon fences and attribute notation follow Pandoc's Markdown syntax.
+Mark2TeX defines the meaning of the visibility and annotation classes.
+Earlier HTML comment directives are handled as ordinary comments.
 
 ## Markdown and LaTeX in one source
 

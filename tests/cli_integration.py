@@ -29,41 +29,43 @@ Public measurement. See [reference](https://example.org).[^instrument]
 
 Updated reading.
 
-<!-- script: begin -->
+::: script
 
 ScriptVariant
 
-<!-- instructor: begin -->
+:::: instructor
 
 InstructorScriptVariant
 
-<!-- end -->
+::::
 
-<!-- end -->
+:::
 
-<!-- slides: begin -->
+::: slides
 
 SlidesVariant
 
-<!-- end -->
+:::
 
-<!-- student: begin -->
+::: student
 
 StudentVariant
 
-<!-- end -->
+:::
 
-<!-- dozent:begin -->
+::: instructor
 
 InstructorOnly
 
-<!-- dozent:end -->
+:::
 
-<!-- note: PresenterOnly -->
+::: notes
+PresenterOnly
+:::
 
----
-
-<!-- title: Continuation -->
+::: slides
+## Continuation
+:::
 
 Response to the calibration.
 

@@ -2,7 +2,7 @@ local parse_blocks = require("mark2tex.parse_blocks")
 local parse_inlines = require("mark2tex.parse_inlines")
 local diagnostics = require("mark2tex.diagnostics")
 local comments = require("mark2tex.comments")
-local lecture = require("mark2tex.lecture")
+local divs = require("mark2tex.divs")
 local nodes = require("mark2tex.nodes")
 local md5 = require("md5")
 
@@ -50,7 +50,7 @@ local function add_inline_nodes(ast, warnings, context, disabled)
 		if element.type == "code" and disabled then
 			-- verbatim environments cannot occur inside a \footnote argument.
 			element.type, element.content = "other", { nodes.text("\n"), nodes.verbatim(element.content) }
-		elseif element.type == "blockquote" or element.type == "dozent_group" then
+		elseif element.type == "blockquote" then
 			element.content = add_inline_nodes(element.content, warnings, context, disabled)
 		elseif element.type == "table" then
 			for index, cell in ipairs(element.headers) do
@@ -83,7 +83,7 @@ local function collect_definitions(ast, context, warnings, disabled)
 			if element.type == "footnote_definition" then
 				element = nodes.other("[^" .. element.identifier .. "]: " .. element.content)
 			elseif element.type == "blockquote" then
-				element.content = collect_definitions(parse_blocks(normalize_input(element.content)), context, warnings, disabled)
+				element.content = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
 			end
 			result[#result + 1] = element
 		end
@@ -91,39 +91,13 @@ local function collect_definitions(ast, context, warnings, disabled)
 	return result
 end
 
-local function normalize_ast(ast)
-	return ast
-end
-
 local function parse(str, config, source_id)
 	local lecture_profile = config and (config.profile == "slides" or config.profile == "handout")
-	local protected, comment_tokens, masked, markers = comments.protect(str, lecture_profile)
-	if #markers > 0 then
-		local selected = comments.select(str, markers, config, source_id)
-		protected, comment_tokens, masked = comments.protect(selected, lecture_profile)
-	end
-	local directives
-	if lecture_profile then
-		protected = protected:gsub("\r\n", "\n")
-		directives = {}
-		for _, comment in ipairs(comment_tokens) do
-			if comment.closed then
-				local content = comment.content:match("^%s*(.-)%s*$")
-				local key, value = content:match("^([a-z]+):%s*(.+)$")
-				local legacy = content:match('^mark2tex:[ \t]+slide%-title="([^"\r\n]+)"$')
-				if legacy then key, value = "title", legacy end
-				if key == "title" or key == "footer" or key == "note" then
-					directives[comment.token] = { type = "slide_" .. key, token = comment.token, title = value }
-				elseif key == "dozent" and (value == "begin" or value == "end") then
-					directives[comment.token] = { type = "dozent_" .. value, token = comment.token }
-				elseif content == "dozent" then
-					directives[comment.token] = { type = "dozent" }
-				end
-			end
-		end
-	end
-	local block_ast = parse_blocks(normalize_input(protected), directives)
-	local warnings = diagnostics.collect(masked)
+	local source = normalize_input(str:gsub("\r\n", "\n"))
+	local protected, comment_tokens, masked = comments.protect(source)
+	local warnings = diagnostics.collect(masked:sub(2))
+	local block_ast = divs.select(parse_blocks(protected, lecture_profile), protected,
+		source, comment_tokens, config, source_id, warnings)
 	local fingerprint
 	if config and config.document_id then
 		fingerprint = md5.sumhexa(config.document_id)
@@ -132,9 +106,6 @@ local function parse(str, config, source_id)
 	end
 	local context = { definitions = {}, seen = {}, count = 0 }
 	block_ast = collect_definitions(block_ast, context, warnings)
-	if directives then
-		block_ast = lecture.group_dozent_blocks(lecture.mark_dozent_blocks(block_ast, directives))
-	end
 	context.resolve = function(identifier)
 		local definition = context.definitions[identifier]
 		if definition == nil then return nil end
@@ -142,13 +113,13 @@ local function parse(str, config, source_id)
 		context.count = context.count + 1
 		local label = "mark2tex:footnote:" .. fingerprint .. ":" .. context.count
 		context.seen[identifier] = label
-		local blocks = collect_definitions(parse_blocks(normalize_input(definition)), context, warnings, true)
+		local blocks = collect_definitions(parse_blocks(normalize_input(definition), false, true), context, warnings, true)
 		return nodes.footnote(add_inline_nodes(blocks, warnings, context, true), label)
 	end
 	local inline_ast = add_inline_nodes(block_ast, warnings, context)
 	inline_ast.warnings = warnings
 	inline_ast.comments = comment_tokens
-	return normalize_ast(inline_ast)
+	return inline_ast
 end
 
 return parse

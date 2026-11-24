@@ -1,6 +1,6 @@
 \ifdefined\LectureHandout
   \documentclass{article}
-  \usepackage[profile=handout]{mark2tex}
+  \usepackage[profile=handout,audience=instructor]{mark2tex}
 \else
   \documentclass{beamer}
   \ifdefined\LectureDozent
@@ -8,7 +8,6 @@
     \setbeameroption{show notes}
   \else
     \usepackage[profile=slides]{mark2tex}
-    \RenewDocumentEnvironment{MarkTwoTeXDozent}{}{\begin{visibleenv}<0>}{\end{visibleenv}}
   \fi
   \newcommand{\SlideFooter}[1]{\gdef\LectureFooter{#1}}
   \newcommand{\LectureFooter}{}

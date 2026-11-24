@@ -15,10 +15,8 @@
 \usepackage{mark2tex}
 \usetheme{default}% Hier kann ein anderes Beamer-Theme stehen.
 
-% Für Publikumsfolien bleibt der Platz der Dozentenblöcke reserviert.
 % Mit --instructor (auch --dozent) erscheinen die Inhalte.
-\MarkTwoTeXHideDozent
-\ifMarkTwoTeXSpeakerNotes % --speaker-notes, für Markdown-Kommentare <!-- note: ... -->
+\ifMarkTwoTeXSpeakerNotes % --speaker-notes, für Markdown-Blöcke mit ::: notes
   \setbeameroption{show notes on second screen=right}
 \fi
 

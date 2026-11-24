@@ -69,6 +69,9 @@
     package.preload["mark2tex.comments"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/comments.lua")
     end
+    package.preload["mark2tex.divs"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/divs.lua")
+    end
     package.preload["mark2tex.parse_inlines"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/parse_inlines.lua")
     end
