@@ -89,11 +89,12 @@ supported.
 
 ## Install the LaTeX package
 
-Run `make` or `make dist` to type-check and generate Lua from Teal, run the
-Lua regression suite, and build the TeX Live archive. The build uses Teal
-0.24.1 from your PATH or a compiler command supplied with `TL=...`. If
-`tl` is missing, the first build downloads the pinned Teal and argparse
-sources via LuaRocks into `.luarocks/` and runs the compiler with `texlua`.
+Run `make` or `make dist` to type-check the Teal sources, verify that the
+committed Lua matches them, run the Lua regression suite, and build the TeX
+Live archive. The build uses Teal 0.24.1 from your PATH or a compiler command
+supplied with `TL=...`. If `tl` is missing, the first build downloads the
+pinned Teal and argparse sources via LuaRocks into `.luarocks/` and runs the
+compiler with `texlua`.
 Subsequent builds reuse that local copy.
 
 ```sh

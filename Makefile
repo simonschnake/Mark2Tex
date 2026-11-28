@@ -79,7 +79,7 @@ lecture-blocks: LECTURE_JOB = blocks
 lecture-handout lecture-slides lecture-blocks:
 	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
 
-dist: teal-gen
+dist: teal-check
 	$(MAKE) test
 	$(MAKE) "$(DIST_ARCHIVE)"
 
