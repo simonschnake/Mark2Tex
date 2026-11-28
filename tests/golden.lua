@@ -56,14 +56,32 @@ local function read_input(path)
 	return helpers.read_file(path)
 end
 
+local WARNING_FIELDS = { "delimiter", "environment", "identifier", "expected_end", "actual_end", "message" }
+
+-- One line per warning, so changes in diagnostics show up like output changes.
+local function describe_warnings(warnings)
+	local lines = {}
+	for _, warning in ipairs(warnings or {}) do
+		local parts = { "%%% warning:", warning.category, tostring(warning.kind) }
+		if warning.line then parts[#parts + 1] = warning.line .. ":" .. tostring(warning.column) end
+		for _, field in ipairs(WARNING_FIELDS) do
+			if warning[field] then parts[#parts + 1] = field .. "=" .. tostring(warning[field]) end
+		end
+		lines[#lines + 1] = table.concat(parts, " ") .. "\n"
+	end
+	return table.concat(lines)
+end
+
 local function render(source, path, variant)
 	local config = assert(core.resolve_config(variant.config))
+	local warnings
 	local ok, result = pcall(function()
 		local ast = parse(source, config, path)
+		warnings = ast.warnings
 		if config.profile then ast = lecture.structure(ast, config) end
 		return write(ast, config)
 	end)
-	if ok then return result end
+	if ok then return describe_warnings(warnings) .. result end
 	return "%%% error: " .. tostring(result)
 end
 

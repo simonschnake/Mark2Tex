@@ -1,0 +1,153 @@
+%%% variant: default
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+%%% variant: instructor
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+%%% variant: handout
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+%%% variant: slides
+\begin{frame}[t,fragile]
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+\end{frame}
+
+%%% variant: slides-dozent-h1-frame
+\begin{frame}[t,fragile]
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+\end{frame}
+
+%%% variant: slides-h1-hide-level-1
+\begin{frame}[t,fragile]
+Edge cases for block scanning.
+
+\begin{verbatim}
+-- backtick fence with $x$, `code` and <!-- comment -->
+\end{verbatim}
+
+\sout{~
+tilde fence with $x$, \texttt{code} and % comment 
+}~
+
+\sout{~python
+x = 1  # tilde fence with a language
+}~
+
+\begin{verbatim}
+fence with \end{verbatim} inside
+\begin{verbatim}
+
+Paragraph before an unclosed fence.
+
+\end{verbatim}
+never closed $x$ <!-- c -->
+
+\end{frame}
+
