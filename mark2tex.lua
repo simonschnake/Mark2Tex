@@ -77,7 +77,7 @@ function comments.protect(source)
    while position <= #source do
 
       local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
-      local code_end = at_line_start and spans.fence_end(source, position) or nil
+      local code_end = at_line_start and spans.line_fence_end(source, position) or nil
       if not code_end and source:sub(position, position) == "`" then
          code_end = spans.code_or_run_end(source, position)
       end
@@ -2591,7 +2591,12 @@ local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
 local decimal_marker = R("09") ^ 1 * S(".)")
 local alpha_marker = R("az") * P(")") * #S(" \t")
 local continuation_list_marker = fence_body + S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
-local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
+
+
+local opens_fence = Cmt(P(0), function(subject, position)
+   return spans.line_fence_end(subject, position) ~= nil
+end)
+local follow_item_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0)) /
 function(t)
@@ -2603,7 +2608,7 @@ end
 
 
 local start_of_enum = newline * C(horizontal_space) * C(decimal_marker + alpha_marker)
-local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
+local follow_enum_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0)) /
 function(t)
@@ -2622,16 +2627,24 @@ end
 
 
 
+
+
 local function fenced(character)
-   return newline * Cmt(Cp() * P(character) ^ 3 * C(rest_of_line ^ (-1)) * newline * Cp(),
-   function(subject, _, start, info, content_start)
-      local finish = spans.fence_end(subject, start)
+   return newline * Cmt(Cp() * P(" ") ^ (-3) * P(character) ^ 3 * C(rest_of_line ^ (-1)) * newline * Cp(),
+   function(subject, _, line_start, info, content_start)
+      local finish, indent = spans.line_fence_end(subject, line_start)
       if not finish then return false end
       local closing = finish
       while subject:sub(closing - 1, closing - 1) == character do closing = closing - 1 end
 
-      if closing <= content_start then return false end
-      return finish + 1, info, subject:sub(content_start, closing - 1)
+
+      if closing < content_start then return false end
+      local content = subject:sub(content_start, closing - 1)
+      if indent > 0 then
+         content = ("\n" .. content):gsub("\n" .. (" ?"):rep(indent), "\n"):sub(2)
+      end
+
+      return finish + 1, info, (content:gsub("\n +$", "\n"))
    end)
 end
 
@@ -2647,7 +2660,8 @@ end
 
 
 
-local quote_line = newline * P(">") * P(" ") ^ (-1) * C(rest_of_line ^ (-1))
+
+local quote_line = newline * P(" ") ^ (-3) * P(">") * P(" ") ^ (-1) * C(rest_of_line ^ (-1))
 
 grammar.blockquote = Ct(quote_line * quote_line ^ 0) /
 function(lines)
@@ -2931,8 +2945,9 @@ local grammar = {}
 
 
 
-grammar.cite = C(P(P(1) - S("\n;,] `\\{}") - marker) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}") - marker) ^ 1)
+
+grammar.cite = C(P(P(1) - S("\n;,] `\\{}%#&") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}%#&") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
 grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]`") - marker) ^ 1)
@@ -2965,7 +2980,6 @@ local raw_command = P(command_only)
 
 
 
-
 grammar.code_span = Cmt(Cp() * P("`"), function(subject, _, start)
    local finish = spans.code_end(subject, start)
    if not finish then return false end
@@ -2975,7 +2989,10 @@ end) / function(content, run)
    if run == 1 and raw_command:match(content) then
       return nodes.latex_cmd(content)
    end
-   if run > 1 and content:match("^ .* $") and content:find("[^ ]") then
+
+
+   content = content:gsub("\n", " ")
+   if content:match("^ .* $") and content:find("[^ ]") then
       content = content:sub(2, -2)
    end
    return nodes.verbatim(content)
@@ -3239,6 +3256,7 @@ end
 
 
 
+
 local function argument_end(source, index)
    local optional = source:sub(index, index) == "["
    local braces, brackets = optional and 0 or 1, optional and 1 or 0
@@ -3252,6 +3270,8 @@ local function argument_end(source, index)
          group = group + 1
       elseif character == "{" then
          braces = braces + 1
+      elseif character == "%" and optional then
+         return nil, "invalid"
       elseif character == "}" then
          if braces == 0 then return nil, "invalid" end
          braces = braces - 1
@@ -3310,6 +3330,16 @@ function spans.fence_end(source, position)
       if last - first + 1 >= #run then return last end
       index = last + 1
    end
+end
+
+
+
+
+function spans.line_fence_end(source, position)
+   local indent = #source:match("^ ? ? ?", position)
+   local finish = spans.fence_end(source, position + indent)
+   if finish then return finish, indent end
+   return nil
 end
 
 return spans

@@ -32,8 +32,9 @@ local grammar: {string | integer: lpeg.Pattern} = {}
 -- Citation
 --------------------
 
-grammar.cite = C(P(P(1) - S("\n;,] `\\{}") - marker) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}") - marker) ^ 1)
+-- Keys never hold %, # or &, which would break the TeX argument they go into.
+grammar.cite = C(P(P(1) - S("\n;,] `\\{}%#&") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}%#&") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
 grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]`") - marker) ^ 1)
@@ -65,8 +66,7 @@ command_only[1] = V("command")
 local raw_command = P(command_only)
 
 -- Code spans follow spans.code_end, the rule every pass shares: n backticks
--- up to the next run of exactly n. With several backticks one space on each
--- side is stripped, so a span can start or end with a backtick.
+-- up to the next run of exactly n.
 grammar.code_span = Cmt(Cp() * P("`"), function(subject: string, _: integer, start: integer): integer | boolean, string, integer
 	local finish = spans.code_end(subject, start)
 	if not finish then return false end
@@ -76,7 +76,10 @@ end) / function(content: string, run: integer): Inline
 	if run == 1 and raw_command:match(content) then
 		return nodes.latex_cmd(content)
 	end
-	if run > 1 and content:match("^ .* $") and content:find("[^ ]") then
+	-- As in CommonMark: line endings become spaces, and one space is stripped
+	-- on each side when both are there (so a span can hold a lone backtick).
+	content = content:gsub("\n", " ")
+	if content:match("^ .* $") and content:find("[^ ]") then
 		content = content:sub(2, -2)
 	end
 	return nodes.verbatim(content)

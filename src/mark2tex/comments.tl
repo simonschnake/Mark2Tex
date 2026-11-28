@@ -22,7 +22,7 @@ function comments.protect(source: string): string, {CommentToken}, string
 	while position <= #source do
 		-- Comments inside fenced code and code spans stay literal (see spans).
 		local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
-		local code_end = at_line_start and spans.fence_end(source, position) or nil
+		local code_end = at_line_start and spans.line_fence_end(source, position) or nil
 		if not code_end and source:sub(position, position) == "`" then
 			code_end = spans.code_or_run_end(source, position)
 		end

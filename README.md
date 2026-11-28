@@ -526,7 +526,8 @@ The current parser intentionally supports only a small, tested subset:
 - inline images (`![alt](path)`, optionally `{width=2em}`), also by reference
 - backslash escapes for Markdown punctuation that TeX does not use:
   `\*`, `\+`, `\<`, `\>`, `\|`, `\?`, and `` \` ``
-- fenced code blocks with three backticks
+- fenced code blocks with three or more backticks or tildes, indented by up
+  to three spaces (removed from the content lines, as in CommonMark)
 - fenced `tex` blocks as raw LaTeX output
 - blockquotes with `>`
 - inline math with `$...$` or `\\(...\\)`
@@ -669,7 +670,8 @@ spans, fenced code blocks, and `tex` blocks are never parsed as math.
 
 ### Blockquotes
 
-A blockquote is written by starting every quoted line with `>`:
+A blockquote is written by starting every quoted line with `>` (after at most
+three spaces):
 
 ```md
 > **Observations** → data → patterns → model → application to new cases

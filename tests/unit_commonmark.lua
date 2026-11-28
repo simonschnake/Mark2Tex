@@ -178,6 +178,36 @@ return function(unit)
 		unit.assertEquals(types(parse_blocks("\nTitle\n---")), "other horizontal_rule")
 	end
 
+	function test_commonmark_indented_fences_and_quotes()
+		-- Up to three spaces; the opening indentation is removed from content lines.
+		unit.assertEquals(helpers.transform("  ```\n  a\n    b\n c\n  ```"), "\\begin{verbatim}\na\n  b\nc\n\\end{verbatim}")
+		unit.assertEquals(helpers.transform("```\nx\n   ```"), "\\begin{verbatim}\nx\n\\end{verbatim}")
+		-- An empty fence is a code block too; a run on the opening line is no fence.
+		unit.assertEquals(helpers.transform("```\n```"), "\\begin{verbatim}\n\\end{verbatim}")
+		unit.assertEquals(parse("``` a ```")[1].type, "other")
+		-- A fence ends a list item: items hold no blocks.
+		unit.assertEquals(helpers.transform("- a\n  ```\n  x\n  ```\n- b"),
+			"\\begin{itemize}\n\\item a\n\\end{itemize}\n\\begin{verbatim}\nx\n\\end{verbatim}\n\\begin{itemize}\n\\item b\n\\end{itemize}")
+		-- An unclosed fence line stays item text.
+		unit.assertEquals(helpers.transform("- a\n  ```b"), "\\begin{itemize}\n\\item a\n  ```b\n\\end{itemize}")
+		-- Four spaces are no fence (no indented code blocks either).
+		unit.assertEquals(parse("    ```\n    x\n    ```")[1].type, "other")
+		-- Comments inside an indented fence stay literal, as in every fence.
+		unit.assertEquals(helpers.transform("   ~~~\n   <!-- c -->\n   ~~~"), "\\begin{verbatim}\n<!-- c -->\n\\end{verbatim}")
+		unit.assertEquals(helpers.transform("   > quoted"), "\\begin{quote}\nquoted\n\\end{quote}")
+		unit.assertEquals(parse("    > not quoted")[1].type, "other")
+	end
+
+	function test_commonmark_code_span_whitespace()
+		unit.assertEquals(helpers.transform("`a\nb`"), "\\texttt{a b}")
+		unit.assertEquals(helpers.transform("``\nfoo\n``"), "\\texttt{foo}")
+		unit.assertEquals(helpers.transform("` a `"), "\\texttt{a}")
+		-- Only one space each side, and only when both are there.
+		unit.assertEquals(helpers.transform("`  a  `"), "\\texttt{ a }")
+		unit.assertEquals(helpers.transform("` a`"), "\\texttt{ a}")
+		unit.assertEquals(helpers.transform("`  `"), "\\texttt{  }")
+	end
+
 	function test_commonmark_loose_lists()
 		unit.assertEquals(helpers.transform("- a\n\n- b\n\n\n- c"), "\\begin{itemize}\n\\item a\n\\item b\n\\item c\n\\end{itemize}")
 		unit.assertEquals(helpers.transform("1. a\n\n2. b"), "\\begin{enumerate}\n\\item a\n\\item b\n\\end{enumerate}")

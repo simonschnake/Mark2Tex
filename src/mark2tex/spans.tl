@@ -83,7 +83,8 @@ end
 -- One argument starting at index, read as TeX reads it: in {...} only braces
 -- count; in [...] braces nest and the first ] outside them (brackets nest,
 -- forgivingly) closes it. Returns the index of its last character, or nil and
--- why: "unclosed", "invalid" (a } with no {, which TeX cannot read) or
+-- why: "unclosed", "invalid" (a } with no {, or a % whose comment would hide
+-- the closing ], neither of which TeX reads as an optional argument) or
 -- "placeholder" (an earlier pass replaced characters inside it, so the
 -- placeholder belongs to that pass).
 local function argument_end(source: string, index: integer): integer, string
@@ -99,6 +100,8 @@ local function argument_end(source: string, index: integer): integer, string
 			group = group + 1
 		elseif character == "{" then
 			braces = braces + 1
+		elseif character == "%" and optional then
+			return nil, "invalid"
 		elseif character == "}" then
 			if braces == 0 then return nil, "invalid" end
 			braces = braces - 1
@@ -157,6 +160,16 @@ function spans.fence_end(source: string, position: integer): integer
 		if last - first + 1 >= #run then return last end
 		index = last + 1
 	end
+end
+
+-- A fenced code block on the line that starts at position, indented by up to
+-- three spaces as in CommonMark. Returns the index of the closing run's last
+-- character (see fence_end) and the width of the indentation, or nil.
+function spans.line_fence_end(source: string, position: integer): integer, integer
+	local indent = #source:match("^ ? ? ?", position)
+	local finish = spans.fence_end(source, position + indent)
+	if finish then return finish, indent end
+	return nil
 end
 
 return spans

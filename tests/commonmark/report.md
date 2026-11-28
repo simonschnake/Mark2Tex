@@ -16,16 +16,16 @@ TeX escapes that print the same character, such as `\#`, count as that character
 | ATX headings | 14 / 18 | partly supported |
 | Setext headings | 11 / 27 | partly supported |
 | Indented code blocks | 3 / 12 | deliberate deviation: indentation is ordinary text; LaTeX bodies are often indented |
-| Fenced code blocks | 12 / 29 | partly supported |
+| Fenced code blocks | 20 / 29 | partly supported |
 | HTML blocks | 0 / 44 | deliberate deviation: HTML has no meaning in LaTeX output |
 | Link reference definitions | 17 / 27 | partly supported |
 | Paragraphs | 6 / 8 | partly supported |
 | Blank lines | 1 / 1 | supported |
-| Block quotes | 14 / 25 | partly supported |
-| List items | 13 / 48 | partly supported |
+| Block quotes | 15 / 25 | partly supported |
+| List items | 15 / 48 | partly supported |
 | Lists | 10 / 26 | partly supported |
 | Inlines | 1 / 1 | supported |
-| Code spans | 17 / 22 | partly supported |
+| Code spans | 21 / 22 | partly supported |
 | Emphasis and strong emphasis | 91 / 132 | partly supported |
 | Links | 73 / 90 | partly supported |
 | Images | 18 / 22 | partly supported |
@@ -34,7 +34,7 @@ TeX escapes that print the same character, such as `\#`, count as that character
 | Hard line breaks | 9 / 15 | partly supported |
 | Soft line breaks | 2 / 2 | supported |
 | Textual content | 3 / 3 | supported |
-| **All** | **369 / 652** | |
+| **All** | **384 / 652** | |
 
 Failures outside the deliberate deviations are listed in
 `tests/commonmark/passing.txt` by omission; inspect one with

@@ -15,6 +15,10 @@ return function(unit)
 		unit.assertEquals(output("@<https://x.org>"), guard .. "@\\url{\\detokenize{https://x.org}}")
 		unit.assertEquals(output("@key^[n]"), "\\cite{key}\\footnote{n}")
 		unit.assertEquals(output("@$x$"), "@$x$")
+		-- %, # and & end a key: inside \cite{...} they would break the TeX.
+		unit.assertEquals(output("@%"), "@\\%")
+		unit.assertEquals(output("@key% more"), "\\cite{key}\\% more")
+		unit.assertEquals(output("[@a#b]"), "[@a\\#b]")
 	end
 
 	function test_robustness_constructs_after_tex_command()
@@ -86,6 +90,9 @@ return function(unit)
 		unit.assertEquals(output("\\cite[p. 3]{k} **b**"), "\\cite[p. 3]{k} \\textbf{b}")
 		-- An optional argument with a } and no { is not one: it stays Markdown.
 		unit.assertEquals(output("\\f{}[`}`]"), "\\f{}[\\texttt{\\}}]")
+		-- A % would comment out the closing ], so that is no argument either.
+		unit.assertEquals(output("~~\\f{}[%]~~"), "\\sout{\\f{}[\\%]}")
+		unit.assertEquals(output("\\f[50\\%]{x}"), "\\f[50\\%]{x}")
 		-- Unclosed: a [ is ordinary text, a { runs to the end of the source.
 		unit.assertEquals(output("\\f[open **x**"), "\\f[open \\textbf{x}")
 		unit.assertEquals(output("\\f{open **x**"), "\\f{open **x**")

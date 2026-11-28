@@ -149,7 +149,12 @@ local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
 local decimal_marker = R("09") ^ 1 * S(".)")
 local alpha_marker = R("az") * P(")") * #S(" \t")
 local continuation_list_marker = fence_body + S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
-local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
+-- A line that opens a closed code fence ends the item, as it does in every
+-- other pass (spans.line_fence_end): items hold no blocks.
+local opens_fence = Cmt(P(0), function(subject: string, position: integer): boolean
+	return spans.line_fence_end(subject, position) ~= nil
+end)
+local follow_item_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 	/ function(t: {string}): RawBlock
@@ -161,7 +166,7 @@ grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
 --------------------
 
 local start_of_enum = newline * C(horizontal_space) * C(decimal_marker + alpha_marker)
-local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
+local follow_enum_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 	/ function(t: {string}): RawBlock
@@ -178,18 +183,26 @@ grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 -- Code
 --------------------
 
--- A fence of three or more backticks or tildes, closed by a run of the same
--- character at least as long (spans.fence_end, shared with every pass).
+-- A fence of three or more backticks or tildes, indented by up to three
+-- spaces and closed by a run of the same character at least as long
+-- (spans.line_fence_end, shared with every pass). As in CommonMark, the
+-- opening fence's indentation is removed from each content line.
 local function fenced(character: string): Pattern
-	return newline * Cmt(Cp() * P(character) ^ 3 * C(rest_of_line ^ -1) * newline * Cp(),
-		function(subject: string, _: integer, start: integer, info: string, content_start: integer): integer | boolean, string, string
-			local finish = spans.fence_end(subject, start)
+	return newline * Cmt(Cp() * P(" ") ^ -3 * P(character) ^ 3 * C(rest_of_line ^ -1) * newline * Cp(),
+		function(subject: string, _: integer, line_start: integer, info: string, content_start: integer): integer | boolean, string, string
+			local finish, indent = spans.line_fence_end(subject, line_start)
 			if not finish then return false end
 			local closing = finish
 			while subject:sub(closing - 1, closing - 1) == character do closing = closing - 1 end
-			-- The fence needs content; the closing run must follow it.
-			if closing <= content_start then return false end
-			return finish + 1, info, subject:sub(content_start, closing - 1)
+			-- The closing run must follow the opening line; the block may be
+			-- empty, as in CommonMark (a run on the opening line is no fence).
+			if closing < content_start then return false end
+			local content = subject:sub(content_start, closing - 1)
+			if indent > 0 then
+				content = ("\n" .. content):gsub("\n" .. (" ?"):rep(indent), "\n"):sub(2)
+			end
+			-- The closing fence's own indentation is not content.
+			return finish + 1, info, (content:gsub("\n +$", "\n"))
 		end)
 end
 
@@ -205,7 +218,8 @@ grammar.code = (fenced("`") + fenced("~"))
 -- Blockquote
 --------------------
 
-local quote_line = newline * P(">") * P(" ") ^ -1 * C(rest_of_line ^ -1)
+-- Up to three spaces may precede the marker, as in CommonMark.
+local quote_line = newline * P(" ") ^ -3 * P(">") * P(" ") ^ -1 * C(rest_of_line ^ -1)
 
 grammar.blockquote = Ct(quote_line * quote_line ^ 0)
 	/ function(lines: {string}): RawBlock

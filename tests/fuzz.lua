@@ -170,6 +170,9 @@ local BLOCKS = {
 	function() return "```" .. pick({ "", "lua" }) .. "\n" .. code_content() .. "\n```" end,
 	function() return "~~~" .. pick({ "", "python" }) .. "\n" .. code_content() .. "\n~~~" end,
 	function() return "````\n```\n" .. code_content() .. "\n````" end,
+	-- Fences and quotes may be indented by up to three spaces.
+	function() return (" "):rep(random(1, 4)) .. "```\n" .. (" "):rep(random(0, 4)) .. code_content() .. "\n" .. (" "):rep(random(0, 3)) .. "```" end,
+	function() return (" "):rep(random(1, 4)) .. "> " .. inline() end,
 	-- A tex fence is raw TeX, so its content has balanced braces.
 	function() return "```tex\n" .. math_content() .. "\n```" end,
 	function() return "\\begin{" .. pick({ "center", "align", "quote" }) .. "}\n" .. math_content() .. "\n\\end{center}" end,
@@ -246,6 +249,33 @@ end
 -- Remove code spans and fences by the CommonMark rule (a run of n backticks
 -- closed by the next run of exactly n in the paragraph), written
 -- independently of src/mark2tex/spans.tl so the two can be compared.
+-- A code fence on the line that starts at line: up to three spaces, then
+-- three or more backticks or tildes, closed by a later run of the same
+-- character at least as long. Returns the closing run's last index, or nil.
+local function fence_close(source, line)
+	local indent = #source:match("^ ? ? ?", line)
+	local run = source:match("^[`~]+", line + indent)
+	if not run or #run < 3 then return nil end
+	local character = run:sub(1, 1) == "`" and "`+" or "~+"
+	-- The closing run is on a later line; a run in the info string is no fence.
+	local search = source:find("\n", line + indent + #run, true)
+	if not search then return nil end
+	while true do
+		local first, last = source:find(character, search)
+		if not first then return nil end
+		if last - first + 1 >= #run then return last end
+		search = last + 1
+	end
+end
+
+-- Code spans and math are only recognized within one line. Clean documents
+-- keep every construct on one line, and where lines end a block (a list item,
+-- a quote, a heading) depends on block structure the oracle does not model;
+-- such inputs then simply fail input_balanced and are not judged.
+local function paragraph_end(source, index)
+	return source:find("\n", index, true) or #source + 1
+end
+
 local function escaped(source, index)
 	local slashes = 0
 	while index - slashes - 1 >= 1 and source:sub(index - slashes - 1, index - slashes - 1) == "\\" do
@@ -264,7 +294,7 @@ local function math_end(source, index)
 	elseif source:sub(index, index) == "$" then opening, closer = "$", "$"
 	else return nil end
 	if escaped(source, index) then return nil end
-	local paragraph = source:find("\n[ \t]*\n", index) or #source + 1
+	local paragraph = paragraph_end(source, index)
 	local search = index + #opening
 	while true do
 		local first = source:find(closer, search, true)
@@ -281,23 +311,16 @@ local function strip_code(source)
 	while index <= #source do
 		local run = source:match("^[`~]+", index)
 		local at_line_start = index == 1 or source:sub(index - 1, index - 1) == "\n"
-		local math = math_end(source, index)
-		if math then
-			output[#output + 1] = source:sub(index, math)
-			index = math + 1
-		elseif run and at_line_start and #run >= 3 then
-			local closing = nil
-			local search = index + #run
-			while true do
-				local first, last = source:find(run:sub(1, 1) == "`" and "`+" or "~+", search)
-				if not first then break end
-				if last - first + 1 >= #run then closing = last break end
-				search = last + 1
-			end
-			if closing then index = closing + 1 else output[#output + 1] = run; index = index + #run end
+		local fence = at_line_start and fence_close(source, index)
+		local math_last = not fence and math_end(source, index)
+		if fence then
+			index = fence + 1
+		elseif math_last then
+			output[#output + 1] = source:sub(index, math_last)
+			index = math_last + 1
 		elseif run and run:sub(1, 1) == "`" and source:sub(index - 1, index - 1) ~= "\\" then
 			run = source:match("^`+", index)
-			local paragraph = source:find("\n[ \t]*\n", index) or #source + 1
+			local paragraph = paragraph_end(source, index)
 			local closing, search = nil, index + #run
 			while true do
 				local first, last = source:find("`+", search)
@@ -314,6 +337,9 @@ local function strip_code(source)
 	return table.concat(output)
 end
 
+-- Every line balanced on its own, outside code: a group across lines may be
+-- split by block structure (or a hidden heading) in ways the oracle does not
+-- model.
 local function input_balanced(source)
 	local text = strip_code(source)
 	local depth, index = 0, 1
@@ -326,6 +352,8 @@ local function input_balanced(source)
 		elseif character == "}" then
 			depth = depth - 1
 			if depth < 0 then return false end
+		elseif character == "\n" and depth ~= 0 then
+			return false
 		end
 		index = index + 1
 	end
