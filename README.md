@@ -801,7 +801,7 @@ make teal-check
 
 Both targets use the pinned Teal compiler described in
 [Install the LaTeX package](#install-the-latex-package). Compiler settings
-(include path, Lua 5.1 code without compatibility shims) live in
+(include path, Lua 5.3 code for LuaTeX without compatibility shims) live in
 `tlconfig.lua`, which editors and the Teal language server also read.
 
 Run regression tests:

@@ -1,8 +1,9 @@
--- Mark2TeX: Markdown-like fragments for LuaLaTeX.
+-- Mark2TeX 0.2.0: Markdown-like fragments for LuaLaTeX.
 -- Generated from src/mark2tex/*.tl by Teal 0.24.1 and scripts/bundle.lua.
 -- Do not edit; change the Teal sources and run 'make teal-gen'.
 
 package.preload["mark2tex.autolinks"] = function(...)
+	return assert(load([[
 
 
 
@@ -47,9 +48,11 @@ function autolinks.match(source, position)
 end
 
 return autolinks
+]], "@src/mark2tex/autolinks.tl"))(...)
 end
 
 package.preload["mark2tex.comments"] = function(...)
+	return assert(load([[
 
 
 
@@ -118,9 +121,11 @@ function comments.restore(output, tokens)
 end
 
 return comments
+]], "@src/mark2tex/comments.tl"))(...)
 end
 
 package.preload["mark2tex.core"] = function(...)
+	return assert(load([[
 local default_config = require("mark2tex.default_config")
 
 
@@ -338,9 +343,11 @@ function core.convert(input_path, cfg)
 end
 
 return core
+]], "@src/mark2tex/core.tl"))(...)
 end
 
 package.preload["mark2tex.default_config"] = function(...)
+	return assert(load([[
 
 
 local Config = {}
@@ -395,9 +402,11 @@ Config.citation = "cite"
 Config.save_dir = "mark2tex"
 
 return Config
+]], "@src/mark2tex/default_config.tl"))(...)
 end
 
 package.preload["mark2tex.delimiters"] = function(...)
+	return assert(load([[
 local delimiters = {}
 
 function delimiters.is_escaped(input, position)
@@ -422,9 +431,11 @@ function delimiters.find_unescaped(input, delimiter, start)
 end
 
 return delimiters
+]], "@src/mark2tex/delimiters.tl"))(...)
 end
 
 package.preload["mark2tex.diagnostics"] = function(...)
+	return assert(load([[
 
 local delimiters = require("mark2tex.delimiters")
 
@@ -605,9 +616,11 @@ function diagnostics.collect(source)
 end
 
 return diagnostics
+]], "@src/mark2tex/diagnostics.tl"))(...)
 end
 
 package.preload["mark2tex.divs"] = function(...)
+	return assert(load([[
 local nodes = require("mark2tex.nodes")
 
 
@@ -825,9 +838,11 @@ line = at_line, column = at_column, }
 end
 
 return divs
+]], "@src/mark2tex/divs.tl"))(...)
 end
 
 package.preload["mark2tex.fileutils"] = function(...)
+	return assert(load([[
 local lfs = require("lfs")
 local md5 = require("md5")
 
@@ -921,9 +936,11 @@ function fileutils.getFirstLine(filePath)
 end
 
 return fileutils
+]], "@src/mark2tex/fileutils.tl"))(...)
 end
 
 package.preload["mark2tex.footnotes"] = function(...)
+	return assert(load([[
 
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
@@ -1047,9 +1064,11 @@ function footnotes.protect(
 end
 
 return footnotes
+]], "@src/mark2tex/footnotes.tl"))(...)
 end
 
 package.preload["mark2tex.lecture"] = function(...)
+	return assert(load([[
 
 
 
@@ -1155,9 +1174,11 @@ footer = footer, notes = notes, }
 end
 
 return lecture
+]], "@src/mark2tex/lecture.tl"))(...)
 end
 
 package.preload["mark2tex.links"] = function(...)
+	return assert(load([[
 
 local autolinks = require("mark2tex.autolinks")
 local delimiters = require("mark2tex.delimiters")
@@ -1462,9 +1483,11 @@ end
 links.protected_end = protected_end
 
 return links
+]], "@src/mark2tex/links.tl"))(...)
 end
 
 package.preload["mark2tex.math"] = function(...)
+	return assert(load([[
 local delimiters = require("mark2tex.delimiters")
 local nodes = require("mark2tex.nodes")
 
@@ -1658,9 +1681,11 @@ function math_parser.expand_tokens(ast, tokens)
 end
 
 return math_parser
+]], "@src/mark2tex/math.tl"))(...)
 end
 
 package.preload["mark2tex.nodes"] = function(...)
+	return assert(load([[
 
 
 
@@ -2080,9 +2105,11 @@ function nodes.literal(content)
 end
 
 return nodes
+]], "@src/mark2tex/nodes.tl"))(...)
 end
 
 package.preload["mark2tex.parse"] = function(...)
+	return assert(load([[
 local parse_blocks = require("mark2tex.parse_blocks")
 local parse_inlines = require("mark2tex.parse_inlines")
 local diagnostics = require("mark2tex.diagnostics")
@@ -2251,9 +2278,11 @@ local function parse(str, config, source_id)
 end
 
 return parse
+]], "@src/mark2tex/parse.tl"))(...)
 end
 
 package.preload["mark2tex.parse_blocks"] = function(...)
+	return assert(load([[
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
@@ -2594,9 +2623,11 @@ local function parse_blocks(str, lecture_profile, nested)
 end
 
 return parse_blocks
+]], "@src/mark2tex/parse_blocks.tl"))(...)
 end
 
 package.preload["mark2tex.parse_inlines"] = function(...)
+	return assert(load([[
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local math_parser = require("mark2tex.math")
@@ -2762,9 +2793,11 @@ local function parse_inlines(str, options)
 end
 
 return parse_inlines
+]], "@src/mark2tex/parse_inlines.tl"))(...)
 end
 
 package.preload["mark2tex.write"] = function(...)
+	return assert(load([[
 
 
 
@@ -3182,6 +3215,7 @@ local function write(ast, config, nested)
 end
 
 return write
+]], "@src/mark2tex/write.tl"))(...)
 end
 
 return require("mark2tex.core")

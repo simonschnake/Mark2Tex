@@ -52,7 +52,7 @@ teal_bundle = mkdir -p $(TEAL_BUILD_DIR); \
 	for src in $(TEAL_SOURCES); do \
 		log=$$($(TEAL_GEN) -o "$(TEAL_BUILD_DIR)/$$(basename "$$src" .tl).lua" "$$src" 2>&1) || { echo "$$log" >&2; exit 1; }; \
 	done; \
-	$(LUA) scripts/bundle.lua "$(1)" "$(TEAL_VERSION)" $(TEAL_MODULES)
+	$(LUA) scripts/bundle.lua "$(1)" "$(VERSION)" "$(TEAL_VERSION)" $(TEAL_MODULES)
 
 # Regenerate the committed bundle after changing a Teal source.
 teal-gen: teal-version
