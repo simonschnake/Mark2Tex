@@ -158,7 +158,7 @@ local function parse(str, config, source_id)
       local label = "mark2tex:footnote:" .. fingerprint .. ":" .. context.count
       context.seen[identifier] = label
       local blocks = collect_definitions(parse_blocks(normalize_input(definition), false, true), context, warnings, true)
-      return nodes.footnote(add_inline_nodes(blocks, warnings, context, true), label)
+      return nodes.footnote_blocks(add_inline_nodes(blocks, warnings, context, true), label)
    end
    local inline_ast = add_inline_nodes(block_ast, warnings, context)
    inline_ast.warnings = warnings

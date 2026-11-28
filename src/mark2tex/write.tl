@@ -326,9 +326,8 @@ walk = function(ast: Any, out: {string}, config: Config)
 		else
 			out[1] = out[1] .. "\\footnote{"
 			if ast.label then out[1] = out[1] .. "\\label{" .. ast.label .. "}" end
-			-- Inline footnotes hold inlines, definitions hold blocks.
 			if ast.inline then walk_nodes(ast.content, out, config)
-			else out[1] = out[1] .. write_blocks(ast.content as {Block}, config, true) end
+			else out[1] = out[1] .. write_blocks(ast.blocks, config, true) end
 			out[1] = out[1] .. "}"
 		end
 	elseif ast is nodes.Literal then

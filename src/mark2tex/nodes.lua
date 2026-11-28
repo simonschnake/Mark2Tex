@@ -249,6 +249,7 @@
 
 
 
+
 local nodes = {}
 
 
@@ -302,7 +303,11 @@ local nodes = {}
 
 
 
+
 function nodes.content(node)
+   if node.type == "footnote" and node.blocks then
+      return node.blocks
+   end
    return (node).content
 end
 
@@ -312,6 +317,11 @@ end
 
 function nodes.footnote(content, label, repeated)
    return { type = "footnote", content = content, label = label, repeated = repeated }
+end
+
+
+function nodes.footnote_blocks(blocks, label)
+   return { type = "footnote", blocks = blocks, label = label }
 end
 
 function nodes.footnote_definition(identifier, content)

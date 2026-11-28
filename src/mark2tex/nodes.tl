@@ -64,9 +64,10 @@ local record Link is NodeBase where self.type == "link"
 end
 
 local record Footnote is NodeBase where self.type == "footnote"
-	-- Inline footnotes hold inlines (inline = true), definitions hold blocks;
-	-- repeated references hold nothing.
-	content: {Inline | Block}
+	-- Inline footnotes (inline = true) hold content, resolved definitions hold
+	-- blocks; repeated references hold neither.
+	content: {Inline}
+	blocks: {Block}
 	label: string
 	repeated: boolean
 	inline: boolean
@@ -299,9 +300,13 @@ local record nodes
 	type SlideSubheading = SlideSubheading
 end
 
--- The content field of any node (nil for nodes without one), for generic
--- traversals such as measuring or searching the AST.
+-- The content of any node (nil for nodes without one), for generic
+-- traversals such as measuring or searching the AST. A resolved footnote
+-- definition yields its blocks.
 function nodes.content(node: Any): string | {Any | string}
+	if node is Footnote and node.blocks then
+		return node.blocks
+	end
 	return (node as ContentView).content
 end
 
@@ -309,8 +314,13 @@ end
 -- Constructors
 --------------------
 
-function nodes.footnote(content?: {Inline | Block}, label?: string, repeated?: boolean): Footnote
+function nodes.footnote(content?: {Inline}, label?: string, repeated?: boolean): Footnote
 	return { type = "footnote", content = content, label = label, repeated = repeated }
+end
+
+-- A footnote whose definition was parsed as blocks.
+function nodes.footnote_blocks(blocks: {Block}, label: string): Footnote
+	return { type = "footnote", blocks = blocks, label = label }
 end
 
 function nodes.footnote_definition(identifier: string, content: string): FootnoteDefinition
