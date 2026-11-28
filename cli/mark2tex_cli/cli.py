@@ -89,6 +89,13 @@ def parser():
     cli.add_argument("--instructor", "--dozent", dest="dozent", action="store_true",
                      help="build the instructor edition")
     cli.add_argument("--speaker-notes", action="store_true", help="show presenter notes on a second screen")
+    cli.add_argument("--bibliography", action="append", type=Path, default=[], metavar="FILE",
+                     help="cite from this .bib file with biblatex and Biber; repeatable, "
+                          "added to the files in $MARK2TEX_BIBLIOGRAPHY")
+    cli.add_argument("--no-bibliography", action="store_true",
+                     help="ignore $MARK2TEX_BIBLIOGRAPHY for this build")
+    cli.add_argument("--citation-style", default="numeric", metavar="STYLE",
+                     help="biblatex style, e.g. authoryear (default: numeric)")
     cli.add_argument("--cache", action="store_true", help="reuse successful builds in .mark2tex-cache")
     cli.add_argument("--cache-format", action="store_true", help="cache the static preamble (implies --cache)")
     cli.add_argument("--watch", action="store_true", help="rebuild when the Markdown source changes")
@@ -108,6 +115,35 @@ def latex_text(value):
         "#": r"\#", "%": r"\%", "_": r"\_", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
     }
     return "".join(" " if char.isspace() else escapes.get(char, char) for char in value)
+
+
+BIBLIOGRAPHY_VARIABLE = "MARK2TEX_BIBLIOGRAPHY"
+# Citation commands in the converted fragment: Mark2TeX's \cite and \parencite,
+# and any biblatex command written as raw TeX.
+CITATION = re.compile(r"\\[A-Za-z]*cite[A-Za-z]*\*?\s*[\[{]")
+
+
+def bibliographies(args):
+    """The .bib files for this build: $MARK2TEX_BIBLIOGRAPHY, then --bibliography."""
+    default = [] if args.no_bibliography else os.environ.get(BIBLIOGRAPHY_VARIABLE, "").split(os.pathsep)
+    files = []
+    for entry in [*(Path(entry) for entry in default if entry), *args.bibliography]:
+        path = entry.expanduser().absolute()
+        if path.suffix.lower() != ".bib":
+            raise ValueError(f"bibliography must be a .bib file: {path}")
+        if not path.is_file():
+            raise ValueError(f"bibliography file not found: {path}")
+        if path not in files:
+            files.append(path)
+    return files
+
+
+def bibliography_setup(args, resources):
+    """Preamble lines that load biblatex with the bibliography files staged in the build."""
+    lines = [r"\usepackage[autostyle]{csquotes}",
+             rf"\usepackage[backend=biber,style={args.citation_style}]{{biblatex}}"]
+    lines.extend(rf"\addbibresource{{{name}}}" for name in resources)
+    return "\n".join(lines)
 
 
 def render(template, values):
@@ -184,10 +220,15 @@ def validate(args):
         raise ValueError("--slide-level requires --format handout or slides")
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", args.language):
         raise ValueError("--language must be one Babel language name")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", args.citation_style):
+        raise ValueError("--citation-style must be one biblatex style name")
+    if args.no_bibliography and args.bibliography:
+        raise ValueError("--no-bibliography only turns off $MARK2TEX_BIBLIOGRAPHY; drop one of them")
+    args.bibliography_files = bibliographies(args)
     if args.source.suffix.lower() not in (".md", ".markdown"):
         raise ValueError("input must be a .md or .markdown file")
     executables = {}
-    for command in ("latexmk", "lualatex", "texlua"):
+    for command in ("latexmk", "lualatex", "texlua", *(("biber",) if args.bibliography_files else ())):
         executable = shutil.which(command)
         if not executable:
             raise ValueError(f"{command} is not on PATH")
@@ -273,7 +314,7 @@ def convert(build, source, content, args, executable, env):
     return fragment
 
 
-def stage_document(build, args, fragment):
+def stage_document(build, args, fragment, resources):
     slides = args.format == "slides"
     body = (rf"\fontsize{{{args.font_size}pt}}{{{int(args.font_size) * 1.5:g}pt}}\selectfont"
             if args.font_size else r"\fontsize{12.75bp}{19.125bp}\selectfont")
@@ -291,12 +332,20 @@ def stage_document(build, args, fragment):
         "TITLE": latex_text(args.title or ""), "AUTHOR": latex_text(args.author), "DATE": latex_text(args.date),
         "TITLEPAGE": titlepage if args.title is not None else "", "FRAGMENT": fragment, "FOOTER": footer,
         "NOTES": r"\setbeameroption{show notes on second screen=right}" if args.speaker_notes else "",
+        # Without biblatex, \parencite (Mark2TeX's [@key]) falls back to \cite, so
+        # the document still compiles and shows the citation as unresolved.
+        "BIBLIOGRAPHY": bibliography_setup(args, resources) if resources else
+        r"\ProvideDocumentCommand{\parencite}{o m}{\IfValueTF{#1}{\cite[#1]{#2}}{\cite{#2}}}",
+        "PRINTBIBLIOGRAPHY": "" if not resources else (
+            r"{\setbeamertemplate{frametitle continuation}{}"
+            r"\begin{frame}[t,allowframebreaks]{\refname}\printbibliography[heading=none]\end{frame}}"
+            if slides else r"\printbibliography"),
     }
     template = TEMPLATES / ("slides.tex" if slides else "article.tex")
     return render(template.read_text(encoding="utf-8"), values)
 
 
-def stage_custom_document(build, args, fragment, document, title_image):
+def stage_custom_document(build, args, fragment, document, title_image, resources):
     image_name = ""
     if title_image is not None:
         image_name = "mark2tex-title-image" + args.title_image.suffix.lower()
@@ -306,11 +355,14 @@ def stage_custom_document(build, args, fragment, document, title_image):
         "Format": args.format, "Paper": args.paper, "Language": args.language,
         "FontSize": args.font_size or "", "SlideLevel": str(args.slide_level or 2),
         "TitleImage": image_name, "Content": rf"\input{{{fragment}}}",
+        "CitationStyle": args.citation_style,
+        "BibliographySetup": bibliography_setup(args, resources) if resources else "",
     }
     switches = {
         "HasTitle": args.title is not None, "HasTitleImage": bool(image_name),
         "Dozent": args.dozent, "SpeakerNotes": args.speaker_notes, "NoFooter": args.no_footer,
         "WritingMargin": args.writing_margin, "Numbered": args.numbered, "TOC": args.toc,
+        "HasBibliography": bool(resources),
     }
     lines = [rf"\newcommand{{\MarkTwoTeX{name}}}{{{value}}}" for name, value in values.items()]
     for name, enabled in switches.items():
@@ -343,6 +395,10 @@ def compile_pdf(args, executables, current=lambda: True):
     custom_document = template.read_text(encoding="utf-8") if template is not None else None
     image = args.title_image.expanduser().absolute() if args.title_image is not None else None
     title_image = image.read_bytes() if image is not None else None
+    bibliography_files = getattr(args, "bibliography_files", None)
+    if bibliography_files is None:
+        bibliography_files = bibliographies(args)
+    bibliography = [path.read_bytes() for path in bibliography_files]
     env = environment(source, template)
     directory = Path.cwd() / ".mark2tex-cache"
     use_project_font_cache = not env.get("TEXMFCACHE")
@@ -359,6 +415,8 @@ def compile_pdf(args, executables, current=lambda: True):
                       "toc", "numbered", "writing_margin", "no_footer", "slide_level", "h1", "dozent", "speaker_notes")
     options = json.dumps([str(source), str(template), custom_document, str(image),
                           hashlib.sha256(title_image).hexdigest() if title_image is not None else None,
+                          [hashlib.sha256(data).hexdigest() for data in bibliography],
+                          args.citation_style if bibliography else None,
                           *(getattr(args, option) for option in render_options)])
     key = hashlib.sha256(identity + options.encode() + b"\0" + content).hexdigest()
     entry = directory / "builds" / (key + ".zip")
@@ -385,10 +443,18 @@ def compile_pdf(args, executables, current=lambda: True):
                 except ValueError:
                     diagnostics(build, args, logfile, failed=True)
                     raise
+                # biblatex and Biber only run when the document cites something,
+                # so a default bibliography costs nothing elsewhere.
+                resources = []
+                if bibliography and CITATION.search((build / fragment).read_text(encoding="utf-8")):
+                    for index, data in enumerate(bibliography, 1):
+                        resources.append(f"mark2tex-bibliography-{index}.bib")
+                        (build / resources[-1]).write_bytes(data)
                 if custom_document is None:
-                    document = stage_document(build, args, fragment)
+                    document = stage_document(build, args, fragment, resources)
                 else:
-                    document = stage_custom_document(build, args, fragment, custom_document, title_image)
+                    document = stage_custom_document(build, args, fragment, custom_document, title_image,
+                                                     resources)
                 format_inputs = None
                 if try_format:
                     static, dynamic = document.split(RUNTIME_BOUNDARY, 1)
@@ -396,7 +462,8 @@ def compile_pdf(args, executables, current=lambda: True):
                 if try_format and format_inputs is None:
                     retry = True
                     continue
-                command = [executables["latexmk"], "-norc", "-lualatex", "-bibtex-", "-recorder",
+                command = [executables["latexmk"], "-norc", "-lualatex", "-bibtex" if resources else "-bibtex-",
+                           "-recorder",
                            "-interaction=nonstopmode", "-halt-on-error", "-file-line-error", "-no-shell-escape"]
                 if format_inputs is not None:
                     document = FORMAT_RUNTIME + dynamic
@@ -456,6 +523,7 @@ def watch(args, executables):
     source, _, _ = paths(args)
     watched = [source]
     watched.extend(path for path in (custom_template(args), args.title_image) if path is not None)
+    watched.extend(args.bibliography_files)
 
     def snapshot():
         return tuple(signature(path.expanduser()) for path in watched)

@@ -38,6 +38,11 @@ erhalten.
 
 ### CLI und Vorlesungen
 
+- `--bibliography DATEI.bib` (wiederholbar) bzw. `MARK2TEX_BIBLIOGRAPHY` für
+  eine Standarddatei: biblatex und Biber laufen nur, wenn das Dokument
+  zitiert; `--citation-style` wählt den biblatex-Stil, `--no-bibliography`
+  ignoriert die Standarddatei. Eigene Templates nutzen
+  `\ifMarkTwoTeXHasBibliography` und `\MarkTwoTeXBibliographySetup`.
 - `mark2tex notes.md` baut ein PDF ohne eigenes LaTeX-Projekt; Installation
   per `uv tool install .` oder pip. Die Wheel bündelt Lua-, TeX-Quellen und
   Templates.
@@ -135,7 +140,6 @@ automatisch angelegt.
   Weitere Lücken laut Konformitätsbericht: Blöcke in Listenpunkten (Zitate,
   Code; Items enthalten nur Inline-Inhalt), die Einrückungsregeln für
   Fortsetzungszeilen von Listen und Lazy Continuation in Zitaten.
-- Die CLI verarbeitet keine Bibliographie (BibTeX/Biber sind deaktiviert).
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.
 - Weitere Grenzfälle für verschachtelte Inlines, Include-Pfade und große

@@ -37,8 +37,8 @@ jobs:
         if: github.event_name != 'schedule'
         run: |
           sudo apt-get install --no-install-recommends -y \
-            latexmk poppler-utils python3-setuptools python3-venv python3-wheel \
-            texlive-fonts-extra texlive-fonts-recommended texlive-lang-german \
+            biber latexmk poppler-utils python3-setuptools python3-venv python3-wheel \
+            texlive-bibtex-extra texlive-fonts-extra texlive-fonts-recommended texlive-lang-german \
             texlive-latex-extra texlive-luatex texlive-plain-generic
 
       - name: Compile and check LuaLaTeX documents

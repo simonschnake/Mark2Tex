@@ -4,6 +4,7 @@ Run with the wheel's Python interpreter and pass its mark2tex executable.
 Requires TeX Live and Poppler (pdftotext, pdfimages and pdfinfo).
 """
 
+import os
 from pathlib import Path
 import signal
 import struct
@@ -128,6 +129,56 @@ def commonmark_pdf(binary, work, source_directory):
     assert len(images.splitlines()) == 3, images
     links = subprocess.check_output(["pdfinfo", "-url", str(pdf)], text=True)
     assert "https://example.org/docs" in links and "https://example.org/image" in links, links
+
+
+BIBLIOGRAPHY = r"""@article{turing1950,
+  author = {Turing, Alan M.},
+  title = {Computing Machinery and Intelligence},
+  journal = {Mind},
+  year = {1950},
+}
+"""
+
+
+def bibliography_pdfs(binary, work, source_directory):
+    bib = work / "library files" / "refs.bib"
+    bib.parent.mkdir()
+    bib.write_text(BIBLIOGRAPHY)
+    cited = source_directory / "cited.md"
+    cited.write_text("# Sources\n\nAs @turing1950 asked [@turing1950, p. 433].\n")
+    plain = source_directory / "plain.md"
+    plain.write_text("# Plain\n\nNo citation here.\n")
+
+    def build(source, *options, env=None):
+        result = subprocess.run([binary, str(source), "--language", "english", *options], cwd=work,
+                                capture_output=True, text=True, timeout=180, env=env)
+        assert result.returncode == 0, (result.stdout, result.stderr)
+        return result
+
+    # An explicit file, with a style, resolves citations and prints the list.
+    build(cited, "--bibliography", str(bib), "--citation-style", "authoryear")
+    text = pdf_text(cited.with_suffix(".pdf"))
+    assert "Turing 1950" in text and "References" in text and "Computing Machinery" in text, text
+
+    # The default file from the environment applies to every build, slides too.
+    default = {**os.environ, "MARK2TEX_BIBLIOGRAPHY": str(bib)}
+    build(cited, "--format", "slides", env=default)
+    text = pdf_text(cited.with_name("cited-slides.pdf"))
+    assert "[1]" in text and "Computing Machinery" in text, text
+    # Without citations nothing is loaded or printed.
+    build(plain, env=default)
+    assert "References" not in pdf_text(plain.with_suffix(".pdf"))
+    # --no-bibliography turns the default off: the citation stays unresolved.
+    build(cited, "--no-bibliography", "-o", str(work / "unresolved.pdf"), env=default)
+    assert "Computing Machinery" not in pdf_text(work / "unresolved.pdf")
+
+    # The build cache notices a changed bibliography.
+    options = ["--bibliography", str(bib), "--cache", "-o", str(work / "cached.pdf")]
+    assert "Compiling" in build(cited, *options).stderr
+    assert "Reusing cached build" in build(cited, *options).stderr
+    bib.write_text(BIBLIOGRAPHY.replace("Computing Machinery", "Thinking Machinery"))
+    assert "Compiling" in build(cited, *options).stderr
+    assert "Thinking Machinery" in pdf_text(work / "cached.pdf")
 
 
 def integration(binary, work):
@@ -288,10 +339,13 @@ def integration(binary, work):
             watcher.wait(timeout=20)
 
     commonmark_pdf(binary, work, source.parent)
+    bibliography_pdfs(binary, work, source.parent)
 
 
 if __name__ == "__main__":
     assert (HERE / "tex").is_dir(), "run from an installed wheel"
+    # A personal default bibliography must not change what the checks see.
+    os.environ.pop("MARK2TEX_BIBLIOGRAPHY", None)
     with tempfile.TemporaryDirectory(prefix="mark2tex-integration-") as directory:
         integration(str(Path(sys.argv[1]).absolute()), Path(directory))
     print("Installed CLI checks passed")

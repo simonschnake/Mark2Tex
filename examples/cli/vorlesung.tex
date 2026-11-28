@@ -11,6 +11,9 @@
 \documentclass[aspectratio=169,t]{beamer}% Seitenverhältnis und Ausrichtung
 \input{mark2tex-template.tex}% Wird beim CLI-Aufruf erzeugt.
 \usepackage[\MarkTwoTeXLanguage]{babel}% --language
+\ifMarkTwoTeXHasBibliography% --bibliography, nur wenn das Dokument zitiert
+  \MarkTwoTeXBibliographySetup
+\fi
 \usepackage{amsmath,tabularx,booktabs}
 \usepackage{mark2tex}
 \usetheme{default}% Hier kann ein anderes Beamer-Theme stehen.
@@ -50,4 +53,8 @@
   \begin{frame}\titlepage\end{frame}
 \fi
 \MarkTwoTeXContent% Die CLI hat die Folienstruktur schon erzeugt.
+\ifMarkTwoTeXHasBibliography
+  \setbeamertemplate{frametitle continuation}{}% kein "I" bei nur einer Folie
+  \begin{frame}[t,allowframebreaks]{\refname}\printbibliography[heading=none]\end{frame}
+\fi
 \end{document}

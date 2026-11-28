@@ -14,6 +14,11 @@
 \documentclass{article}
 
 \usepackage[\MarkTwoTeXLanguage]{babel}% --language, z. B. ngerman oder english
+% --bibliography DATEI.bib oder $MARK2TEX_BIBLIOGRAPHY: lädt csquotes und biblatex
+% mit --citation-style, aber nur, wenn das Dokument zitiert.
+\ifMarkTwoTeXHasBibliography
+  \MarkTwoTeXBibliographySetup
+\fi
 \usepackage{geometry}
 \ifMarkTwoTeXWritingMargin % --writing-margin
   \geometry{left=18mm,right=72mm,top=25mm,bottom=25mm}
@@ -49,4 +54,7 @@
 % Ihre Lösung erscheint im Text und im Handout.
 % Hier fügt die CLI das bereits umgewandelte Markdown ein.
 \MarkTwoTeXContent
+\ifMarkTwoTeXHasBibliography
+  \printbibliography
+\fi
 \end{document}

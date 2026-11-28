@@ -191,7 +191,8 @@ uv tool install .
 You can also install the Python package into your current environment with
 `python -m pip install .`.
 The command requires Python 3.9 or newer and a TeX installation with
-`latexmk`, `texlua`, LuaLaTeX, Beamer, STIX Two and Latin Modern. The wheel
+`latexmk`, `texlua`, LuaLaTeX, Beamer, STIX Two and Latin Modern (plus Biber,
+biblatex and csquotes for `--bibliography`). The wheel
 bundles Mark2TeX's Lua and TeX sources and its document templates.
 The TeX Live and Overleaf archives can still be used independently with
 `\usepackage{mark2tex}` and `\mdinput`.
@@ -215,9 +216,22 @@ and `--speaker-notes`. Use `--instructor` or its alias `--dozent` in any
 format to select the instructor edition and add `-dozent` to the default
 filename.
 
-Mark2TeX converts Markdown citations into LaTeX citation commands. The CLI
-disables automatic BibTeX and Biber runs. To build a bibliography from a
-`.bib` file, use the LaTeX package workflow with your bibliography setup.
+Mark2TeX converts Markdown citations into LaTeX citation commands. To resolve
+them, pass a `.bib` file; the CLI then loads biblatex, runs Biber, and prints
+the bibliography at the end (on a final frame for slides):
+
+```sh
+mark2tex notes.md --bibliography refs.bib --citation-style authoryear
+```
+
+`--bibliography` can be repeated. To use your standard library in every build,
+set `MARK2TEX_BIBLIOGRAPHY` once, for example in your shell profile; several
+files are separated by `:` (`;` on Windows). `--bibliography` adds to these
+files, and `--no-bibliography` ignores the variable for one build. biblatex and
+Biber only run when the document cites something, so a default library costs
+nothing elsewhere, and only cited entries are listed. `--citation-style` takes
+any biblatex style and defaults to `numeric`. The build cache tracks the
+contents of the `.bib` files, and `--watch` rebuilds when one changes.
 
 For raw TeX learning blocks, the built-in templates define
 `\begin{Lernblock}{Title}` to begin a section or a slide. The starred form
@@ -302,6 +316,11 @@ the converted Markdown with `\MarkTwoTeXContent` inside the document body.
   let the template apply those presentation choices.
 - `\ifMarkTwoTeXHasTitleImage` indicates whether `--title-image` supplied an
   image. Pass `\MarkTwoTeXTitleImage` to the template's image command.
+- `\ifMarkTwoTeXHasBibliography` is true when a bibliography is configured and
+  the document cites something. `\MarkTwoTeXBibliographySetup` then loads
+  csquotes and biblatex with `--citation-style` and adds the `.bib` files; call
+  it in the preamble after babel, and `\printbibliography` where the list
+  belongs. `\MarkTwoTeXCitationStyle` holds the style name.
 
 The template applies layout flags itself. If the Markdown uses raw TeX
 environments such as `Lernblock`, define them in the template.
