@@ -366,6 +366,21 @@ The test uses LuaLaTeX, Beamer, STIX Two, and Poppler's `pdfinfo` and `pdftotext
 
 ### Content visibility and top-level headings
 
+### Columns and figures
+
+Wrap two or more `column` divs in a `columns` div to set them side by
+side on slides. The script prints the columns in source order. A figure
+div such as `::: {.figure width=12em}` accepts a raw `tikzpicture`,
+`\input{diagram.tikz}`, or a standalone Markdown image. Add a nested
+`caption` div at the end for an unnumbered script-only caption. The
+[heat conduction example](examples/cli/waermeleitung.md) shows all fences.
+
+Use `![Description](diagram.pdf){width=12em}` for a standalone image
+with an explicit width. Widths in em scale with the surrounding type.
+An omitted width preserves the natural size. Both are capped at the
+available line width. The mark2tex package loads TikZ and adjustbox;
+load any drawing-specific TikZ libraries in your template.
+
 Use `::: script` for standard and handout output, `::: slides` for slides,
 `::: instructor` for the instructor edition, and `::: student` for the
 regular edition. Close each block with a line containing only colons.

@@ -108,6 +108,8 @@ $(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark
 		echo "depend kvoptions"; \
 		echo "depend ulem"; \
 		echo "depend tools"; \
+		echo "depend adjustbox"; \
+		echo "depend pgf"; \
 		echo "depend booktabs"; \
 		echo "runfiles size=1"; \
 		find "$(DIST_BUILD_DIR)/texmf-dist/tex" "$(DIST_BUILD_DIR)/texmf-dist/scripts" -type f | LC_ALL=C sort | sed 's#^$(DIST_BUILD_DIR)/# #'; \

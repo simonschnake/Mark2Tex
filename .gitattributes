@@ -1,0 +1,2 @@
+# Lua modules are compiled from the neighbouring .tl sources (make teal-gen).
+src/mark2tex/*.lua linguist-generated=true

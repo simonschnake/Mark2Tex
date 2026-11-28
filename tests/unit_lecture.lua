@@ -20,6 +20,20 @@ local function count(text, pattern)
 end
 
 return function(assertions)
+	function test_columns_and_tikz_script_caption()
+		local markdown = assert(files.read_file("examples/cli/waermeleitung.md"))
+		local slides = render(markdown, "slides")
+		local handout = render(markdown, "handout")
+		assert(slides:find("\\begin{columns}", 1, true))
+		assert(not handout:find("\\begin{column", 1, true))
+		assert(not slides:find("Temperaturverlauf", 1, true))
+		assert(handout:find("Temperaturverlauf", 1, true))
+		for _, output in ipairs({ slides, handout }) do
+			assert(output:find("width=12em,max width=\\linewidth", 1, true))
+			assert(output:find("\\begin{tikzpicture}", 1, true))
+		end
+	end
+
 	function test_variant_blocks_and_local_slide_boundary()
 		local markdown = [=[
 ## Common

@@ -31,6 +31,8 @@
 \RequirePackage{array}
 \RequirePackage{tabularx}
 \RequirePackage{booktabs}
+\RequirePackage{adjustbox}
+\RequirePackage{tikz}
 
 
 \begin{luacode*}
@@ -60,8 +62,14 @@
     package.preload["mark2tex.math"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/math.lua")
     end
+    package.preload["mark2tex.autolinks"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/autolinks.lua")
+    end
     package.preload["mark2tex.links"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/links.lua")
+    end
+    package.preload["mark2tex.delimiters"] = function()
+      return dofile(mark2tex_dir .. "/src/mark2tex/delimiters.lua")
     end
     package.preload["mark2tex.diagnostics"] = function()
       return dofile(mark2tex_dir .. "/src/mark2tex/diagnostics.lua")
