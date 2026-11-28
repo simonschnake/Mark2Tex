@@ -1,0 +1,16 @@
+Full [the site][Web], collapsed [Web][], shortcut [web] and *formatted [label][web]*.
+Titles are parsed: [docs].
+
+Undefined [x][nowhere] and [nowhere] stay literal.
+
+[web]: https://example.org/a_b?x=1&y=2
+[Docs]: <local file.pdf> "The manual"
+[docs]: https://ignored.example "first definition wins"
+..................................................
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
+Full \href{\detokenize{https://example.org/a_b?x=1&y=2}}{the site}, collapsed \href{\detokenize{https://example.org/a_b?x=1&y=2}}{Web}, shortcut \href{\detokenize{https://example.org/a_b?x=1&y=2}}{web} and \emph{formatted \href{\detokenize{https://example.org/a_b?x=1&y=2}}{label}}.
+Titles are parsed: \href{\detokenize{local file.pdf}}{docs}.
+
+Undefined [x][nowhere] and [nowhere] stay literal.
+
+

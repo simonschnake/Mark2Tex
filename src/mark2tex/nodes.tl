@@ -83,9 +83,19 @@ local record Other is NodeBase where self.type == "other"
 	content: {Inline}
 end
 
+-- A hard line break: a backslash at the end of a line inside a paragraph.
+local record LineBreak is NodeBase where self.type == "line_break"
+end
+
+-- An image inside text; standalone image lines are Image blocks.
+local record InlineImage is NodeBase where self.type == "inline_image"
+	path: string
+	width: string
+end
+
 local type Inline = Text | Bold | Italic | Strikethrough | Verbatim | LatexCmd
 	| Citation | ParenCitation | InlineMath | DisplayMath | Link | Footnote
-	| Literal | Other
+	| Literal | Other | LineBreak | InlineImage
 
 --------------------
 -- Blocks shared by both stages
@@ -160,6 +170,13 @@ local record RawTable is NodeBase where self.type == "table"
 	rows: {{string}}
 end
 
+-- [label]: destination "title"; parse collects these document-wide.
+local record LinkDefinition is NodeBase where self.type == "link_definition"
+	label: string
+	destination: string
+	title: string
+end
+
 local record FootnoteDefinition is NodeBase where self.type == "footnote_definition"
 	identifier: string
 	content: string
@@ -173,7 +190,7 @@ local record DivFence is NodeBase where self.type == "div_fence"
 end
 
 local type RawBlock = RawHeader | RawItem | RawEnum | RawOther | RawBlockquote
-	| RawTable | FootnoteDefinition | DivFence | HorizontalRule | Latex | Code
+	| RawTable | FootnoteDefinition | LinkDefinition | DivFence | HorizontalRule | Latex | Code
 	| DisplayMath | Image | SlideBreak | SlidePause | SlideNote | SlideFooter
 
 --------------------
@@ -270,6 +287,8 @@ local record nodes
 	type Footnote = Footnote
 	type Literal = Literal
 	type Other = Other
+	type LineBreak = LineBreak
+	type InlineImage = InlineImage
 
 	type HorizontalRule = HorizontalRule
 	type Latex = Latex
@@ -287,6 +306,7 @@ local record nodes
 	type RawBlockquote = RawBlockquote
 	type RawTable = RawTable
 	type FootnoteDefinition = FootnoteDefinition
+	type LinkDefinition = LinkDefinition
 	type DivFence = DivFence
 
 	type Header = Header
@@ -410,6 +430,14 @@ end
 
 function nodes.text(content: string): Text
 	return { type = "text", content = content }
+end
+
+function nodes.line_break(): LineBreak
+	return { type = "line_break" }
+end
+
+function nodes.inline_image(path: string, width?: string): InlineImage
+	return { type = "inline_image", path = path, width = width or "" }
 end
 
 function nodes.literal(content: string): Literal

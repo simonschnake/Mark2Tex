@@ -42,11 +42,18 @@ grammar.footnote_definition = newline * P(" ") ^ -3 * P("[^")
 -- Header
 --------------------
 
+-- An optional closing sequence of #s after a space is not part of the text.
+local function atx_content(content: string): string
+	content = content:gsub("[ \t]+$", "")
+	if content:match("^#+$") then return "" end
+	return (content:gsub("[ \t]+#+$", ""))
+end
+
 grammar.header = newline
 	* space ^ 0
 	* Ct(C(hash ^ 1) * space * C((P(1) - newline) ^ 1))
 	/ function(t: {string}): RawBlock
-		return nodes.header(#t[1], t[2])
+		return nodes.header(#t[1], atx_content(t[2]))
 	end
 
 --------------------
@@ -54,10 +61,16 @@ grammar.header = newline
 --------------------
 
 -- Keep the rule line-oriented so that hyphens inside ordinary paragraphs and
--- table separator rows are not interpreted as horizontal rules.
+-- table separator rows are not interpreted as horizontal rules. Three or more
+-- of -, * or _, optionally spaced; it takes precedence over a list item.
+local function rule_run(character: string): Pattern
+	return P(character) * (S(" \t") ^ 0 * P(character)) ^ 2
+end
+local thematic_break = rule_run("-") + rule_run("*") + rule_run("_")
+
 grammar.horizontal_rule = newline
 	* horizontal_space
-	* P("-") ^ 3
+	* thematic_break
 	* horizontal_space
 	* line_end
 	/ nodes.horizontal_rule
@@ -273,6 +286,25 @@ grammar.table = newline
 	end
 
 --------------------
+-- Link reference definition
+--------------------
+
+-- A definition cannot interrupt a paragraph: the line before it is blank or
+-- another definition. Definitions take a single line.
+grammar.link_definition = Cmt(Cp() * newline * #(P(" ") ^ -3 * P("[") * -P("^")) * C(rest_of_line),
+	function(subject: string, finish: integer, start: integer, line: string): integer | boolean, RawBlock
+		local label, target = links.definition(line)
+		if not label then return false end
+		local previous_start = start - 1
+		while previous_start > 0 and subject:sub(previous_start, previous_start) ~= "\n" do
+			previous_start = previous_start - 1
+		end
+		local previous = subject:sub(previous_start + 1, start - 1)
+		if previous:find("%S") and not links.definition(previous) then return false end
+		return finish, { type = "link_definition", label = label, destination = target.destination, title = target.title }
+	end)
+
+--------------------
 -- Other
 --------------------
 
@@ -293,7 +325,7 @@ grammar.image = newline * horizontal_space * P("![") * (P(1) - S("]\n")) ^ 0
 -- Display math must be considered before a generic raw LaTeX environment.
 -- Otherwise an environment such as `aligned` consumes its surrounding
 -- delimiters and is emitted outside math mode.
-grammar.outer_elements = V("image") + V("footnote_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("image") + V("footnote_definition") + V("link_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t: string): RawBlock
 	return nodes.raw_other(t)
@@ -329,11 +361,11 @@ end
 
 lecture.header = newline * C(P(" ") ^ 0) * C(hash ^ 1) * space * C(rest_of_line)
 	/ function(indent: string, hashes: string, content: string): RawBlock
-		local heading = nodes.header(#hashes, content)
+		local heading = nodes.header(#hashes, atx_content(content))
 		heading.indented = indent ~= ""
 		return heading
 	end
-lecture.slide_break = standalone(P("-") ^ 3 / function(): RawBlock return { type = "slide_break" } end)
+lecture.slide_break = standalone(thematic_break / function(): RawBlock return { type = "slide_break" } end)
 lecture.slide_pause = standalone(P(". . .") / function(): RawBlock return { type = "slide_pause" } end)
 local nested_grammar = P(grammar) * -1
 grammar.outer_elements = V("div_fence") + grammar.outer_elements
@@ -342,12 +374,79 @@ lecture.outer_elements = V("slide_break") + V("slide_pause") + grammar.outer_ele
 local classic_grammar = P(grammar) * -1
 local lecture_grammar = P(lecture) * -1
 
-local function parse_blocks(str: string, lecture_profile?: boolean, nested?: boolean): {RawBlock}
-	if nested then return nested_grammar:match(str) as {RawBlock} end
-	if lecture_profile then
-		return lecture_grammar:match(str) as {RawBlock}
+-- A setext heading: paragraph lines underlined by a line of = signs (up to
+-- three spaces indented). The --- underline stays a horizontal rule, and a
+-- slide break in lecture profiles. Splits the paragraph text around it.
+local function setext_headings(block: nodes.RawOther, result: {RawBlock})
+	local content = block.content
+	local paragraph_start: integer -- first character of the current paragraph line run
+	local consumed = 1 -- content before this index has been emitted
+	local position = 1
+	while position <= #content do
+		local line_end_index = content:find("\n", position, true) or #content + 1
+		local line = content:sub(position, line_end_index - 1)
+		local indent = line:match("^( *)=+[ \t]*$")
+		if indent and #indent <= 3 and paragraph_start then
+			-- Like an ATX heading, the heading owns the newline before it.
+			local before = content:sub(consumed, paragraph_start - 2)
+			if before:find("%S") then result[#result + 1] = nodes.raw_other(before) end
+			local lines: {string} = {}
+			for text in content:sub(paragraph_start, position - 2):gmatch("[^\n]+") do
+				lines[#lines + 1] = text:match("^%s*(.-)%s*$")
+			end
+			result[#result + 1] = nodes.header(1, table.concat(lines, "\n"))
+			consumed, paragraph_start = line_end_index, nil
+		elseif line:find("%S") then
+			paragraph_start = paragraph_start or position
+		else
+			paragraph_start = nil
+		end
+		position = line_end_index + 1
 	end
-	return classic_grammar:match(str) as {RawBlock}
+	if consumed == 1 then
+		result[#result + 1] = block
+	elseif consumed <= #content then
+		result[#result + 1] = nodes.raw_other(content:sub(consumed))
+	end
+end
+
+local function list_level(block: RawBlock): integer
+	if block is nodes.RawItem or block is nodes.RawEnum then return block.level end
+	return nil
+end
+
+-- A blank line keeps a list open when the next item continues it: the same
+-- kind of list, or a deeper (nested) level.
+local function continues_list(previous: RawBlock, following: RawBlock): boolean
+	local previous_level, following_level = list_level(previous), following and list_level(following)
+	if not previous_level or not following_level then return false end
+	return previous.type == following.type or following_level > previous_level
+end
+
+-- Setext headings, and loose lists: a blank line between two list items does
+-- not end the list.
+local function postprocess(blocks: {RawBlock}): {RawBlock}
+	if not blocks then return blocks end
+	local result: {RawBlock} = {}
+	for index, block in ipairs(blocks) do
+		if block is nodes.RawOther then
+			if not (block.content:match("^%s*$") and index > 1
+				and continues_list(blocks[index - 1], blocks[index + 1])) then
+				setext_headings(block, result)
+			end
+		else
+			result[#result + 1] = block
+		end
+	end
+	return result
+end
+
+local function parse_blocks(str: string, lecture_profile?: boolean, nested?: boolean): {RawBlock}
+	if nested then return postprocess(nested_grammar:match(str) as {RawBlock}) end
+	if lecture_profile then
+		return postprocess(lecture_grammar:match(str) as {RawBlock})
+	end
+	return postprocess(classic_grammar:match(str) as {RawBlock})
 end
 
 return parse_blocks

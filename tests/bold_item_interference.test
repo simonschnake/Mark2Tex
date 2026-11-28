@@ -1,7 +1,7 @@
-** Test **
+**Test**
 - Item 1
 ..................................................
-\textbf{ Test }
+\textbf{Test}
 \begin{itemize}
 \item Item 1
 \end{itemize}

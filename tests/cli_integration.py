@@ -1,7 +1,7 @@
 """Exercise an installed Mark2TeX wheel outside the source checkout.
 
 Run with the wheel's Python interpreter and pass its mark2tex executable.
-Requires TeX Live and Poppler (pdftotext and pdfimages).
+Requires TeX Live and Poppler (pdftotext, pdfimages and pdfinfo).
 """
 
 from pathlib import Path
@@ -76,6 +76,27 @@ Manual example.
 \end{Lernblock}
 """
 
+COMMONMARK_DOCUMENT = r"""CommonMark for C#
+=================
+
+Use the [reference link][docs] and the linked inline image
+[![sample](images/sample.png){width=2em}][image].
+
+First line\
+Second line.
+
+- First item
+
+- Second item
+
+* * *
+
+# C#
+
+[docs]: https://example.org/docs
+[image]: https://example.org/image
+"""
+
 
 def png(path, color):
     def chunk(name, data):
@@ -90,6 +111,23 @@ def png(path, color):
 
 def pdf_text(pdf):
     return subprocess.check_output(["pdftotext", str(pdf), "-"], text=True)
+
+
+def commonmark_pdf(binary, work, source_directory):
+    source = source_directory / "commonmark.md"
+    source.write_text(COMMONMARK_DOCUMENT)
+    subprocess.run([binary, str(source), "--language", "english"], cwd=work,
+                   check=True, timeout=180)
+    pdf = source.with_suffix(".pdf")
+    text = pdf_text(pdf)
+    for phrase in ("CommonMark for C#", "reference link", "First line\nSecond line.",
+                   "First item", "Second item"):
+        assert phrase in text, text
+    assert "C#" in text.splitlines(), text
+    images = subprocess.check_output(["pdfimages", "-list", str(pdf)], text=True)
+    assert len(images.splitlines()) == 3, images
+    links = subprocess.check_output(["pdfinfo", "-url", str(pdf)], text=True)
+    assert "https://example.org/docs" in links and "https://example.org/image" in links, links
 
 
 def integration(binary, work):
@@ -248,6 +286,8 @@ def integration(binary, work):
         finally:
             watcher.send_signal(signal.SIGINT)
             watcher.wait(timeout=20)
+
+    commonmark_pdf(binary, work, source.parent)
 
 
 if __name__ == "__main__":

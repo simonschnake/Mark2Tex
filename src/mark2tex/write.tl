@@ -175,12 +175,13 @@ end
 
 local write_blocks: function(ast: {Block}, config: Config, nested: boolean, comment_tokens?: {CommentToken}): string
 
--- In ordinary prose an ampersand is a LaTeX alignment character and a percent
+-- In ordinary prose an ampersand is a LaTeX alignment character, a percent
 -- sign would start a TeX comment that swallows the rest of the line, closing
--- braces included. Escape both here, leaving raw LaTeX nodes untouched;
--- Markdown comments are written as <!-- -->.
+-- braces included, and an underscore that is not emphasis (snake_case) is a
+-- subscript outside math. A hash is reserved for macro parameters. Escape
+-- these characters in text nodes; Markdown comments are written as <!-- -->.
 local function write_text(text: string): string
-	return (text:gsub("[&%%]", "\\%0"))
+	return (text:gsub("[&%%_#]", "\\%0"))
 end
 
 -- Inline code is literal text inside a TeX argument. Escape in one pass so
@@ -287,6 +288,11 @@ local function write_image(ast: nodes.Image, out: Buffer)
 	emit(out, "\n\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
 end
 
+local function write_inline_image(ast: nodes.InlineImage, out: Buffer)
+	local size = ast.width ~= "" and ("width=" .. ast.width .. ",") or ""
+	emit(out, "\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
+end
+
 local function write_item(ast: nodes.Item, out: Buffer, config: Config)
 	emit(out, "\n\\item ")
 	walk_nodes(ast.content, out, config)
@@ -368,7 +374,11 @@ local function write_footnote(ast: nodes.Footnote, out: Buffer, config: Config)
 	emit(out, "}")
 end
 
-local LITERAL_ESCAPES: {string: string} = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
+local LITERAL_ESCAPES: {string: string} = {
+	["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}",
+	-- TeX's ligatures would print a quote.
+	["`"] = "\\textasciigrave{}",
+}
 
 local function write_literal(ast: nodes.Literal, out: Buffer)
 	emit(out, LITERAL_ESCAPES[ast.content] or (ast.content:gsub("[%%{}#&_$]", "\\%0")))
@@ -402,6 +412,8 @@ local WRITERS: {string: Handler} = {
 	slide_paragraph = constant("\n\\par\n"),
 	horizontal_rule = constant("\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"),
 	image = write_image as Handler,
+	inline_image = write_inline_image as Handler,
+	line_break = constant("\\\\\n"),
 	latex = raw("\n", ""),
 	item = write_item as Handler,
 	enum = write_enum as Handler,

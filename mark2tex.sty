@@ -31,7 +31,9 @@
 \RequirePackage{array}
 \RequirePackage{tabularx}
 \RequirePackage{booktabs}
-\RequirePackage{adjustbox}
+% Load adjustbox at the end of the preamble so that templates loading it later
+% with their own options (e.g. beamer themes using [export]) do not clash.
+\AddToHook{begindocument/before}{\RequirePackage{adjustbox}}
 \RequirePackage{tikz}
 
 

@@ -1,0 +1,48 @@
+Before
+
+***
+
+Stars
+
+___
+
+Underscores
+
+- - -
+
+Spaced hyphens
+
+ * * *
+
+- a list item
+- stays a list
+..................................................
+Before
+
+\par\addvspace{\medskipamount}
+\noindent\rule{\linewidth}{0.4pt}
+\par\addvspace{\medskipamount}
+
+Stars
+
+\par\addvspace{\medskipamount}
+\noindent\rule{\linewidth}{0.4pt}
+\par\addvspace{\medskipamount}
+
+Underscores
+
+\par\addvspace{\medskipamount}
+\noindent\rule{\linewidth}{0.4pt}
+\par\addvspace{\medskipamount}
+
+Spaced hyphens
+
+\par\addvspace{\medskipamount}
+\noindent\rule{\linewidth}{0.4pt}
+\par\addvspace{\medskipamount}
+
+\begin{itemize}
+\item a list item
+\item stays a list
+\end{itemize}
+

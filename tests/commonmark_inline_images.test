@@ -1,0 +1,12 @@
+An icon ![alt](icons/check.png) inline, sized ![a](logo.pdf){width=1.5em}.
+By reference ![logo][l], and linked [![badge](badge.png)](https://example.org).
+Remote images stay literal: ![x](https://example.org/a.png).
+
+[l]: images/logo.png
+..................................................
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
+An icon \adjustbox{max width=\linewidth}{\includegraphics{icons/check.png}} inline, sized \adjustbox{width=1.5em,max width=\linewidth}{\includegraphics{logo.pdf}}.
+By reference \adjustbox{max width=\linewidth}{\includegraphics{images/logo.png}}, and linked \href{\detokenize{https://example.org}}{\adjustbox{max width=\linewidth}{\includegraphics{badge.png}}}.
+Remote images stay literal: ![x](https://example.org/a.png).
+
+

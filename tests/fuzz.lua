@@ -117,7 +117,12 @@ local INLINE_ATOMS = {
 	function(depth) return "[" .. inline(depth + 1) .. "](" .. pick(DESTINATIONS) .. (chance(20) and ' "title"' or "") .. ")" end,
 	function() return "<https://example.org/" .. pick({ "a", "b_c", "x%20y" }) .. ">" end,
 	function() return "<someone@example.org>" end,
-	function() return "![alt](image.png)" end,
+	function() return "![alt](image.png)" .. (chance(30) and "{width=2em}" or "") end,
+	-- Reference links resolve only when a definition block names the label.
+	function(depth) return "[" .. inline(depth + 1) .. "]" .. pick({ "[ref]", "[]", "[missing]", "" }) end,
+	function() return pick({ "[ref]", "[Ref]", "![alt][img]" }) end,
+	-- A trailing backslash breaks the line.
+	function() return words(1) .. "\\\n" .. words(1) end,
 	function() return "[^" .. pick({ "a", "b", "missing" }) .. "]" end,
 	function(depth) return "^[" .. inline(depth + 1) .. "]" end,
 	function() return "@" .. pick({ "key", "Turing1950" }) end,
@@ -127,7 +132,7 @@ local INLINE_ATOMS = {
 	function() return "\\textbf{" .. words(2) .. (chance(50) and " $" .. math_content() .. "$" or "") .. "}" end,
 	function() return "\\ref{" .. pick({ "a", "fig:x" }) .. "}" end,
 	-- \[ and \] are display math delimiters, not escapes.
-	function() return pick({ "\\*", "\\_", "\\$", "\\`", "\\\\" }) end,
+	function() return pick({ "\\*", "\\_", "\\$", "\\`", "\\\\", "\\+", "\\|", "\\<", "\\>", "\\?", "\\`{e}" }) end,
 }
 
 inline = function(depth)
@@ -170,7 +175,10 @@ local BLOCKS = {
 	function() return "\\begin{" .. pick({ "center", "align", "quote" }) .. "}\n" .. math_content() .. "\n\\end{center}" end,
 	function() return "$$\n" .. math_content() .. "\n$$" end,
 	function() return "[^" .. pick({ "a", "b" }) .. "]: " .. inline() .. (chance(30) and "\n    " .. inline() or "") end,
-	function() return "---" end,
+	function() return pick({ "---", "***", "___", "- - -", " * * *" }) end,
+	function() return ("#"):rep(random(1, 3)) .. " " .. inline() .. " " .. ("#"):rep(random(1, 3)) end,
+	function() return inline() .. "\n" .. ("="):rep(random(1, 5)) end,
+	function() return pick({ "[ref]", "[img]", "[REF]" }) .. ": " .. pick(DESTINATIONS) .. (chance(30) and ' "title"' or "") end,
 	function() return ". . ." end,
 	function() return "![alt](figure.pdf)" .. (chance(50) and "{width=10em}" or "") end,
 	function(depth) return (":"):rep(random(3, 5)) .. " " .. pick(CLASSES) .. "\n" .. block(depth + 1) .. "\n" .. (":"):rep(random(3, 5)) end,

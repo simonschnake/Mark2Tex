@@ -1,0 +1,12 @@
+Identifiers like foo_bar_baz and snake_case_name stay literal.
+Emphasis with _underscores_ and *stars* still works, also intraword: foo*bar*baz.
+Delimiters next to spaces do not count: a * b * c, x ** y ** z, p _ q _ r.
+Umlauts are word characters: für_bar_ but _über_.
+__init__ is strong, ***both*** nests.
+..................................................
+Identifiers like foo\_bar\_baz and snake\_case\_name stay literal.
+Emphasis with \emph{underscores} and \emph{stars} still works, also intraword: foo\emph{bar}baz.
+Delimiters next to spaces do not count: a * b * c, x ** y ** z, p \_ q \_ r.
+Umlauts are word characters: für\_bar\_ but \emph{über}.
+\textbf{init} is strong, \emph{\textbf{both}} nests.
+

@@ -20,7 +20,11 @@ return function(unit)
 	function test_robustness_constructs_after_tex_command()
 		unit.assertEquals(output("\\LaTeX^[note]"), "\\LaTeX\\footnote{note}")
 		unit.assertEquals(output("\\LaTeX<https://x.org>"), guard .. "\\LaTeX\\url{\\detokenize{https://x.org}}")
-		unit.assertEquals(output("x\\\n<https://x.org>"), guard .. "x\\\n\\url{\\detokenize{https://x.org}}")
+		-- A backslash at the end of a line is a hard line break.
+		unit.assertEquals(output("x\\\n<https://x.org>"), guard .. "x\\\\\n\\url{\\detokenize{https://x.org}}")
+		-- Protecting the footnote can make an unmatched bracket group look closed.
+		unit.assertEquals(output("\\r{}[ ^[{]]"), "\\r{}[ \\footnote{{}]")
+		unit.assertEquals(output("\\LaTeX{}[ ^[`{`]]"), "\\LaTeX{}[ \\footnote{\\texttt{\\{}}]")
 	end
 
 	-- Every pass delimits code, math and TeX by the shared rules in spans.tl.
@@ -39,13 +43,15 @@ return function(unit)
 	function test_robustness_tex_commands_and_links()
 		unit.assertEquals(output("\\ref{a}[x](u)"), guard .. "\\ref{a}\\href{\\detokenize{u}}{x}")
 		unit.assertEquals(output("\\cite[p. 3]{k} and \\f{\\[}"), "\\cite[p. 3]{k} and \\f{\\[}")
-		unit.assertEquals(output("@key\\` x"), "\\cite{key}\\` x")
+		-- \` is a Markdown escape for a backtick; only \`{e} stays the TeX accent.
+		unit.assertEquals(output("@key\\` x"), "\\cite{key}\\textasciigrave{} x")
 	end
 
 	function test_robustness_non_links_keep_destination_literal()
 		unit.assertEquals(output("[a `{`](b c"), "[a \\texttt{\\{}](b c")
 		unit.assertEquals(output("[a [b](https://e.org/x%20y) c](d e"), guard .. "[a \\href{\\detokenize{https://e.org/x}\\%\\detokenize{20y}}{b} c](d e")
-		unit.assertEquals(output("see ![a](my_file.png) here"), "see ![a](my\\_file.png) here")
+		-- A remote image is not an image here; its destination stays literal.
+		unit.assertEquals(output("see ![a](https://e.org/my_file.png) here"), "see ![a](https://e.org/my\\_file.png) here")
 		unit.assertEquals(output("[](^["), "[](\\textasciicircum{}[")
 	end
 
@@ -55,11 +61,18 @@ return function(unit)
 		unit.assertEquals(output("`50%` and $x % y$ stay raw"), "\\texttt{50\\%} and $x % y$ stay raw")
 	end
 
+	function test_robustness_hash_in_text()
+		unit.assertEquals(output("# C#"), "\\section{C\\#}")
+		unit.assertEquals(output("C# and \\# and " .. [[\newcommand{\example}[1]{#1}]]),
+			"C\\# and \\# and " .. [[\newcommand{\example}[1]{#1}]])
+	end
+
 	-- A stray special character stays literal without dropping the formatting
 	-- of the rest of the paragraph.
 	function test_robustness_stray_character_keeps_formatting()
-		unit.assertEquals(output("`}`\\"), "\\texttt{\\}}\\")
-		unit.assertEquals(output("**bold** and `code` \\"), "\\textbf{bold} and \\texttt{code} \\")
+		-- A final backslash escapes nothing, so it is printed as one.
+		unit.assertEquals(output("`}`\\"), "\\texttt{\\}}\\textbackslash{}")
+		unit.assertEquals(output("**bold** and `code` \\"), "\\textbf{bold} and \\texttt{code} \\textbackslash{}")
 		unit.assertEquals(output("**bold** and *open"), "\\textbf{bold} and *open")
 	end
 end

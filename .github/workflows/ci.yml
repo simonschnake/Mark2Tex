@@ -1,0 +1,50 @@
+name: CI
+
+"on":
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      LUA_PATH: "/usr/share/lua/5.3/?.lua;;"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Lua and Teal dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lua-unit luarocks texlive-binaries
+
+      - name: Run Lua tests and check the generated bundle
+        run: make test teal-check LUA=texlua FUZZ_JOBS=4
+
+      - name: Run extended fuzzing
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: make fuzz LUA=texlua FUZZ_JOBS=4 FUZZ_SEED="$(date -u +%Y%m%d)"
+
+      - name: Install PDF and wheel dependencies
+        if: github.event_name != 'schedule'
+        run: |
+          sudo apt-get install --no-install-recommends -y \
+            latexmk poppler-utils python3-setuptools python3-venv python3-wheel \
+            texlive-fonts-extra texlive-fonts-recommended texlive-lang-german \
+            texlive-latex-extra texlive-luatex texlive-science
+
+      - name: Compile and check LuaLaTeX documents
+        if: github.event_name != 'schedule'
+        run: make -j2 latex-smoke latex-lecture LUA=texlua
+
+      - name: Test the installed Python wheel
+        if: github.event_name != 'schedule'
+        run: make cli-integration PYTHON=/usr/bin/python3

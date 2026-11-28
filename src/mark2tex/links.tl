@@ -8,9 +8,17 @@ local nodes = require("mark2tex.nodes")
 local type Match = autolinks.Match
 local type Inline = nodes.Inline
 
+-- The target of a link reference definition.
+local record Reference
+	destination: string
+	title: string
+end
+
 local record Options
 	disable_links: boolean
 	link_label: boolean
+	-- Looks up a normalized reference label (see links.normalize_label).
+	resolve_reference: function(string): Reference
 end
 
 -- Placeholder token in the protected source and the node it stands for.
@@ -22,6 +30,7 @@ end
 -- Types are exported as aliases: nested records would emit runtime tables.
 local record links
 	type Token = Token
+	type Reference = Reference
 	protected_end: function(source: string, position: integer): integer
 end
 
@@ -175,7 +184,60 @@ local function suffix(source: string, start: integer): Match
 	return { destination = destination, title = title, finish = index }
 end
 
-function links.match(source: string, position: integer): Match
+-- Reference labels match case-insensitively, with whitespace runs collapsed.
+function links.normalize_label(label: string): string
+	return (label:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""):lower())
+end
+
+-- A link reference definition on one line, [label]: destination "title".
+-- Returns the normalized label and its target, or nil for any other line.
+function links.definition(line: string): string, Reference
+	local indent, rest = line:match("^( *)(%[.*)$")
+	if not rest or #indent > 3 or rest:sub(2, 2) == "^" then return nil end
+	local index = 2
+	while index <= #rest do
+		local c = rest:sub(index, index)
+		if c == "\\" then index = index + 2
+		elseif c == "[" then return nil
+		elseif c == "]" then break
+		else index = index + 1 end
+	end
+	if rest:sub(index, index + 1) ~= "]:" then return nil end
+	local label = rest:sub(2, index - 1)
+	if not label:find("%S") or #label > 999 then return nil end
+	-- The inline-link suffix parser reads "destination title)", so close the
+	-- line with a parenthesis that must be the one it stops at.
+	local destination_start = rest:find("%S", index + 2)
+	if not destination_start then return nil end
+	local closed = rest:gsub("%s+$", "") .. ")"
+	local result = suffix(closed, index + 2)
+	if not result or result.finish ~= #closed then return nil end
+	if result.destination == "" and rest:sub(destination_start, destination_start + 1) ~= "<>" then return nil end
+	return links.normalize_label(label), { destination = result.destination, title = result.title }
+end
+
+-- After a label: [label](destination), [label][reference], [label][] or the
+-- shortcut [label]. References only match a definition from resolve.
+local function reference_suffix(source: string, position: integer, label_end: integer,
+	resolve: function(string): Reference): Match
+	local label = source:sub(position + 1, label_end - 1)
+	local key, finish = label, label_end
+	if source:sub(label_end + 1, label_end + 1) == "[" then
+		local close = source:find("]", label_end + 2, true)
+		local reference = close and source:sub(label_end + 2, close - 1)
+		if reference and not reference:find("[%[\n]") then
+			if reference:find("%S") then key = reference end
+			finish = close
+		end
+	end
+	if not key:find("%S") then return nil end
+	local target = resolve(links.normalize_label(key))
+	if not target then return nil end
+	return { destination = target.destination, title = target.title, label = label,
+		kind = "inline", label_end = label_end, finish = finish }
+end
+
+function links.match(source: string, position: integer, resolve?: function(string): Reference): Match
 	if source:sub(position, position) == "<" then
 		return autolinks.match(source, position)
 	end
@@ -194,12 +256,24 @@ function links.match(source: string, position: integer): Match
 			index = index + 1
 		else index = index + 1 end
 	end
-	if depth ~= 0 or source:sub(index + 1, index + 1) ~= "(" then return nil end
-	local result = suffix(source, index + 2)
-	if not result then return nil end
+	if depth ~= 0 then return nil end
+	local result = source:sub(index + 1, index + 1) == "(" and suffix(source, index + 2)
+	if not result then
+		return resolve and reference_suffix(source, position, index, resolve) or nil
+	end
 	result.label, result.kind, result.label_end = source:sub(position + 1, index - 1), "inline", index
 	return result
 end
+
+-- Image paths go to \includegraphics, which takes local files only; TeX
+-- metacharacters would break its argument.
+local function image_path(destination: string): boolean
+	return destination ~= "" and not destination:match("^[%a][%w+.-]*:")
+		and not destination:find("[%%#{}\\%^~]")
+end
+
+local em_width = "^{width=(%d+%.?%d*em)}"
+
 
 -- Label warnings come from the inline parser and are passed through unchanged.
 function links.protect<W>(source: string, parse_label: function(string): ({Inline}, {W}), options?: Options): string, {Token}, {W}
@@ -221,7 +295,7 @@ function links.protect<W>(source: string, parse_label: function(string): ({Inlin
 	while index <= #source do
 		local literal_end = literal_until[index]
 		local last = not literal_end and protected_end(source, index)
-		local match = not literal_end and not last and links.match(source, index)
+		local match = not literal_end and not last and links.match(source, index, options.resolve_reference)
 		local malformed, malformed_label: integer, integer
 		if not literal_end and not last and not match then malformed, malformed_label = malformed_end(source, index) end
 		if literal_end then
@@ -229,7 +303,14 @@ function links.protect<W>(source: string, parse_label: function(string): ({Inlin
 			index = literal_end + 1
 		elseif match then
 			local image = index > 1 and source:sub(index - 1, index - 1) == "!" and not delimiters.is_escaped(source, index - 1)
-			if image or options.disable_links then
+				and output[#output] == "!" and match.kind == "inline"
+			if image and image_path(match.destination) then
+				-- The "!" was copied as a character of its own.
+				output[#output] = nil
+				local width = source:match(em_width, match.finish + 1)
+				add(nodes.inline_image(match.destination, width))
+				index = match.finish + 1 + (width and #"{width=}" + #width or 0)
+			elseif image or options.disable_links then
 				-- Not a link here (an image, or a link inside a link label).
 				output[#output + 1] = source:sub(index, index)
 				literal_until[match.label_end + 1] = match.finish

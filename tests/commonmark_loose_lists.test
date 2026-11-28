@@ -1,0 +1,42 @@
+- first
+
+- second
+
+  - nested
+
+- third
+
+1. one
+
+2. two
+
+A paragraph between lists ends them.
+
+- alone
+
+1. different kind
+..................................................
+\begin{itemize}
+\item first
+\item second
+\begin{itemize}
+\item nested
+\end{itemize}
+\item third
+\end{itemize}
+
+\begin{enumerate}
+\item one
+\item two
+\end{enumerate}
+
+A paragraph between lists ends them.
+
+\begin{itemize}
+\item alone
+\end{itemize}
+
+\begin{enumerate}
+\item different kind
+\end{enumerate}
+

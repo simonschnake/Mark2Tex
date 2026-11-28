@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := dist
 
 LUA ?= lua
+PYTHON ?= python3
 PACKAGE ?= mark2tex
 VERSION ?= 0.2.0
 REVISION ?= 2
@@ -11,7 +12,7 @@ OVERLEAF_BUILD_DIR := $(DIST_DIR)/build/$(PACKAGE)-overleaf
 OVERLEAF_ARCHIVE := $(DIST_DIR)/$(PACKAGE)-overleaf.zip
 TLMGR_USER_TREE ?= $(abspath $(DIST_DIR)/tlmgr-usertree)
 
-.PHONY: test golden-update fuzz latex-smoke latex-lecture lecture-handout lecture-slides lecture-blocks dist overleaf-zip clean-dist tlmgr-install-dry-run
+.PHONY: test golden-update fuzz latex-smoke latex-lecture lecture-handout lecture-slides lecture-blocks cli-integration dist overleaf-zip clean-dist tlmgr-install-dry-run
 
 test:
 	$(LUA) tests/run.lua
@@ -38,7 +39,8 @@ fuzz:
 		$(LUA) tests/fuzz.lua $$share $$(( $(FUZZ_SEED) + job )) > tests/tmp/fuzz-job-$$job.log 2>&1 & pids="$$pids $$!"; \
 	done; \
 	for pid in $$pids; do wait $$pid || status=1; done; \
-	cat tests/tmp/fuzz-job-*.log; exit $$status
+	for job in $$(seq 0 $$(( $(FUZZ_JOBS) - 1 ))); do cat tests/tmp/fuzz-job-$$job.log; done; \
+	exit $$status
 
 TEAL_VERSION := 0.24.1
 TEXLUA ?= texlua
@@ -108,6 +110,15 @@ lecture-slides: LECTURE_JOB = folien
 lecture-blocks: LECTURE_JOB = blocks
 lecture-handout lecture-slides lecture-blocks:
 	cd tests/lecture && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
+
+cli-integration:
+	@set -e; \
+	work=$$(mktemp -d); \
+	trap 'rm -rf "$$work"' EXIT; \
+	$(PYTHON) -m venv --system-site-packages "$$work/venv"; \
+	"$$work/venv/bin/python" -m pip wheel --no-index --no-build-isolation --no-deps -w "$$work" .; \
+	"$$work/venv/bin/python" -m pip install --ignore-installed --no-index --no-deps "$$work"/mark2tex-*.whl; \
+	"$$work/venv/bin/python" tests/cli_integration.py "$$work/venv/bin/mark2tex"
 
 dist: teal-check
 	$(MAKE) test

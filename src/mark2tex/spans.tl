@@ -93,11 +93,18 @@ function spans.command_end(source: string, position: integer): integer
 		local group = index + 1
 		while #stack > 0 and group <= #source do
 			local character = source:sub(group, group)
-			if character == "\\" then group = group + 1
+			-- An earlier pass may have replaced characters that kept this
+			-- argument open. Its placeholder still belongs to that pass.
+			if placeholders.markers:find(character, 1, true) then break end
+			if character == "\\" then
+				local escaped = source:sub(group + 1, group + 1)
+				if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then break end
+				group = group + 1
 			elseif character == "{" or character == "[" then stack[#stack + 1] = character == "{" and "}" or "]"
 			elseif character == stack[#stack] then table.remove(stack) end
 			group = group + 1
 		end
+		if #stack > 0 and group <= #source then break end
 		-- [label](destination) after a command is a Markdown link, not an argument.
 		-- Later passes see a placeholder where an earlier pass replaced the
 		-- "(...)" or another construct, so a placeholder counts the same.

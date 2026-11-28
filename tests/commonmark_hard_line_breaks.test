@@ -1,0 +1,18 @@
+Line one\
+line two\
+  indented three
+
+A paragraph ending in a backslash\
+
+TeX line breaks stay: a\\
+b
+..................................................
+Line one\\
+line two\\
+  indented three
+
+A paragraph ending in a backslash\
+
+TeX line breaks stay: a\\
+b
+

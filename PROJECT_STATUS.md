@@ -51,7 +51,7 @@ erhalten.
   atomar aktualisiert. Fehlgeschlagene Builds behalten das letzte PDF.
 - Paketoptionen `profile=handout|slides`, `slide-level`, `audience` und `h1`
   bieten dasselbe Vorlesungslayout auch für `\mdinput` in eigenen Projekten.
-- Folienstruktur nach Pandoc-Beamer-Konventionen: Überschriften, `---` als
+- Folienstruktur nach Pandoc-Beamer-Konventionen: Überschriften, `---` (oder `***`, `___`) als
   Fortsetzungsfolie, `. . .` als Overlay.
 - Fenced Divs im Pandoc-Stil steuern die Sichtbarkeit (`script`, `slides`,
   `instructor`, `student`, auch kombiniert) und Annotationen (`footer`,
@@ -67,14 +67,25 @@ erhalten.
 - Alphabetische Aufzählungen und Startwerte für nummerierte Listen.
 - Referenzierte und Inline-Fußnoten mit Formatierung, mehrzeiligen
   Definitionen und wiederholten Verweisen; Warnungen bei ungültigen Markern.
-- Die Cache-Versionskennung steht bei v19.
+- CommonMark-Konstrukte, die nicht mit LaTeX kollidieren: Flanking-Regeln für
+  Hervorhebungen (`snake_case` bleibt wörtlich und wird als `\_` ausgegeben),
+  horizontale Linien aus `***`, `___` und `- - -`, schließende `#`-Folgen,
+  lose Listen, harte Zeilenumbrüche mit `\` am Zeilenende, Referenzlinks,
+  Inline-Bilder, Setext-Überschriften mit `===` und Markdown-Escapes für
+  `* + < > | ? \``. Tests in `tests/commonmark_*.test` und
+  `tests/unit_commonmark.lua`; der Fuzzer erzeugt die neuen Konstrukte mit.
+- Ein `#` in Prosa und Überschriften wird als `\#` ausgegeben. Ein
+  einzelner Backslash am Ende einer Überschrift bleibt sichtbar. Interne
+  Fußnoten-Platzhalter werden auch neben unvollständigen optionalen
+  TeX-Argumenten aufgelöst. Die Cache-Versionskennung steht bei v22.
 
 ### Älterer Stand, weiterhin gültig
 
 - Inline-Links, URL- und E-Mail-Autolinks; Links setzen separat geladenes
   `hyperref` voraus.
-- Inline-Code escaped LaTeX-Sonderzeichen, normaler Text escaped `&` und `%`
-  (Kommentare per `<!-- -->`).
+- Inline-Code stellt LaTeX-Sonderzeichen wörtlich dar. Der Text außerhalb
+  von LaTeX-Kommandos und Mathematik erhält Escape-Sequenzen für `&`,
+  `%`, `#` und wörtliche Unterstriche. Kommentare verwenden `<!-- -->`.
 - Der Ausgabe-Cache berücksichtigt Inhalt, Konfiguration und die
   Versionskennung.
 - Markdown-Dateien werden im LuaTeX-Recorder registriert; `\mdincludeonly`
@@ -83,16 +94,20 @@ erhalten.
 
 ## Verifikation
 
-- `make test`: Lua-Unit-Tests und Markdown/TeX-Fixtures (aktuell 143 Tests).
-- `make test` vergleicht zusätzlich alle Beispiele und Fixture-Eingaben in sechs
-  Profilvarianten mit den Golden-Snapshots in `tests/golden/`.
+- `make test` führt 169 Lua- und Fixture-Tests sowie einen kurzen Fuzzlauf
+  aus. Es vergleicht die Beispiele und Fixtures in sechs Profilvarianten mit
+  den Golden-Snapshots in `tests/golden/`.
 - `make teal-check`: das Bundle stimmt mit den Teal-Quellen überein.
 - `make latex-smoke`: zwei LuaLaTeX-Läufe für aufgelöste Verweise,
   Recorder-/Ausgabeprüfungen und tatsächliche PDF-Linkziele.
 - `make -j2 latex-lecture`: Handout, Folien und Annotationen als PDFs bauen
   und mit `pdfinfo`/`pdftotext` prüfen.
-- `python tests/cli_integration.py "$(command -v mark2tex)"`: CLI-Integration.
-  Dieser Test hängt noch nicht an einem Make-Target.
+- `make cli-integration` baut und installiert ein frisches Wheel und testet
+  die CLI außerhalb des Checkouts. Der CommonMark-PDF-Test prüft
+  Überschriften, Umbruch, Liste, Inline-Bild und die beiden Linkziele.
+- GitHub Actions führt diese Prüfungen bei Pushes und Pull Requests aus.
+  Der wöchentliche Lauf prüft auf dem Standardbranch zusätzlich 16.000
+  Fuzz-Eingaben mit einem Seed aus dem UTC-Datum.
 
 Die Tests decken unter anderem reale Dissertationstexte, Listen, Tabellen,
 Mathematik, Kommentare, Fußnoten, Links, Vorlesungsprofile und fehlerhafte
@@ -101,9 +116,6 @@ automatisch angelegt.
 
 ## Offene Arbeiten
 
-- Eine CI fehlt. Sie sollte `make test`, `make teal-check`, die LaTeX-Tests
-  und den CLI-Integrationstest ausführen und damit auch die
-  Entwicklungs-Dependencies reproduzierbar festlegen.
 - Der AST ist nur teilweise streng typisiert: stufenabhängige Felder
   (Inhalt, Titel, Tabellenzellen) sind eine lose Union, der Writer castet.
 - Die Blockebene nutzt weiterhin LPeg und flache Listen-Nodes mit Levelwerten.
@@ -111,10 +123,9 @@ automatisch angelegt.
   sinnvolle größere Umbauten; die Teal-Typen erleichtern das jetzt.
 - Diagnosen existieren für Mathematik, LaTeX-Umgebungen und Fenced Divs;
   Positionsangaben und Warnungen für weitere Parserfälle können verbessert werden.
-- Vollständige CommonMark-Kompatibilität ist kein Ziel. Inline-Bilder,
-  Referenzlinks und Task-Listen sind weiterhin nicht unterstützt. Die
-  README-Liste „Deliberately unsupported“ nennt Bilder noch pauschal und
-  sollte auf eigenständige Bilder hin präzisiert werden.
+- Vollständige CommonMark-Kompatibilität ist kein Ziel; die README-Liste
+  „Deliberately unsupported“ nennt die bewussten Abweichungen (u. a.
+  eingerückte Codeblöcke, Setext mit `---`, TeX-Escapes, HTML, Task-Listen).
 - Die CLI verarbeitet keine Bibliographie (BibTeX/Biber sind deaktiviert).
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.

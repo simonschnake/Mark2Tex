@@ -319,11 +319,13 @@ the marker, the CLI uses the regular build and PDF cache.
 
 To build a wheel for offline installation, run
 `python -m pip wheel --no-deps -w dist .` from the checkout. Install that
-wheel with `python -m pip install dist/mark2tex-*.whl`. The installed-wheel
-integration test uses a temporary working directory and needs Poppler:
+wheel with `python -m pip install dist/mark2tex-*.whl`.
+The integration target builds a wheel and tests it in a temporary Python
+environment. It uses the selected Python's setuptools and wheel, LuaLaTeX
+with STIX Two, latexmk, and Poppler.
 
 ```sh
-python tests/cli_integration.py "$(command -v mark2tex)"
+make cli-integration
 ```
 
 The standalone `texlua scripts/convert.lua INPUT OUTPUT_DIR` entry point
@@ -507,15 +509,23 @@ blocks stays literal.
 
 The current parser intentionally supports only a small, tested subset:
 
-- headings with `#`, `##`, `###`, ...
-- horizontal rules with `---` on its own line
+- headings with `#`, `##`, `###`, ..., with an optional closing sequence
+  (`## Heading ##`), and setext level-1 headings underlined with `===`
+- horizontal rules with three or more `-`, `*`, or `_` on their own line,
+  optionally spaced (`- - -`)
 - paragraph detection for normal text
+- hard line breaks with a backslash at the end of a line
 - HTML comments (`<!-- ... -->`), preserved as LaTeX `%` comments
 - italics with `*text*` or `_text_`
-- bold with `**text**` or `__text__`
+- bold with `**text**` or `__text__`; delimiters next to whitespace do not
+  count, and underscores inside a word (`snake_case_name`) stay literal
 - strikethrough with `~~text~~`
 - inline code with backticks, e.g. `` `code` ``; LaTeX special characters stay literal
-- inline links (`[label](target)`), URL autolinks, and email autolinks
+- inline links (`[label](target)`), reference links (`[label][ref]`,
+  `[ref][]`, `[ref]` with `[ref]: target`), URL autolinks, and email autolinks
+- inline images (`![alt](path)`, optionally `{width=2em}`), also by reference
+- backslash escapes for Markdown punctuation that TeX does not use:
+  `\*`, `\+`, `\<`, `\>`, `\|`, `\?`, and `` \` ``
 - fenced code blocks with three backticks
 - fenced `tex` blocks as raw LaTeX output
 - blockquotes with `>`
@@ -523,7 +533,8 @@ The current parser intentionally supports only a small, tested subset:
 - display math with `$$...$$` or `\\[...\\]`
 - pipe tables, including inline formatting and math inside cells
 - LaTeX commands such as `\alpha`, `\cref{...}`, or `\textit{...}`
-- unordered lists with `-`, `*`, or `+`
+- unordered lists with `-`, `*`, or `+`; blank lines between items keep
+  one list
 - ordered lists with `1.`, `1)`, or lowercase letters followed by a closing
   parenthesis and whitespace, as in `a) First item`. The first marker sets
   the starting number or letter (for example, `4.` or `c)`). Subsequent
@@ -549,8 +560,8 @@ The output is LaTeX-like:
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
-- normal text is mostly kept as written; ampersands and percent signs are
-  escaped for LaTeX (`50%` stays a percent sign; write comments as `<!-- -->`)
+- ampersands, percent signs, hash signs, and literal underscores in text
+  are escaped for LaTeX, so `50%`, `C#`, and `snake_case` print as written
 
 ### Links
 
@@ -572,7 +583,25 @@ are parsed but do not appear in the output. URI spaces become `%20`; local file
 paths retain their spaces. A target beginning with `#` refers to an existing
 LaTeX label through `\hyperref`.
 
-Reference links, images, and nested links are unsupported. Bare URLs require
+Reference links use a definition on its own line, anywhere in the file
+(including blockquotes and footnotes):
+
+```md
+See the [project page][site] or simply [site].
+
+[site]: https://example.org "Optional title"
+```
+
+Labels match case-insensitively with whitespace collapsed; the first definition
+of a label wins. A definition must follow a blank line or another definition, so
+a paragraph line such as `[Note]: see below` is never swallowed, and it must fit
+on one line. An unused definition produces a `link` warning, because it is
+omitted from the output. Undefined references stay literal text.
+
+Inline images are written with `\includegraphics`, scaled down to the line
+width if needed. Their paths must be local files without TeX special characters
+(`%`, `#`, `{`, `}`, `\`, `^`, `~`); remote images stay literal text. An image
+may be the label of a link. Nested links are unsupported. Bare URLs require
 angle brackets to become autolinks. Links inside code, math, and raw LaTeX
 arguments are left alone.
 
@@ -667,8 +696,8 @@ lines without a `>` marker are not supported.
 ## Robustness rules
 
 Mark2TeX only transforms complete, unambiguous Markdown constructs. An
-underscore in ordinary text (for example `snake_case`) is kept literally;
-italics require a matching closing underscore or asterisk. Likewise, an
+underscore in ordinary text (for example `snake_case`) is printed literally
+(written as `\_`); italics require a matching closing underscore or asterisk. Likewise, an
 unclosed fenced code block or an unclosed `\begin{...}` environment is emitted
 as ordinary text instead of being partially converted. Paragraphs immediately
 before or after a list remain separate paragraphs.
@@ -678,12 +707,21 @@ before or after a list remain separate paragraphs.
 Mark2TeX is not a full Markdown converter. In particular, do not expect the
 following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
 
-- images in Markdown syntax
-- HTML blocks other than comments
+- HTML blocks and inline HTML other than comments
+- indented code blocks (four spaces of indentation are ordinary text, since
+  LaTeX bodies and continuation lines are often indented)
+- setext headings underlined with `---`; such a line stays a horizontal rule
+  (or a slide break in lecture profiles)
+- backslash escapes that mean something in TeX: `\#`, `\_`, `\$`, `\%`, `\&`,
+  `\{`, `\}` keep their (identical) TeX meaning, while `\-`, `\.`, `\~`,
+  `\^`, `\[`, `\(`, and `` \`{e} `` stay TeX commands (hyphenation, accents,
+  math)
+- HTML entities such as `&copy;` (use the Unicode character)
+- hard line breaks with two trailing spaces
+- lazy continuation lines in blockquotes and list items
 - task lists
-- reference links
-- arbitrary escaping rules
-- fully specified edge cases for nested inline elements
+- fully specified edge cases for nested inline elements (the emphasis rules
+  are a simplified version of CommonMark's)
 
 If you need such constructs, the preferred approach at the moment is usually
 direct LaTeX, for example as a `tex` code block or a raw LaTeX environment.
@@ -826,11 +864,18 @@ Run individual fixtures:
 lua tests/run.lua tests/header.test tests/lists.test
 ```
 
-Test LuaLaTeX integration:
+Test LuaLaTeX and the installed Python wheel:
 
 ```sh
 make latex-smoke
+make -j2 latex-lecture
+make cli-integration
 ```
+
+GitHub Actions runs the Lua tests, Teal bundle check, LuaLaTeX tests, and
+installed-wheel integration on pushes and pull requests. The weekly
+extended fuzz run uses 16,000 inputs and a seed based on the UTC date.
+Reproduce a reported seed with `make fuzz FUZZ_SEED=<seed> FUZZ_JOBS=1`.
 
 The test runner uses `luaunit` if it is installed. If `luaunit` is missing, it
 falls back to a small built-in assertion runner so that parser and writer

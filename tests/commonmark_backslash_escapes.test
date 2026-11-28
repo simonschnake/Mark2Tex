@@ -1,0 +1,22 @@
+Markdown escapes: \*not emphasis\*, \+ not a list, \<tag\>, a\|b, \? and \`not code\`.
+TeX escapes stay TeX: \# \_ \$ \% \& \{ \} \- \\
+Accent: \`{e}.
+
+| a | b |
+| --- | --- |
+| x\|y | \* |
+..................................................
+Markdown escapes: *not emphasis*, + not a list, <tag>, a|b, ? and \textasciigrave{}not code\textasciigrave{}.
+TeX escapes stay TeX: \# \_ \$ \% \& \{ \} \- \\
+Accent: \`{e}.
+
+\par\addvspace{\medskipamount}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+a & b \\
+\midrule
+x|y & * \\
+\bottomrule
+\end{tabularx}
+\par\addvspace{\medskipamount}
+

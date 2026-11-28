@@ -4,6 +4,7 @@ local diagnostics = require("mark2tex.diagnostics")
 local comments = require("mark2tex.comments")
 local divs = require("mark2tex.divs")
 local nodes = require("mark2tex.nodes")
+local type links = require("mark2tex.links")
 local md5 = require("md5")
 
 local type Config = require("mark2tex.default_config")
@@ -13,14 +14,27 @@ local type Block = nodes.Block
 local type Document = nodes.Document
 local type Issue = diagnostics.Issue
 
-local record FootnoteContext
+local record ReferenceEntry
+	label: string
+	target: links.Reference
+	used: boolean
+end
+
+local record InlineContext
 	definitions: {string: string}
 	seen: {string: string}
 	count: integer
 	resolve: function(string): nodes.Footnote
+	-- Link reference definitions by normalized label, in definition order.
+	references: {string: ReferenceEntry}
+	reference_order: {ReferenceEntry}
+	resolve_reference: function(string): links.Reference
 end
 
 local record DuplicateWarning is Issue
+end
+
+local record LinkWarning is Issue
 end
 
 local function normalize_input(str: string): string
@@ -44,14 +58,15 @@ local function append_warning(warnings: {Issue}, candidate: Issue)
 	warnings[#warnings + 1] = candidate
 end
 
-local add_inline_nodes: function(ast: {RawBlock}, warnings: {Issue}, context: FootnoteContext, disabled?: boolean): {Block}
+local add_inline_nodes: function(ast: {RawBlock}, warnings: {Issue}, context: InlineContext, disabled?: boolean): {Block}
 
 -- Parse the inline content of raw blocks, building the parsed block nodes.
-add_inline_nodes = function(ast: {RawBlock}, warnings: {Issue}, context: FootnoteContext, disabled?: boolean): {Block}
+add_inline_nodes = function(ast: {RawBlock}, warnings: {Issue}, context: InlineContext, disabled?: boolean): {Block}
 	local function parse_content(content: string, allow_display?: boolean, disable_footnotes?: boolean): {Inline}
 		local parsed, content_warnings = parse_inlines(content, {
 			allow_display = allow_display,
 			resolve_footnote = context.resolve,
+			resolve_reference = context.resolve_reference,
 			disable_footnotes = disabled or disable_footnotes,
 		})
 		for _, warning in ipairs(content_warnings) do
@@ -109,10 +124,18 @@ end
 
 -- Collect before resolving, allowing definitions after their references and
 -- sharing the document scope with blockquotes. First duplicate wins.
-local function collect_definitions(ast: {RawBlock}, context: FootnoteContext, warnings: {Issue}, disabled?: boolean): {RawBlock}
+local function collect_definitions(ast: {RawBlock}, context: InlineContext, warnings: {Issue}, disabled?: boolean): {RawBlock}
 	local result: {RawBlock} = {}
 	for _, element in ipairs(ast) do
-		if element is nodes.FootnoteDefinition and not disabled then
+		if element is nodes.LinkDefinition then
+			-- Link references anywhere in the document can use these definitions.
+			if not context.references[element.label] then
+				local entry: ReferenceEntry = { label = element.label,
+					target = { destination = element.destination, title = element.title } }
+				context.references[element.label] = entry
+				context.reference_order[#context.reference_order + 1] = entry
+			end
+		elseif element is nodes.FootnoteDefinition and not disabled then
 			if context.definitions[element.identifier] then
 				local duplicate: DuplicateWarning = { category = "footnote", kind = "duplicate", identifier = element.identifier }
 				append_warning(warnings, duplicate)
@@ -147,8 +170,14 @@ local function parse(str: string, config?: Config, source_id?: string): Document
 	else
 		fingerprint = md5.sumhexa(source_id and (source_id .. "\0" .. str) or str)
 	end
-	local context: FootnoteContext = { definitions = {}, seen = {}, count = 0 }
+	local context: InlineContext = { definitions = {}, seen = {}, count = 0, references = {}, reference_order = {} }
 	block_ast = collect_definitions(block_ast, context, warnings)
+	context.resolve_reference = function(label: string): links.Reference
+		local entry = context.references[label]
+		if not entry then return nil end
+		entry.used = true
+		return entry.target
+	end
 	context.resolve = function(identifier: string): nodes.Footnote
 		local definition = context.definitions[identifier]
 		if definition == nil then return nil end
@@ -160,6 +189,14 @@ local function parse(str: string, config?: Config, source_id?: string): Document
 		return nodes.footnote_blocks(add_inline_nodes(blocks, warnings, context, true), label)
 	end
 	local inline_ast = add_inline_nodes(block_ast, warnings, context) as Document
+	-- An unused definition may be a paragraph line that was meant as text.
+	for _, entry in ipairs(context.reference_order) do
+		if not entry.used then
+			local unused: LinkWarning = { category = "link", kind = "unused",
+				message = "unused link definition [" .. entry.label .. "]; omitted" }
+			warnings[#warnings + 1] = unused
+		end
+	end
 	inline_ast.warnings = warnings
 	inline_ast.comments = comment_tokens
 	return inline_ast

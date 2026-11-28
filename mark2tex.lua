@@ -155,7 +155,7 @@ local core = {}
 
 
 
-local CACHE_VERSION = "v20"
+local CACHE_VERSION = "v22"
 
 local function copy_table(value)
    if type(value) ~= "table" then
@@ -1186,7 +1186,16 @@ local nodes = require("mark2tex.nodes")
 
 
 
+
+
+
+
+
+
+
+
 local links = {}
+
 
 
 
@@ -1341,7 +1350,60 @@ local function suffix(source, start)
    return { destination = destination, title = title, finish = index }
 end
 
-function links.match(source, position)
+
+function links.normalize_label(label)
+   return (label:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""):lower())
+end
+
+
+
+function links.definition(line)
+   local indent, rest = line:match("^( *)(%[.*)$")
+   if not rest or #indent > 3 or rest:sub(2, 2) == "^" then return nil end
+   local index = 2
+   while index <= #rest do
+      local c = rest:sub(index, index)
+      if c == "\\" then index = index + 2
+      elseif c == "[" then return nil
+      elseif c == "]" then break
+      else index = index + 1 end
+   end
+   if rest:sub(index, index + 1) ~= "]:" then return nil end
+   local label = rest:sub(2, index - 1)
+   if not label:find("%S") or #label > 999 then return nil end
+
+
+   local destination_start = rest:find("%S", index + 2)
+   if not destination_start then return nil end
+   local closed = rest:gsub("%s+$", "") .. ")"
+   local result = suffix(closed, index + 2)
+   if not result or result.finish ~= #closed then return nil end
+   if result.destination == "" and rest:sub(destination_start, destination_start + 1) ~= "<>" then return nil end
+   return links.normalize_label(label), { destination = result.destination, title = result.title }
+end
+
+
+
+local function reference_suffix(source, position, label_end,
+   resolve)
+   local label = source:sub(position + 1, label_end - 1)
+   local key, finish = label, label_end
+   if source:sub(label_end + 1, label_end + 1) == "[" then
+      local close = source:find("]", label_end + 2, true)
+      local reference = close and source:sub(label_end + 2, close - 1)
+      if reference and not reference:find("[%[\n]") then
+         if reference:find("%S") then key = reference end
+         finish = close
+      end
+   end
+   if not key:find("%S") then return nil end
+   local target = resolve(links.normalize_label(key))
+   if not target then return nil end
+   return { destination = target.destination, title = target.title, label = label,
+kind = "inline", label_end = label_end, finish = finish, }
+end
+
+function links.match(source, position, resolve)
    if source:sub(position, position) == "<" then
       return autolinks.match(source, position)
    end
@@ -1360,12 +1422,24 @@ function links.match(source, position)
          index = index + 1
       else index = index + 1 end
    end
-   if depth ~= 0 or source:sub(index + 1, index + 1) ~= "(" then return nil end
-   local result = suffix(source, index + 2)
-   if not result then return nil end
+   if depth ~= 0 then return nil end
+   local result = source:sub(index + 1, index + 1) == "(" and suffix(source, index + 2)
+   if not result then
+      return resolve and reference_suffix(source, position, index, resolve) or nil
+   end
    result.label, result.kind, result.label_end = source:sub(position + 1, index - 1), "inline", index
    return result
 end
+
+
+
+local function image_path(destination)
+   return destination ~= "" and not destination:match("^[%a][%w+.-]*:") and
+   not destination:find("[%%#{}\\%^~]")
+end
+
+local em_width = "^{width=(%d+%.?%d*em)}"
+
 
 
 function links.protect(source, parse_label, options)
@@ -1387,15 +1461,22 @@ function links.protect(source, parse_label, options)
    while index <= #source do
       local literal_end = literal_until[index]
       local last = not literal_end and protected_end(source, index)
-      local match = not literal_end and not last and links.match(source, index)
+      local match = not literal_end and not last and links.match(source, index, options.resolve_reference)
       local malformed, malformed_label
       if not literal_end and not last and not match then malformed, malformed_label = malformed_end(source, index) end
       if literal_end then
          add(literal_suffix(source, index, literal_end))
          index = literal_end + 1
       elseif match then
-         local image = index > 1 and source:sub(index - 1, index - 1) == "!" and not delimiters.is_escaped(source, index - 1)
-         if image or options.disable_links then
+         local image = index > 1 and source:sub(index - 1, index - 1) == "!" and not delimiters.is_escaped(source, index - 1) and
+         output[#output] == "!" and match.kind == "inline"
+         if image and image_path(match.destination) then
+
+            output[#output] = nil
+            local width = source:match(em_width, match.finish + 1)
+            add(nodes.inline_image(match.destination, width))
+            index = match.finish + 1 + (width and #"{width=}" + #width or 0)
+         elseif image or options.disable_links then
 
             output[#output + 1] = source:sub(index, index)
             literal_until[match.label_end + 1] = match.finish
@@ -1948,7 +2029,27 @@ package.preload["mark2tex.nodes"] = function(...)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 local nodes = {}
+
+
+
 
 
 
@@ -2111,6 +2212,14 @@ function nodes.text(content)
    return { type = "text", content = content }
 end
 
+function nodes.line_break()
+   return { type = "line_break" }
+end
+
+function nodes.inline_image(path, width)
+   return { type = "inline_image", path = path, width = width or "" }
+end
+
 function nodes.literal(content)
    return { type = "literal", content = content }
 end
@@ -2127,7 +2236,21 @@ local diagnostics = require("mark2tex.diagnostics")
 local comments = require("mark2tex.comments")
 local divs = require("mark2tex.divs")
 local nodes = require("mark2tex.nodes")
+
 local md5 = require("md5")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2175,6 +2298,7 @@ add_inline_nodes = function(ast, warnings, context, disabled)
       local parsed, content_warnings = parse_inlines(content, {
          allow_display = allow_display,
          resolve_footnote = context.resolve,
+         resolve_reference = context.resolve_reference,
          disable_footnotes = disabled or disable_footnotes,
       })
       for _, warning in ipairs(content_warnings) do
@@ -2235,7 +2359,15 @@ end
 local function collect_definitions(ast, context, warnings, disabled)
    local result = {}
    for _, element in ipairs(ast) do
-      if element.type == "footnote_definition" and not disabled then
+      if element.type == "link_definition" then
+
+         if not context.references[element.label] then
+            local entry = { label = element.label,
+target = { destination = element.destination, title = element.title }, }
+            context.references[element.label] = entry
+            context.reference_order[#context.reference_order + 1] = entry
+         end
+      elseif element.type == "footnote_definition" and not disabled then
          if context.definitions[element.identifier] then
             local duplicate = { category = "footnote", kind = "duplicate", identifier = element.identifier }
             append_warning(warnings, duplicate)
@@ -2270,8 +2402,14 @@ local function parse(str, config, source_id)
    else
       fingerprint = md5.sumhexa(source_id and (source_id .. "\0" .. str) or str)
    end
-   local context = { definitions = {}, seen = {}, count = 0 }
+   local context = { definitions = {}, seen = {}, count = 0, references = {}, reference_order = {} }
    block_ast = collect_definitions(block_ast, context, warnings)
+   context.resolve_reference = function(label)
+      local entry = context.references[label]
+      if not entry then return nil end
+      entry.used = true
+      return entry.target
+   end
    context.resolve = function(identifier)
       local definition = context.definitions[identifier]
       if definition == nil then return nil end
@@ -2283,6 +2421,14 @@ local function parse(str, config, source_id)
       return nodes.footnote_blocks(add_inline_nodes(blocks, warnings, context, true), label)
    end
    local inline_ast = add_inline_nodes(block_ast, warnings, context)
+
+   for _, entry in ipairs(context.reference_order) do
+      if not entry.used then
+         local unused = { category = "link", kind = "unused",
+message = "unused link definition [" .. entry.label .. "]; omitted", }
+         warnings[#warnings + 1] = unused
+      end
+   end
    inline_ast.warnings = warnings
    inline_ast.comments = comment_tokens
    return inline_ast
@@ -2338,11 +2484,18 @@ end
 
 
 
+
+local function atx_content(content)
+   content = content:gsub("[ \t]+$", "")
+   if content:match("^#+$") then return "" end
+   return (content:gsub("[ \t]+#+$", ""))
+end
+
 grammar.header = newline *
 space ^ 0 *
 Ct(C(hash ^ 1) * space * C((P(1) - newline) ^ 1)) /
 function(t)
-   return nodes.header(#t[1], t[2])
+   return nodes.header(#t[1], atx_content(t[2]))
 end
 
 
@@ -2351,9 +2504,15 @@ end
 
 
 
+
+local function rule_run(character)
+   return P(character) * (S(" \t") ^ 0 * P(character)) ^ 2
+end
+local thematic_break = rule_run("-") + rule_run("*") + rule_run("_")
+
 grammar.horizontal_rule = newline *
 horizontal_space *
-P("-") ^ 3 *
+thematic_break *
 horizontal_space *
 line_end /
 nodes.horizontal_rule
@@ -2572,6 +2731,25 @@ end
 
 
 
+
+
+grammar.link_definition = Cmt(Cp() * newline * #(P(" ") ^ (-3) * P("[") * -P("^")) * C(rest_of_line),
+function(subject, finish, start, line)
+   local label, target = links.definition(line)
+   if not label then return false end
+   local previous_start = start - 1
+   while previous_start > 0 and subject:sub(previous_start, previous_start) ~= "\n" do
+      previous_start = previous_start - 1
+   end
+   local previous = subject:sub(previous_start + 1, start - 1)
+   if previous:find("%S") and not links.definition(previous) then return false end
+   return finish, { type = "link_definition", label = label, destination = target.destination, title = target.title }
+end)
+
+
+
+
+
 grammar.div_fence = (fence * Cp()) / function(position, delimiter, attributes_text, ending)
    return { type = "div_fence", position = position, ending = ending,
 length = #delimiter, attributes = attributes_text, }
@@ -2589,7 +2767,7 @@ end
 
 
 
-grammar.outer_elements = V("image") + V("footnote_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("image") + V("footnote_definition") + V("link_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
    return nodes.raw_other(t)
@@ -2625,11 +2803,11 @@ end
 
 lecture.header = newline * C(P(" ") ^ 0) * C(hash ^ 1) * space * C(rest_of_line) /
 function(indent, hashes, content)
-   local heading = nodes.header(#hashes, content)
+   local heading = nodes.header(#hashes, atx_content(content))
    heading.indented = indent ~= ""
    return heading
 end
-lecture.slide_break = standalone(P("-") ^ 3 / function() return { type = "slide_break" } end)
+lecture.slide_break = standalone(thematic_break / function() return { type = "slide_break" } end)
 lecture.slide_pause = standalone(P(". . .") / function() return { type = "slide_pause" } end)
 local nested_grammar = P(grammar) * -1
 grammar.outer_elements = V("div_fence") + grammar.outer_elements
@@ -2638,12 +2816,79 @@ lecture.outer_elements = V("slide_break") + V("slide_pause") + grammar.outer_ele
 local classic_grammar = P(grammar) * -1
 local lecture_grammar = P(lecture) * -1
 
-local function parse_blocks(str, lecture_profile, nested)
-   if nested then return nested_grammar:match(str) end
-   if lecture_profile then
-      return lecture_grammar:match(str)
+
+
+
+local function setext_headings(block, result)
+   local content = block.content
+   local paragraph_start
+   local consumed = 1
+   local position = 1
+   while position <= #content do
+      local line_end_index = content:find("\n", position, true) or #content + 1
+      local line = content:sub(position, line_end_index - 1)
+      local indent = line:match("^( *)=+[ \t]*$")
+      if indent and #indent <= 3 and paragraph_start then
+
+         local before = content:sub(consumed, paragraph_start - 2)
+         if before:find("%S") then result[#result + 1] = nodes.raw_other(before) end
+         local lines = {}
+         for text in content:sub(paragraph_start, position - 2):gmatch("[^\n]+") do
+            lines[#lines + 1] = text:match("^%s*(.-)%s*$")
+         end
+         result[#result + 1] = nodes.header(1, table.concat(lines, "\n"))
+         consumed, paragraph_start = line_end_index, nil
+      elseif line:find("%S") then
+         paragraph_start = paragraph_start or position
+      else
+         paragraph_start = nil
+      end
+      position = line_end_index + 1
    end
-   return classic_grammar:match(str)
+   if consumed == 1 then
+      result[#result + 1] = block
+   elseif consumed <= #content then
+      result[#result + 1] = nodes.raw_other(content:sub(consumed))
+   end
+end
+
+local function list_level(block)
+   if block.type == "item" or block.type == "enum" then return block.level end
+   return nil
+end
+
+
+
+local function continues_list(previous, following)
+   local previous_level, following_level = list_level(previous), following and list_level(following)
+   if not previous_level or not following_level then return false end
+   return previous.type == following.type or following_level > previous_level
+end
+
+
+
+local function postprocess(blocks)
+   if not blocks then return blocks end
+   local result = {}
+   for index, block in ipairs(blocks) do
+      if block.type == "other" then
+         if not (block.content:match("^%s*$") and index > 1 and
+            continues_list(blocks[index - 1], blocks[index + 1])) then
+            setext_headings(block, result)
+         end
+      else
+         result[#result + 1] = block
+      end
+   end
+   return result
+end
+
+local function parse_blocks(str, lecture_profile, nested)
+   if nested then return postprocess(nested_grammar:match(str)) end
+   if lecture_profile then
+      return postprocess(lecture_grammar:match(str))
+   end
+   return postprocess(classic_grammar:match(str))
 end
 
 return parse_blocks
@@ -2659,6 +2904,7 @@ local links = require("mark2tex.links")
 local footnotes = require("mark2tex.footnotes")
 local placeholders = require("mark2tex.tokens")
 local spans = require("mark2tex.spans")
+
 
 
 
@@ -2746,46 +2992,86 @@ end
 
 
 
+
+local markdown_escapes = {
+   ["*"] = true, ["+"] = true, ["<"] = true, [">"] = true, ["|"] = true, ["?"] = true,
+}
+
+
+
 grammar.latex_cmd = Cmt(Cp() * P("\\"), function(subject, _, start)
    local finish = spans.command_end(subject, start)
-   if finish then return finish + 1, subject:sub(start, finish) end
+   if finish then return finish + 1, nodes.latex_cmd(subject:sub(start, finish)) end
    local symbol = subject:sub(start + 1, start + 1)
-   if symbol == "" or placeholders.markers:find(symbol, 1, true) then return false end
-   return start + 2, subject:sub(start, start + 1)
-end) / function(t)
-   return nodes.latex_cmd(t)
+
+
+   if symbol == "" or placeholders.markers:find(symbol, 1, true) then
+      return start + 1, nodes.literal("\\")
+   end
+
+   if markdown_escapes[symbol] or (symbol == "`" and subject:sub(start + 2, start + 2) ~= "{") then
+      return start + 2, nodes.literal(symbol)
+   end
+   return start + 2, nodes.latex_cmd(subject:sub(start, start + 1))
+end)
+
+
+
+grammar.line_break = P("\\") * newline * #(S(" \t") ^ 0 * (P(1) - newline)) / function()
+   return nodes.line_break()
 end
 
 
 
 
 
-grammar.italic_star = P("*") *
+
+
+
+local word = "[%w\128-\255]"
+
+local function opener(delimiter, intraword)
+   return Cmt(P(delimiter), function(subject, position)
+      local following = subject:sub(position, position)
+      if following == "" or following:match("%s") then return false end
+      return intraword or not subject:sub(position - #delimiter - 1, position - #delimiter - 1):match(word)
+   end)
+end
+
+local function closer(delimiter, intraword)
+   return Cmt(P(delimiter), function(subject, position)
+      local preceding = subject:sub(position - #delimiter - 1, position - #delimiter - 1)
+      if preceding == "" or preceding:match("%s") then return false end
+      return intraword or not subject:sub(position, position):match(word)
+   end)
+end
+
+grammar.italic_star = opener("*", true) *
 Ct((V("final_elements") + V("bold") + V("text")) ^ 1) *
-P("*") /
+closer("*", true) /
 function(t)
    return nodes.italic(t)
 end
 
-grammar.italic_underline = P("_") *
+grammar.italic_underline = opener("_", false) *
 Ct((V("final_elements") + V("bold") + V("strikethrough") + V("text")) ^ 1) *
-P("_") /
+closer("_", false) /
 function(t)
    return nodes.italic(t)
 end
 
 grammar.italic = V("italic_star") + V("italic_underline")
 
-grammar.bold_star = P("**") *
+grammar.bold_star = opener("**", true) *
 Ct((V("final_elements") + V("italic") + V("strikethrough") + V("text")) ^ 1) *
-P("**") /
+closer("**", true) /
 function(t)
    return nodes.bold(t)
 end
 
-grammar.bold_underline = P("__") *
+grammar.bold_underline = opener("__", false) *
 Ct((V("final_elements") + V("italic") + V("text")) ^ 1) *
-P("__") /
+closer("__", false) /
 function(t)
    return nodes.bold(t)
 end
@@ -2811,7 +3097,7 @@ end
 
 
 
-grammar.final_elements = V("paren_citation") + V("citation") + V("code_span") + V("latex_cmd")
+grammar.final_elements = V("paren_citation") + V("citation") + V("code_span") + V("line_break") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
 
@@ -2840,11 +3126,12 @@ end
 local function parse_inlines(str, options)
    options = options or {}
    local footnote_protected, footnote_tokens, footnote_warnings = footnotes.protect(str, options.resolve_footnote, function(content)
-      return parse_inlines(content, { disable_footnotes = true })
+      return parse_inlines(content, { disable_footnotes = true, resolve_reference = options.resolve_reference })
    end, options.disable_footnotes)
    local link_protected, link_tokens, link_warnings = links.protect(footnote_protected, function(label)
       return parse_inlines(label, { allow_display = false, disable_links = true, link_label = true, disable_footnotes = true })
-   end, { disable_links = options.disable_links, link_label = options.link_label })
+   end, { disable_links = options.disable_links, link_label = options.link_label,
+resolve_reference = options.resolve_reference, })
    local protected, tokens, math_warnings = math_parser.protect_inlines(link_protected, { allow_display = options.allow_display })
    local warnings = {}
    for _, warning in ipairs(math_warnings) do warnings[#warnings + 1] = warning end
@@ -2959,11 +3246,18 @@ function spans.command_end(source, position)
       local group = index + 1
       while #stack > 0 and group <= #source do
          local character = source:sub(group, group)
-         if character == "\\" then group = group + 1
+
+
+         if placeholders.markers:find(character, 1, true) then break end
+         if character == "\\" then
+            local escaped = source:sub(group + 1, group + 1)
+            if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then break end
+            group = group + 1
          elseif character == "{" or character == "[" then stack[#stack + 1] = character == "{" and "}" or "]"
          elseif character == stack[#stack] then table.remove(stack) end
          group = group + 1
       end
+      if #stack > 0 and group <= #source then break end
 
 
 
@@ -3221,8 +3515,9 @@ local write_blocks
 
 
 
+
 local function write_text(text)
-   return (text:gsub("[&%%]", "\\%0"))
+   return (text:gsub("[&%%_#]", "\\%0"))
 end
 
 
@@ -3329,6 +3624,11 @@ local function write_image(ast, out)
    emit(out, "\n\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
 end
 
+local function write_inline_image(ast, out)
+   local size = ast.width ~= "" and ("width=" .. ast.width .. ",") or ""
+   emit(out, "\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
+end
+
 local function write_item(ast, out, config)
    emit(out, "\n\\item ")
    walk_nodes(ast.content, out, config)
@@ -3410,7 +3710,11 @@ local function write_footnote(ast, out, config)
    emit(out, "}")
 end
 
-local LITERAL_ESCAPES = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
+local LITERAL_ESCAPES = {
+   ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}",
+
+   ["`"] = "\\textasciigrave{}",
+}
 
 local function write_literal(ast, out)
    emit(out, LITERAL_ESCAPES[ast.content] or (ast.content:gsub("[%%{}#&_$]", "\\%0")))
@@ -3444,6 +3748,8 @@ local WRITERS = {
    slide_paragraph = constant("\n\\par\n"),
    horizontal_rule = constant("\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"),
    image = write_image,
+   inline_image = write_inline_image,
+   line_break = constant("\\\\\n"),
    latex = raw("\n", ""),
    item = write_item,
    enum = write_enum,
