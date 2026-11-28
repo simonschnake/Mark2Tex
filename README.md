@@ -704,8 +704,11 @@ before or after a list remain separate paragraphs.
 
 ## Deliberately unsupported
 
-Mark2TeX is not a full Markdown converter. In particular, do not expect the
-following to work like they do in CommonMark, Pandoc, or GitHub Markdown:
+Mark2TeX is not a full Markdown converter. [The CommonMark conformance
+report](tests/commonmark/report.md) shows, section by section, how many examples
+of the CommonMark spec Mark2TeX handles like the spec does; `make test` fails if
+one of them regresses. In particular, do not expect the following to work like
+they do in CommonMark, Pandoc, or GitHub Markdown:
 
 - HTML blocks and inline HTML other than comments
 - indented code blocks (four spaces of indentation are ordinary text, since

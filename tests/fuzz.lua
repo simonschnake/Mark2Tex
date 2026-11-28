@@ -246,12 +246,46 @@ end
 -- Remove code spans and fences by the CommonMark rule (a run of n backticks
 -- closed by the next run of exactly n in the paragraph), written
 -- independently of src/mark2tex/spans.tl so the two can be compared.
+local function escaped(source, index)
+	local slashes = 0
+	while index - slashes - 1 >= 1 and source:sub(index - slashes - 1, index - slashes - 1) == "\\" do
+		slashes = slashes + 1
+	end
+	return slashes % 2 == 1
+end
+
+-- Math opened before a backtick is raw TeX: its closing delimiter in the same
+-- paragraph, or nil. A single $ is not closed by half of a $$.
+local function math_end(source, index)
+	local opening = source:sub(index, index + 1)
+	local closer
+	if opening == "$$" then closer = "$$"
+	elseif opening == "\\(" then closer = "\\)"
+	elseif source:sub(index, index) == "$" then opening, closer = "$", "$"
+	else return nil end
+	if escaped(source, index) then return nil end
+	local paragraph = source:find("\n[ \t]*\n", index) or #source + 1
+	local search = index + #opening
+	while true do
+		local first = source:find(closer, search, true)
+		if not first or first >= paragraph then return nil end
+		if not escaped(source, first) and (closer ~= "$" or source:sub(first, first + 1) ~= "$$") then
+			return first + #closer - 1
+		end
+		search = first + (closer == "$" and source:sub(first, first + 1) == "$$" and 2 or 1)
+	end
+end
+
 local function strip_code(source)
 	local output, index = {}, 1
 	while index <= #source do
 		local run = source:match("^[`~]+", index)
 		local at_line_start = index == 1 or source:sub(index - 1, index - 1) == "\n"
-		if run and at_line_start and #run >= 3 then
+		local math = math_end(source, index)
+		if math then
+			output[#output + 1] = source:sub(index, math)
+			index = math + 1
+		elseif run and at_line_start and #run >= 3 then
 			local closing = nil
 			local search = index + #run
 			while true do

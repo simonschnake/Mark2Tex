@@ -75,4 +75,19 @@ return function(unit)
 		unit.assertEquals(output("**bold** and `code` \\"), "\\textbf{bold} and \\texttt{code} \\textbackslash{}")
 		unit.assertEquals(output("**bold** and *open"), "\\textbf{bold} and *open")
 	end
+
+	-- TeX command arguments are read as TeX reads them (spans.command_end).
+	function test_robustness_tex_arguments_follow_tex()
+		-- Brackets inside a brace argument are ordinary characters.
+		unit.assertEquals(output("\\textbf{[} and **bold** and `code`"), "\\textbf{[} and \\textbf{bold} and \\texttt{code}")
+		unit.assertEquals(output("\\f{]} **b**"), "\\f{]} \\textbf{b}")
+		-- Braces nest inside an optional argument; ] inside them does not close it.
+		unit.assertEquals(output("\\f[{]}]{x} **b**"), "\\f[{]}]{x} \\textbf{b}")
+		unit.assertEquals(output("\\cite[p. 3]{k} **b**"), "\\cite[p. 3]{k} \\textbf{b}")
+		-- An optional argument with a } and no { is not one: it stays Markdown.
+		unit.assertEquals(output("\\f{}[`}`]"), "\\f{}[\\texttt{\\}}]")
+		-- Unclosed: a [ is ordinary text, a { runs to the end of the source.
+		unit.assertEquals(output("\\f[open **x**"), "\\f[open \\textbf{x}")
+		unit.assertEquals(output("\\f{open **x**"), "\\f{open **x**")
+	end
 end

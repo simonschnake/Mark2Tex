@@ -17,7 +17,8 @@ local core = require("mark2tex.core")
 
 local GOLDEN_DIR = "tests/golden"
 local INPUT_DIRS = { "examples", "tests" }
-local SKIP_DIRS = { ["tests/golden"] = true, ["tests/tmp"] = true }
+-- tests/commonmark holds the spec harness and its generated report, not inputs.
+local SKIP_DIRS = { ["tests/golden"] = true, ["tests/tmp"] = true, ["tests/commonmark"] = true }
 
 local VARIANTS = {
 	{ name = "default", config = {} },

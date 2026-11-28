@@ -80,6 +80,41 @@ function spans.math_closer(opening: string): string
 	return opening
 end
 
+-- One argument starting at index, read as TeX reads it: in {...} only braces
+-- count; in [...] braces nest and the first ] outside them (brackets nest,
+-- forgivingly) closes it. Returns the index of its last character, or nil and
+-- why: "unclosed", "invalid" (a } with no {, which TeX cannot read) or
+-- "placeholder" (an earlier pass replaced characters inside it, so the
+-- placeholder belongs to that pass).
+local function argument_end(source: string, index: integer): integer, string
+	local optional = source:sub(index, index) == "["
+	local braces, brackets = optional and 0 or 1, optional and 1 or 0
+	local group = index + 1
+	while group <= #source do
+		local character = source:sub(group, group)
+		if placeholders.markers:find(character, 1, true) then return nil, "placeholder" end
+		if character == "\\" then
+			local escaped = source:sub(group + 1, group + 1)
+			if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then return nil, "placeholder" end
+			group = group + 1
+		elseif character == "{" then
+			braces = braces + 1
+		elseif character == "}" then
+			if braces == 0 then return nil, "invalid" end
+			braces = braces - 1
+			if not optional and braces == 0 then return group end
+		elseif optional and braces == 0 then
+			if character == "[" then brackets = brackets + 1 end
+			if character == "]" then
+				brackets = brackets - 1
+				if brackets == 0 then return group end
+			end
+		end
+		group = group + 1
+	end
+	return nil, "unclosed"
+end
+
 -- A TeX command (backslash, letters or @, optional star) with its bracket and
 -- brace arguments, which every pass treats as opaque raw TeX. Returns the
 -- index of its last character, or nil when no command starts at position.
@@ -88,35 +123,21 @@ function spans.command_end(source: string, position: integer): integer
 	if not command then return nil end
 	local index = position + #command
 	while source:sub(index, index) == "{" or source:sub(index, index) == "[" do
-		local opening = source:sub(index, index)
-		local stack = { opening == "{" and "}" or "]" }
-		local group = index + 1
-		while #stack > 0 and group <= #source do
-			local character = source:sub(group, group)
-			-- An earlier pass may have replaced characters that kept this
-			-- argument open. Its placeholder still belongs to that pass.
-			if placeholders.markers:find(character, 1, true) then break end
-			if character == "\\" then
-				local escaped = source:sub(group + 1, group + 1)
-				if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then break end
-				group = group + 1
-			elseif character == "{" or character == "[" then stack[#stack + 1] = character == "{" and "}" or "]"
-			elseif character == stack[#stack] then table.remove(stack) end
-			group = group + 1
-		end
-		if #stack > 0 and group <= #source then break end
+		local optional = source:sub(index, index) == "["
+		local last, problem = argument_end(source, index)
+		-- An unclosed mandatory argument runs to the end of the source; an
+		-- unclosed or unreadable optional one is ordinary text.
+		if problem == "unclosed" and not optional then return #source end
+		if not last then break end
 		-- [label](destination) after a command is a Markdown link, not an argument.
 		-- Later passes see a placeholder where an earlier pass replaced the
 		-- "(...)" or another construct, so a placeholder counts the same.
-		local following = source:sub(group, group)
-		if opening == "[" and #stack == 0 and following ~= ""
+		local following = source:sub(last + 1, last + 1)
+		if optional and following ~= ""
 			and (following == "(" or placeholders.markers:find(following, 1, true)) then break end
-		-- An optional argument must be closed; an unclosed [ is ordinary text.
-		if opening == "[" and #stack > 0 then break end
-		index = group
+		index = last + 1
 	end
-	-- An unclosed argument runs to the end of the source.
-	return math.min(index - 1, #source)
+	return index - 1
 end
 
 -- A fenced code block at position, which must start a line: three or more

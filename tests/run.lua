@@ -164,5 +164,6 @@ require("tests.unit_footnotes")(luaunit)
 require("tests.unit_lecture")(luaunit)
 require("tests.unit_robustness")(luaunit)
 require("tests.unit_commonmark")(luaunit)
+require("tests.unit_conformance")(luaunit)
 
 os.exit(luaunit.LuaUnit.run())

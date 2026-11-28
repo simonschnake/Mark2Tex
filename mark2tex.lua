@@ -3236,40 +3236,61 @@ end
 
 
 
+
+
+
+local function argument_end(source, index)
+   local optional = source:sub(index, index) == "["
+   local braces, brackets = optional and 0 or 1, optional and 1 or 0
+   local group = index + 1
+   while group <= #source do
+      local character = source:sub(group, group)
+      if placeholders.markers:find(character, 1, true) then return nil, "placeholder" end
+      if character == "\\" then
+         local escaped = source:sub(group + 1, group + 1)
+         if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then return nil, "placeholder" end
+         group = group + 1
+      elseif character == "{" then
+         braces = braces + 1
+      elseif character == "}" then
+         if braces == 0 then return nil, "invalid" end
+         braces = braces - 1
+         if not optional and braces == 0 then return group end
+      elseif optional and braces == 0 then
+         if character == "[" then brackets = brackets + 1 end
+         if character == "]" then
+            brackets = brackets - 1
+            if brackets == 0 then return group end
+         end
+      end
+      group = group + 1
+   end
+   return nil, "unclosed"
+end
+
+
+
+
 function spans.command_end(source, position)
    local command = source:match("^\\[%a@]+%*?", position)
    if not command then return nil end
    local index = position + #command
    while source:sub(index, index) == "{" or source:sub(index, index) == "[" do
-      local opening = source:sub(index, index)
-      local stack = { opening == "{" and "}" or "]" }
-      local group = index + 1
-      while #stack > 0 and group <= #source do
-         local character = source:sub(group, group)
+      local optional = source:sub(index, index) == "["
+      local last, problem = argument_end(source, index)
 
 
-         if placeholders.markers:find(character, 1, true) then break end
-         if character == "\\" then
-            local escaped = source:sub(group + 1, group + 1)
-            if escaped ~= "" and placeholders.markers:find(escaped, 1, true) then break end
-            group = group + 1
-         elseif character == "{" or character == "[" then stack[#stack + 1] = character == "{" and "}" or "]"
-         elseif character == stack[#stack] then table.remove(stack) end
-         group = group + 1
-      end
-      if #stack > 0 and group <= #source then break end
+      if problem == "unclosed" and not optional then return #source end
+      if not last then break end
 
 
 
-      local following = source:sub(group, group)
-      if opening == "[" and #stack == 0 and following ~= "" and
+      local following = source:sub(last + 1, last + 1)
+      if optional and following ~= "" and
          (following == "(" or placeholders.markers:find(following, 1, true)) then          break end
-
-      if opening == "[" and #stack > 0 then break end
-      index = group
+      index = last + 1
    end
-
-   return math.min(index - 1, #source)
+   return index - 1
 end
 
 

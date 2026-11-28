@@ -74,6 +74,12 @@ erhalten.
   Inline-Bilder, Setext-Überschriften mit `===` und Markdown-Escapes für
   `* + < > | ? \``. Tests in `tests/commonmark_*.test` und
   `tests/unit_commonmark.lua`; der Fuzzer erzeugt die neuen Konstrukte mit.
+- CommonMark-Konformitätstest: Alle 652 Beispiele der Spezifikation 0.31.2
+  (`tests/commonmark/spec.lua`, CC-BY-SA 4.0) werden konvertiert und über eine
+  gemeinsame Normalform mit dem HTML der Spezifikation verglichen. Aktuell
+  bestehen 369; `tests/commonmark/report.md` zeigt den Stand je Abschnitt,
+  `make test` schlägt fehl, wenn ein Beispiel aus `passing.txt` zurückfällt.
+  Nach Verbesserungen: `lua tests/commonmark/conformance.lua --update`.
 - Ein `#` in Prosa und Überschriften wird als `\#` ausgegeben. Ein
   einzelner Backslash am Ende einer Überschrift bleibt sichtbar. Interne
   Fußnoten-Platzhalter werden auch neben unvollständigen optionalen
@@ -126,6 +132,11 @@ automatisch angelegt.
 - Vollständige CommonMark-Kompatibilität ist kein Ziel; die README-Liste
   „Deliberately unsupported“ nennt die bewussten Abweichungen (u. a.
   eingerückte Codeblöcke, Setext mit `---`, TeX-Escapes, HTML, Task-Listen).
+  Weitere Lücken laut Konformitätsbericht: Blöcke in Listenpunkten (Zitate,
+  Code; Items enthalten nur Inline-Inhalt), die Einrückungsregeln für
+  Fortsetzungszeilen von Listen, eingerückte Zitate (`   >`) und Code-Fences,
+  Lazy Continuation in Zitaten sowie Code-Spans über Zeilenumbrüche
+  (Randleerzeichen werden nicht entfernt).
 - Die CLI verarbeitet keine Bibliographie (BibTeX/Biber sind deaktiviert).
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.
