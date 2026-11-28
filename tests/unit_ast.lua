@@ -162,14 +162,18 @@ a = b
 		local ast = parse_blocks([[
 Paragraph before
 - Item one
+  continued
 Paragraph after
 ]])
 
 		helpers.assert_node(luaunit, ast[1], "other")
-		helpers.assert_node(luaunit, ast[2], "item")
+		helpers.assert_node(luaunit, ast[2], "list")
 		helpers.assert_node(luaunit, ast[3], "other")
 		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[1].content), "Paragraph before")
-		luaunit.assertEquals(ast[2].content, "Item one")
+		luaunit.assertEquals(ast[2].kind, "bullet")
+		luaunit.assertEquals(#ast[2].content, 1)
+		-- The item's source, without its indentation; parse reads its blocks.
+		luaunit.assertEquals(ast[2].content[1].content, "Item one\ncontinued")
 		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[3].content), "Paragraph after")
 	end
 
@@ -186,17 +190,24 @@ Paragraph after
 		luaunit.assertEquals(header.content[4].content, "cite")
 	end
 
-	function test_ast_list_nodes_keep_level_and_inline_content()
-		local ast = parse("- Parent\n  - Child with `code`\n", default_config)
+	function test_ast_list_items_hold_blocks()
+		local ast = parse("- Parent\n  - Child with `code`\n\n  Second paragraph\n", default_config)
 
-		helpers.assert_node(luaunit, ast[1], "item")
-		luaunit.assertEquals(ast[1].level, 0)
-		luaunit.assertEquals(ast[1].content[1].content, "Parent")
+		helpers.assert_node(luaunit, ast[1], "list")
+		luaunit.assertEquals(#ast[1].content, 1)
+		local parent = ast[1].content[1]
+		helpers.assert_node(luaunit, parent, "list_item")
+		helpers.assert_node(luaunit, parent.content[1], "other")
+		luaunit.assertEquals(parent.content[1].content[1].content, "\nParent")
 
-		helpers.assert_node(luaunit, ast[2], "item")
-		luaunit.assertEquals(ast[2].level, 2)
-		helpers.assert_node(luaunit, ast[2].content[2], "verbatim")
-		luaunit.assertEquals(ast[2].content[2].content, "code")
+		local child_list = parent.content[2]
+		helpers.assert_node(luaunit, child_list, "list")
+		local child = child_list.content[1]
+		helpers.assert_node(luaunit, child.content[1].content[2], "verbatim")
+		luaunit.assertEquals(child.content[1].content[2].content, "code")
+		-- The blank line ends the nested list, not the item.
+		helpers.assert_node(luaunit, parent.content[3], "other")
+		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(parent.content[3].content[1].content), "Second paragraph")
 	end
 
 	function test_ast_code_and_latex_nodes()
@@ -319,25 +330,24 @@ Trailing text
 			default_config
 		)
 
-		luaunit.assertEquals(#ast, 10)
+		luaunit.assertEquals(#ast, 8)
 		luaunit.assertEquals(ast[1].type, "header")
 		luaunit.assertEquals(ast[2].type, "other")
 		luaunit.assertEquals(ast[3].type, "code")
 		luaunit.assertEquals(ast[4].type, "other")
 		luaunit.assertEquals(ast[5].type, "latex")
 		luaunit.assertEquals(ast[6].type, "other")
-		luaunit.assertEquals(ast[7].type, "item")
-		luaunit.assertEquals(ast[8].type, "item")
-		luaunit.assertEquals(ast[9].type, "item")
-		luaunit.assertEquals(ast[10].type, "other")
+		luaunit.assertEquals(ast[7].type, "list")
+		luaunit.assertEquals(ast[8].type, "other")
 
 		luaunit.assertEquals(ast[1].content[1].content, "Heading with ")
 		helpers.assert_node(luaunit, ast[1].content[2], "italic")
 		luaunit.assertEquals(ast[3].code_type, "lua")
 		luaunit.assertEquals(ast[3].content, "print(1)\n")
-		luaunit.assertEquals(ast[7].level, 0)
-		luaunit.assertEquals(ast[8].level, 2)
-		luaunit.assertEquals(ast[9].level, 0)
-		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[10].content[1].content), "Trailing text")
+		local items = ast[7].content
+		luaunit.assertEquals(#items, 2)
+		luaunit.assertEquals(items[1].content[2].type, "list")
+		luaunit.assertEquals(#items[2].content, 1)
+		luaunit.assertEquals(helpers.strip_newlines_at_start_and_end(ast[8].content[1].content), "Trailing text")
 	end
 end

@@ -82,13 +82,20 @@ erhalten.
 - CommonMark-Konformitätstest: Alle 652 Beispiele der Spezifikation 0.31.2
   (`tests/commonmark/spec.lua`, CC-BY-SA 4.0) werden konvertiert und über eine
   gemeinsame Normalform mit dem HTML der Spezifikation verglichen. Aktuell
-  bestehen 384; `tests/commonmark/report.md` zeigt den Stand je Abschnitt,
+  bestehen 400; `tests/commonmark/report.md` zeigt den Stand je Abschnitt,
   `make test` schlägt fehl, wenn ein Beispiel aus `passing.txt` zurückfällt.
   Nach Verbesserungen: `lua tests/commonmark/conformance.lua --update`.
 - Ein `#` in Prosa und Überschriften wird als `\#` ausgegeben. Ein
   einzelner Backslash am Ende einer Überschrift bleibt sichtbar. Interne
   Fußnoten-Platzhalter werden auch neben unvollständigen optionalen
-  TeX-Argumenten aufgelöst. Die Cache-Versionskennung steht bei v22.
+  TeX-Argumenten aufgelöst. Die Cache-Versionskennung steht bei v23.
+- Listen als echte Container: Ein Listenpunkt enthält Blöcke (weitere
+  Absätze, Code-Fences, Zitate, Tabellen, Display-Mathematik, verschachtelte
+  Listen, Fußnoten- und Linkdefinitionen). Fortsetzungszeilen gehören zum
+  Punkt, wenn sie tiefer als sein Marker eingerückt sind; die Einrückung bis
+  zur Inhaltsspalte wird entfernt. `3.14 …` am Zeilenanfang ist keine
+  Aufzählung mehr (Marker brauchen Leerraum dahinter). Über Div-Grenzen
+  getrennte Punkte derselben Liste bleiben eine Liste.
 
 ### Älterer Stand, weiterhin gültig
 
@@ -105,7 +112,7 @@ erhalten.
 
 ## Verifikation
 
-- `make test` führt 169 Lua- und Fixture-Tests sowie einen kurzen Fuzzlauf
+- `make test` führt 174 Lua- und Fixture-Tests sowie einen kurzen Fuzzlauf
   aus. Es vergleicht die Beispiele und Fixtures in sechs Profilvarianten mit
   den Golden-Snapshots in `tests/golden/`.
 - `make teal-check`: das Bundle stimmt mit den Teal-Quellen überein.
@@ -129,17 +136,18 @@ automatisch angelegt.
 
 - Der AST ist nur teilweise streng typisiert: stufenabhängige Felder
   (Inhalt, Titel, Tabellenzellen) sind eine lose Union, der Writer castet.
-- Die Blockebene nutzt weiterhin LPeg und flache Listen-Nodes mit Levelwerten.
-  Ein zeilenorientierter Blockparser und echte List-/List-Item-Nodes bleiben
-  sinnvolle größere Umbauten; die Teal-Typen erleichtern das jetzt.
+- Listen sind zeilenorientiert gelesene Container (`list`/`list_item`), die
+  übrigen Blöcke werden weiterhin per LPeg erkannt. Ein vollständig
+  zeilenorientierter Blockparser (auch für Zitate, damit dort Lazy
+  Continuation möglich wird) bleibt ein möglicher Umbau.
 - Diagnosen existieren für Mathematik, LaTeX-Umgebungen und Fenced Divs;
   Positionsangaben und Warnungen für weitere Parserfälle können verbessert werden.
 - Vollständige CommonMark-Kompatibilität ist kein Ziel; die README-Liste
   „Deliberately unsupported“ nennt die bewussten Abweichungen (u. a.
   eingerückte Codeblöcke, Setext mit `---`, TeX-Escapes, HTML, Task-Listen).
-  Weitere Lücken laut Konformitätsbericht: Blöcke in Listenpunkten (Zitate,
-  Code; Items enthalten nur Inline-Inhalt), die Einrückungsregeln für
-  Fortsetzungszeilen von Listen und Lazy Continuation in Zitaten.
+  Weitere Lücken laut Konformitätsbericht: Lazy Continuation in Zitaten und
+  Listen (eine nicht eingerückte Zeile beendet die Liste bewusst) sowie die
+  CommonMark-Regel, dass erst die Inhaltsspalte verschachtelt.
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.
 - Weitere Grenzfälle für verschachtelte Inlines, Include-Pfade und große

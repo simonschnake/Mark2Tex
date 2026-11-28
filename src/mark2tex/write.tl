@@ -3,8 +3,7 @@ elements:
 - header
 - horizontal_rule
 - latex environment
-- item
-- enum
+- list
 - code
 - other
 - citation
@@ -25,7 +24,6 @@ local type Config = require("mark2tex.default_config")
 local type Block = nodes.Block
 local type Any = nodes.Any
 local type Document = nodes.Document
-local type ListNode = nodes.Item | nodes.Enum
 local type CommentToken = comments.Token
 
 -- Output is collected in a buffer and joined once; growing one string by
@@ -45,76 +43,6 @@ local function remove_trailing_indent(out: Buffer): boolean
 	local trimmed, removed = table.concat(out.parts):gsub("\n[ \t]+$", "\n")
 	out.parts = { trimmed }
 	return removed > 0
-end
-
-local record ListState
-	type: string
-	level: integer
-	style: string
-end
-
-local function list_style(ast: ListNode): string
-	if ast is nodes.Enum then
-		return ast.style or "decimal"
-	end
-	return "decimal"
-end
-
-local function list_environment(list_type: string): string
-	if list_type == "item" then
-		return "itemize"
-	end
-	return "enumerate"
-end
-
-local function close_list(out: Buffer, stack: {ListState})
-	local current = table.remove(stack)
-	emit(out, "\n\\end{", list_environment(current.type), "}")
-end
-
-local function close_lists_until(out: Buffer, stack: {ListState}, level: integer)
-	while #stack > 0 and stack[#stack].level > level do
-		close_list(out, stack)
-	end
-end
-
-local function close_all_lists(out: Buffer, stack: {ListState})
-	while #stack > 0 do
-		close_list(out, stack)
-	end
-end
-
-local function open_list(out: Buffer, stack: {ListState}, ast: ListNode)
-	table.insert(stack, { type = ast.type, level = ast.level, style = list_style(ast) })
-	emit(out, "\n\\begin{", list_environment(ast.type), "}")
-	if ast is nodes.Enum then
-		local counter = "\\csname @enumctr\\endcsname"
-		if ast.style == "alpha" then
-			-- Capture the counter name for references from nested lists.
-			emit(out, "\n\\expandafter\\edef\\csname the", counter, "\\endcsname{",
-				"\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname",
-				"{\\noexpand\\value{", counter, "}}}",
-				"\n\\expandafter\\def\\csname @itemlabel\\endcsname{",
-				"\\csname the", counter, "\\endcsname)}")
-		end
-		if ast.start and ast.start ~= 1 then
-			emit(out, "\n\\setcounter{", counter, "}{", tostring(ast.start - 1), "}")
-		end
-	end
-end
-
-local function ensure_list_environment(out: Buffer, stack: {ListState}, ast: ListNode)
-	close_lists_until(out, stack, ast.level)
-
-	local style = list_style(ast)
-	if #stack > 0 and stack[#stack].level == ast.level
-		and (stack[#stack].type ~= ast.type or stack[#stack].style ~= style) then
-		close_list(out, stack)
-	end
-
-	if #stack == 0 or stack[#stack].level < ast.level or stack[#stack].type ~= ast.type then
-		open_list(out, stack, ast)
-	end
 end
 
 -- Estimate displayed text from inline nodes, excluding Markdown formatting.
@@ -209,7 +137,9 @@ local function has_verbatim(blocks: {Block}): boolean
 	for _, node in ipairs(blocks) do
 		if node is nodes.Code
 			or (node is nodes.Latex and node.content:find("\\begin{verbatim", 1, true))
-			or (node is nodes.Blockquote and has_verbatim(node.content)) then
+			or (node is nodes.Blockquote and has_verbatim(node.content))
+			or (node is nodes.List and has_verbatim(node.content as {Block}))
+			or (node is nodes.ListItem and has_verbatim(node.content)) then
 			return true
 		end
 	end
@@ -293,14 +223,28 @@ local function write_inline_image(ast: nodes.InlineImage, out: Buffer)
 	emit(out, "\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
 end
 
-local function write_item(ast: nodes.Item, out: Buffer, config: Config)
-	emit(out, "\n\\item ")
-	walk_nodes(ast.content, out, config)
-end
-
-local function write_enum(ast: nodes.Enum, out: Buffer, config: Config)
-	emit(out, "\n\\item") -- TODO: the space after \item is not always needed
-	walk_nodes(ast.content, out, config)
+local function write_list(ast: nodes.List, out: Buffer, config: Config)
+	local environment = ast.kind == "bullet" and "itemize" or "enumerate"
+	emit(out, "\n\\begin{", environment, "}")
+	if ast.kind ~= "bullet" then
+		local counter = "\\csname @enumctr\\endcsname"
+		if ast.kind == "alpha" then
+			-- Capture the counter name for references from nested lists.
+			emit(out, "\n\\expandafter\\edef\\csname the", counter, "\\endcsname{",
+				"\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname",
+				"{\\noexpand\\value{", counter, "}}}",
+				"\n\\expandafter\\def\\csname @itemlabel\\endcsname{",
+				"\\csname the", counter, "\\endcsname)}")
+		end
+		if ast.start and ast.start ~= 1 then
+			emit(out, "\n\\setcounter{", counter, "}{", tostring(ast.start - 1), "}")
+		end
+	end
+	for _, item in ipairs(ast.content) do
+		-- The next \item or \end starts on a new line anyway.
+		emit(out, "\n\\item ", (write_blocks(item.content, config, true):gsub("%s+$", "")))
+	end
+	emit(out, "\n\\end{", environment, "}")
 end
 
 local function write_blockquote(ast: nodes.Blockquote, out: Buffer, config: Config)
@@ -415,8 +359,7 @@ local WRITERS: {string: Handler} = {
 	inline_image = write_inline_image as Handler,
 	line_break = constant("\\\\\n"),
 	latex = raw("\n", ""),
-	item = write_item as Handler,
-	enum = write_enum as Handler,
+	list = write_list as Handler,
 	code = raw("\n\\begin{verbatim}\n", "\\end{verbatim}"),
 	blockquote = write_blockquote as Handler,
 	table = write_table as Handler,
@@ -475,18 +418,9 @@ end
 
 write_blocks = function(ast: {Block}, config: Config, nested: boolean, comment_tokens?: {CommentToken}): string
 	local out: Buffer = { parts = {} }
-	local list_stack: {ListState} = {}
-
 	for _, node in ipairs(ast) do
-		if node is nodes.Item or node is nodes.Enum then
-			ensure_list_environment(out, list_stack, node)
-		else
-			close_all_lists(out, list_stack)
-		end
 		walk(node, out, config)
 	end
-
-	close_all_lists(out, list_stack)
 
 	-- Every block starts with a newline; drop the one before the first block.
 	local result = comments.restore(table.concat(out.parts):sub(2), comment_tokens)

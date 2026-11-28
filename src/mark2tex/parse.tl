@@ -103,12 +103,12 @@ add_inline_nodes = function(ast: {RawBlock}, warnings: {Issue}, context: InlineC
 			local parsed: nodes.Header = { type = "header", level = element.level, indented = element.indented,
 				content = parse_content(element.content, nil, true) }
 			block = parsed
-		elseif element is nodes.RawItem then
-			local parsed: nodes.Item = { type = "item", level = element.level, content = parse_content(element.content) }
-			block = parsed
-		elseif element is nodes.RawEnum then
-			local parsed: nodes.Enum = { type = "enum", level = element.level, style = element.style, start = element.start,
-				content = parse_content(element.content) }
+		elseif element is nodes.RawList then
+			local items: {nodes.ListItem} = {}
+			for index, item in ipairs(element.content) do
+				items[index] = { type = "list_item", content = add_inline_nodes(item.blocks, warnings, context, disabled) }
+			end
+			local parsed: nodes.List = { type = "list", kind = element.kind, start = element.start, content = items }
 			block = parsed
 		elseif element is nodes.RawOther then
 			block = nodes.other(parse_content(element.content))
@@ -147,6 +147,10 @@ local function collect_definitions(ast: {RawBlock}, context: InlineContext, warn
 				element = nodes.raw_other("[^" .. element.identifier .. "]: " .. element.content)
 			elseif element is nodes.RawBlockquote then
 				element.blocks = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
+			elseif element is nodes.RawList then
+				for _, item in ipairs(element.content) do
+					item.blocks = collect_definitions(parse_blocks(normalize_input(item.content), false, true), context, warnings, disabled)
+				end
 			end
 			result[#result + 1] = element
 		end

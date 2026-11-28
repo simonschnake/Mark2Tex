@@ -5,5 +5,5 @@
 \begin{itemize}
 \item Item with \textbf{bold} text
 \item Item with \texttt{code} and $x$
-  Continuation with \cite{source2024}
+Continuation with \cite{source2024}
 \end{itemize}

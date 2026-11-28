@@ -139,7 +139,7 @@ return function(unit)
 		-- Not at the end of a paragraph, and \\ stays TeX.
 		unit.assertEquals(helpers.transform("a\\\n\nb"), "a\\\n\nb")
 		unit.assertEquals(helpers.transform("a\\\\\nb"), "a\\\\\nb")
-		unit.assertEquals(helpers.transform("- item\\\n  next"), "\\begin{itemize}\n\\item item\\\\\n  next\n\\end{itemize}")
+		unit.assertEquals(helpers.transform("- item\\\n  next"), "\\begin{itemize}\n\\item item\\\\\nnext\n\\end{itemize}")
 	end
 
 	function test_commonmark_trailing_backslash_is_literal()
@@ -185,11 +185,13 @@ return function(unit)
 		-- An empty fence is a code block too; a run on the opening line is no fence.
 		unit.assertEquals(helpers.transform("```\n```"), "\\begin{verbatim}\n\\end{verbatim}")
 		unit.assertEquals(parse("``` a ```")[1].type, "other")
-		-- A fence ends a list item: items hold no blocks.
+		-- An indented fence belongs to the list item; an unindented one ends the list.
 		unit.assertEquals(helpers.transform("- a\n  ```\n  x\n  ```\n- b"),
+			"\\begin{itemize}\n\\item a\n\\begin{verbatim}\nx\n\\end{verbatim}\n\\item b\n\\end{itemize}")
+		unit.assertEquals(helpers.transform("- a\n```\nx\n```\n- b"),
 			"\\begin{itemize}\n\\item a\n\\end{itemize}\n\\begin{verbatim}\nx\n\\end{verbatim}\n\\begin{itemize}\n\\item b\n\\end{itemize}")
 		-- An unclosed fence line stays item text.
-		unit.assertEquals(helpers.transform("- a\n  ```b"), "\\begin{itemize}\n\\item a\n  ```b\n\\end{itemize}")
+		unit.assertEquals(helpers.transform("- a\n  ```b"), "\\begin{itemize}\n\\item a\n```b\n\\end{itemize}")
 		-- Four spaces are no fence (no indented code blocks either).
 		unit.assertEquals(parse("    ```\n    x\n    ```")[1].type, "other")
 		-- Comments inside an indented fence stay literal, as in every fence.

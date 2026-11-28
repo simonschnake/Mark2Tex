@@ -155,7 +155,7 @@ local core = {}
 
 
 
-local CACHE_VERSION = "v22"
+local CACHE_VERSION = "v23"
 
 local function copy_table(value)
    if type(value) ~= "table" then
@@ -658,6 +658,17 @@ local annotations = { notes = "slide_note", footer = "slide_footer" }
 
 local function append_block(output, node)
    local previous = output[#output]
+
+
+   if node.type == "list" then
+      local before = previous
+      if before and before.type == "other" and not before.content:find("%S") then before = output[#output - 1] end
+      if before and before.type == "list" and before.kind == node.kind then
+         for _, item in ipairs(node.content) do before.content[#before.content + 1] = item end
+         if before ~= previous then output[#output] = nil end
+         return
+      end
+   end
    if previous and previous.type == "other" and node.type == "other" and
       previous.content:find("%S") and node.content:find("%S") then
       local gap = previous.content:match("%s*$") .. node.content:match("^%s*")
@@ -2046,6 +2057,7 @@ package.preload["mark2tex.nodes"] = function(...)
 
 
 
+
 local nodes = {}
 
 
@@ -2143,12 +2155,12 @@ function nodes.latex(content)
    return { type = "latex", content = content }
 end
 
-function nodes.item(level, content)
-   return { type = "item", level = level, content = content }
+function nodes.raw_list(kind, start)
+   return { type = "list", kind = kind, start = start, content = {} }
 end
 
-function nodes.enum(level, content, style, start)
-   return { type = "enum", level = level, content = content, style = style, start = start }
+function nodes.raw_list_item(content)
+   return { type = "list_item", content = content }
 end
 
 function nodes.code(code_type, content)
@@ -2335,12 +2347,12 @@ add_inline_nodes = function(ast, warnings, context, disabled)
          local parsed = { type = "header", level = element.level, indented = element.indented,
 content = parse_content(element.content, nil, true), }
          block = parsed
-      elseif element.type == "item" then
-         local parsed = { type = "item", level = element.level, content = parse_content(element.content) }
-         block = parsed
-      elseif element.type == "enum" then
-         local parsed = { type = "enum", level = element.level, style = element.style, start = element.start,
-content = parse_content(element.content), }
+      elseif element.type == "list" then
+         local items = {}
+         for index, item in ipairs(element.content) do
+            items[index] = { type = "list_item", content = add_inline_nodes(item.blocks, warnings, context, disabled) }
+         end
+         local parsed = { type = "list", kind = element.kind, start = element.start, content = items }
          block = parsed
       elseif element.type == "other" then
          block = nodes.other(parse_content(element.content))
@@ -2379,6 +2391,10 @@ target = { destination = element.destination, title = element.title }, }
             element = nodes.raw_other("[^" .. element.identifier .. "]: " .. element.content)
          elseif element.type == "blockquote" then
             element.blocks = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
+         elseif element.type == "list" then
+            for _, item in ipairs(element.content) do
+               item.blocks = collect_definitions(parse_blocks(normalize_input(item.content), false, true), context, warnings, disabled)
+            end
          end
          result[#result + 1] = element
       end
@@ -2587,39 +2603,186 @@ space ^ 0 *
 
 
 
-local start_of_item = newline * C(S(" \t") ^ 0) * S("-*+") * space
-local decimal_marker = R("09") ^ 1 * S(".)")
-local alpha_marker = R("az") * P(")") * #S(" \t")
-local continuation_list_marker = fence_body + S("-*+") * space + decimal_marker + alpha_marker + P("#") * space
-
-
-local opens_fence = Cmt(P(0), function(subject, position)
-   return spans.line_fence_end(subject, position) ~= nil
-end)
-local follow_item_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
-
-grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0)) /
-function(t)
-   return nodes.item(#t[1], t[2])
-end
 
 
 
 
 
-local start_of_enum = newline * C(horizontal_space) * C(decimal_marker + alpha_marker)
-local follow_enum_line = newline ^ 1 * -opens_fence * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ (-1)
 
-grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0)) /
-function(t)
-   local marker = t[2]:sub(1, -2)
-   local start = tonumber(marker)
-   if start then
 
-      return nodes.enum(#t[1], t[3], "decimal", (start <= 2147483647 and start or 1))
+
+
+
+
+
+local function indentation(line)
+   local columns, index = 0, 1
+   while true do
+      local character = line:sub(index, index)
+      if character == " " then
+         columns = columns + 1
+      elseif character == "\t" then
+         columns = columns + 4 - columns % 4
+      else
+         break
+      end
+      index = index + 1
    end
-   return nodes.enum(#t[1], t[3]:gsub("^\t+", " "), "alpha", marker:byte() - string.byte("a") + 1)
+   return columns, line:sub(index)
 end
+
+
+local function strip_columns(line, count)
+   local columns, rest = indentation(line)
+   if columns <= count then return rest end
+   return (" "):rep(columns - count) .. rest
+end
+
+
+
+
+
+
+
+
+
+
+
+local MAX_COUNTER = 2147483647
+
+
+
+local function list_marker(line)
+   local indent, rest = indentation(line)
+   local kind, marker, tail
+   local start = 1
+   local bullet, after_bullet = rest:match("^([-*+])(.*)$")
+   if bullet then
+      kind, marker, tail = "bullet", bullet, after_bullet
+   else
+      local digits, delimiter, after_digits = rest:match("^(%d+)([.)])(.*)$")
+      if digits then
+
+         local number = tonumber(digits)
+         kind, marker, tail = "decimal", digits .. delimiter, after_digits
+         start = (number <= MAX_COUNTER and number or 1)
+      else
+         local letter, after_letter = rest:match("^(%l)%)(.*)$")
+         if not letter then return nil end
+         kind, marker, tail = "alpha", letter .. ")", after_letter
+         start = letter:byte() - string.byte("a") + 1
+      end
+   end
+   if tail ~= "" and not tail:match("^[ \t]") then return nil end
+   local spaces, content = indentation(tail)
+   local width = indent + #marker
+   if content == "" then
+      return { kind = kind, start = start, indent = indent, column = width + 1, first = "" }
+   elseif spaces >= 5 then
+
+      return { kind = kind, start = start, indent = indent, column = width + 1,
+first = (" "):rep(spaces - 1) .. content, }
+   end
+   return { kind = kind, start = start, indent = indent, column = width + spaces, first = content }
+end
+
+local rule_line = horizontal_space * thematic_break * horizontal_space * -1
+
+local function is_rule(line)
+   return lpeg.match(rule_line, line) ~= nil
+end
+
+
+
+local function line_from(subject, start)
+   local stop = subject:find("\n", start, true) or #subject + 1
+   return subject:sub(start, stop - 1), stop
+end
+
+local function blank(line)
+   return not line:find("%S")
+end
+
+
+
+
+local function scan_list(subject, line_start)
+   local position = line_start - 1
+   local line, stop = line_from(subject, line_start)
+   if is_rule(line) then return false end
+   local marker = list_marker(line)
+   if not marker then return false end
+   if marker.first == "" and position > 1 then
+
+      local previous = subject:sub(1, position - 1):match("([^\n]*)$")
+      if not blank(previous) then return false end
+   end
+
+   local list = nodes.raw_list(marker.kind, marker.start)
+   local finish = stop
+   while marker do
+      local lines = { marker.first }
+      local column, marker_indent = marker.column, marker.indent
+      local pending = 0
+      local next_start = stop + 1
+      while next_start <= #subject do
+         local text, text_stop = line_from(subject, next_start)
+         local indent, rest = indentation(text)
+         if rest == "" then
+
+            if #lines == 1 and lines[1] == "" then break end
+            pending = pending + 1
+         elseif indent > marker_indent then
+
+
+            local fence_end = spans.line_fence_end(subject, next_start)
+            if fence_end then
+               text_stop = subject:find("\n", fence_end, true) or #subject + 1
+               local fenced_lines = {}
+               for fenced_line in subject:sub(next_start, text_stop - 1):gmatch("[^\n]*") do
+                  local fenced_indent, fenced_rest = indentation(fenced_line)
+                  if fenced_rest ~= "" and fenced_indent <= marker_indent then
+                     fenced_lines = nil
+                     break
+                  end
+                  fenced_lines[#fenced_lines + 1] = strip_columns(fenced_line, column)
+               end
+               if not fenced_lines then break end
+               for _ = 1, pending do lines[#lines + 1] = "" end
+               for _, fenced_line in ipairs(fenced_lines) do lines[#lines + 1] = fenced_line end
+            else
+               for _ = 1, pending do lines[#lines + 1] = "" end
+               lines[#lines + 1] = strip_columns(text, column)
+            end
+            pending = 0
+            finish = text_stop
+         else
+            break
+         end
+         next_start = text_stop + 1
+      end
+      list.content[#list.content + 1] = nodes.raw_list_item(table.concat(lines, "\n"))
+
+
+      marker = nil
+      while next_start <= #subject do
+         local text, text_stop = line_from(subject, next_start)
+         if not blank(text) then
+            local sibling = not is_rule(text) and list_marker(text)
+            if sibling and sibling.kind == list.kind then
+               marker, stop, finish = sibling, text_stop, text_stop
+            end
+            break
+         end
+         next_start = text_stop + 1
+      end
+   end
+   return finish, list
+end
+
+
+grammar.list = #(newline * horizontal_space * (S("-*+") + R("09") + R("az") * P(")"))) *
+Cmt(newline, scan_list)
 
 
 
@@ -2781,7 +2944,7 @@ end
 
 
 
-grammar.outer_elements = V("image") + V("footnote_definition") + V("link_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
+grammar.outer_elements = V("image") + V("footnote_definition") + V("link_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("list")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
    return nodes.raw_other(t)
@@ -2866,30 +3029,13 @@ local function setext_headings(block, result)
    end
 end
 
-local function list_level(block)
-   if block.type == "item" or block.type == "enum" then return block.level end
-   return nil
-end
-
-
-
-local function continues_list(previous, following)
-   local previous_level, following_level = list_level(previous), following and list_level(following)
-   if not previous_level or not following_level then return false end
-   return previous.type == following.type or following_level > previous_level
-end
-
-
 
 local function postprocess(blocks)
    if not blocks then return blocks end
    local result = {}
-   for index, block in ipairs(blocks) do
+   for _, block in ipairs(blocks) do
       if block.type == "other" then
-         if not (block.content:match("^%s*$") and index > 1 and
-            continues_list(blocks[index - 1], blocks[index + 1])) then
-            setext_headings(block, result)
-         end
+         setext_headings(block, result)
       else
          result[#result + 1] = block
       end
@@ -3403,11 +3549,9 @@ package.preload["mark2tex.write"] = function(...)
 
 
 
-
 local comments = require("mark2tex.comments")
 local links = require("mark2tex.links")
 local nodes = require("mark2tex.nodes")
-
 
 
 
@@ -3432,76 +3576,6 @@ local function remove_trailing_indent(out)
    local trimmed, removed = table.concat(out.parts):gsub("\n[ \t]+$", "\n")
    out.parts = { trimmed }
    return removed > 0
-end
-
-
-
-
-
-
-
-local function list_style(ast)
-   if ast.type == "enum" then
-      return ast.style or "decimal"
-   end
-   return "decimal"
-end
-
-local function list_environment(list_type)
-   if list_type == "item" then
-      return "itemize"
-   end
-   return "enumerate"
-end
-
-local function close_list(out, stack)
-   local current = table.remove(stack)
-   emit(out, "\n\\end{", list_environment(current.type), "}")
-end
-
-local function close_lists_until(out, stack, level)
-   while #stack > 0 and stack[#stack].level > level do
-      close_list(out, stack)
-   end
-end
-
-local function close_all_lists(out, stack)
-   while #stack > 0 do
-      close_list(out, stack)
-   end
-end
-
-local function open_list(out, stack, ast)
-   table.insert(stack, { type = ast.type, level = ast.level, style = list_style(ast) })
-   emit(out, "\n\\begin{", list_environment(ast.type), "}")
-   if ast.type == "enum" then
-      local counter = "\\csname @enumctr\\endcsname"
-      if ast.style == "alpha" then
-
-         emit(out, "\n\\expandafter\\edef\\csname the", counter, "\\endcsname{",
-         "\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname",
-         "{\\noexpand\\value{", counter, "}}}",
-         "\n\\expandafter\\def\\csname @itemlabel\\endcsname{",
-         "\\csname the", counter, "\\endcsname)}")
-      end
-      if ast.start and ast.start ~= 1 then
-         emit(out, "\n\\setcounter{", counter, "}{", tostring(ast.start - 1), "}")
-      end
-   end
-end
-
-local function ensure_list_environment(out, stack, ast)
-   close_lists_until(out, stack, ast.level)
-
-   local style = list_style(ast)
-   if #stack > 0 and stack[#stack].level == ast.level and
-      (stack[#stack].type ~= ast.type or stack[#stack].style ~= style) then
-      close_list(out, stack)
-   end
-
-   if #stack == 0 or stack[#stack].level < ast.level or stack[#stack].type ~= ast.type then
-      open_list(out, stack, ast)
-   end
 end
 
 
@@ -3596,7 +3670,9 @@ local function has_verbatim(blocks)
    for _, node in ipairs(blocks) do
       if node.type == "code" or
          (node.type == "latex" and node.content:find("\\begin{verbatim", 1, true)) or
-         (node.type == "blockquote" and has_verbatim(node.content)) then
+         (node.type == "blockquote" and has_verbatim(node.content)) or
+         (node.type == "list" and has_verbatim(node.content)) or
+         (node.type == "list_item" and has_verbatim(node.content)) then
          return true
       end
    end
@@ -3680,14 +3756,28 @@ local function write_inline_image(ast, out)
    emit(out, "\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
 end
 
-local function write_item(ast, out, config)
-   emit(out, "\n\\item ")
-   walk_nodes(ast.content, out, config)
-end
+local function write_list(ast, out, config)
+   local environment = ast.kind == "bullet" and "itemize" or "enumerate"
+   emit(out, "\n\\begin{", environment, "}")
+   if ast.kind ~= "bullet" then
+      local counter = "\\csname @enumctr\\endcsname"
+      if ast.kind == "alpha" then
 
-local function write_enum(ast, out, config)
-   emit(out, "\n\\item")
-   walk_nodes(ast.content, out, config)
+         emit(out, "\n\\expandafter\\edef\\csname the", counter, "\\endcsname{",
+         "\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname",
+         "{\\noexpand\\value{", counter, "}}}",
+         "\n\\expandafter\\def\\csname @itemlabel\\endcsname{",
+         "\\csname the", counter, "\\endcsname)}")
+      end
+      if ast.start and ast.start ~= 1 then
+         emit(out, "\n\\setcounter{", counter, "}{", tostring(ast.start - 1), "}")
+      end
+   end
+   for _, item in ipairs(ast.content) do
+
+      emit(out, "\n\\item ", (write_blocks(item.content, config, true):gsub("%s+$", "")))
+   end
+   emit(out, "\n\\end{", environment, "}")
 end
 
 local function write_blockquote(ast, out, config)
@@ -3802,8 +3892,7 @@ local WRITERS = {
    inline_image = write_inline_image,
    line_break = constant("\\\\\n"),
    latex = raw("\n", ""),
-   item = write_item,
-   enum = write_enum,
+   list = write_list,
    code = raw("\n\\begin{verbatim}\n", "\\end{verbatim}"),
    blockquote = write_blockquote,
    table = write_table,
@@ -3862,18 +3951,9 @@ end
 
 write_blocks = function(ast, config, nested, comment_tokens)
    local out = { parts = {} }
-   local list_stack = {}
-
    for _, node in ipairs(ast) do
-      if node.type == "item" or node.type == "enum" then
-         ensure_list_environment(out, list_stack, node)
-      else
-         close_all_lists(out, list_stack)
-      end
       walk(node, out, config)
    end
-
-   close_all_lists(out, list_stack)
 
 
    local result = comments.restore(table.concat(out.parts):sub(2), comment_tokens)

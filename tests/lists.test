@@ -10,7 +10,7 @@ Normaler text.
 \begin{itemize}
 \item Item 1
 \item Item 2
-  With a second line
+With a second line
 \item Item 3
 \begin{enumerate}
 \item Under item 3

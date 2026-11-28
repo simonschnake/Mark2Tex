@@ -13,13 +13,13 @@
 \begin{enumerate}
 \item \textbf{Embedding}
 
-   Beispielsweise:
+Beispielsweise:
 
 \[
-   \begin{pmatrix}
-   0{,}2\\
-   -0{,}7\\
-   0{,}1
-   \end{pmatrix}
-   \]
+\begin{pmatrix}
+0{,}2\\
+-0{,}7\\
+0{,}1
+\end{pmatrix}
+\]
 \end{enumerate}

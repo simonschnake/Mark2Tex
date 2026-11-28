@@ -163,54 +163,39 @@ local function paragraphs(text)
 	return table.concat(out)
 end
 
--- Mark2TeX keeps list items flat with an indentation level, as the writer
--- reads them; rebuild the nesting the same way.
-local function list_tag(node) return node.type == "item" and "ul" or "ol" end
-
-blocks_canonical = function(blocks)
+blocks_canonical = function(blocks, in_item)
 	local out = {}
-	local stack = {}
-	local function close_list()
-		local list = table.remove(stack)
-		out[#out + 1] = "</li></" .. list.tag .. ">"
-	end
 	for _, node in ipairs(blocks) do
-		if node.type == "item" or node.type == "enum" then
-			while #stack > 0 and stack[#stack].level > node.level do close_list() end
-			local top = stack[#stack]
-			if top and top.level == node.level and top.tag ~= list_tag(node) then close_list(); top = stack[#stack] end
-			if not top or top.level < node.level then
-				stack[#stack + 1] = { level = node.level, tag = list_tag(node) }
-				out[#out + 1] = "<" .. list_tag(node) .. ">"
-			else
-				out[#out + 1] = "</li>"
+		local kind = node.type
+		if kind == "list" then
+			local tag = node.kind == "bullet" and "ul" or "ol"
+			out[#out + 1] = "<" .. tag .. ">"
+			for _, item in ipairs(node.content) do
+				out[#out + 1] = "<li>" .. blocks_canonical(item.content, true) .. "</li>"
 			end
-			out[#out + 1] = "<li>" .. inline_canonical(node.content)
+			out[#out + 1] = "</" .. tag .. ">"
+		elseif kind == "header" then
+			out[#out + 1] = "<h" .. node.level .. ">" .. inline_canonical(node.content) .. "</h" .. node.level .. ">"
+		elseif kind == "other" then
+			-- The expected HTML turns paragraphs inside items into spaces.
+			local text = paragraphs(inline_canonical(node.content))
+			out[#out + 1] = in_item and text:gsub("</?p>", " ") or text
+		elseif kind == "horizontal_rule" then
+			out[#out + 1] = "<hr>"
+		elseif kind == "code" then
+			out[#out + 1] = "<pre>" .. preformatted(node.content) .. "</pre>"
+		elseif kind == "blockquote" then
+			out[#out + 1] = "<blockquote>" .. blocks_canonical(node.content) .. "</blockquote>"
+		elseif kind == "latex" then
+			out[#out + 1] = "<p>" .. escape(node.content) .. "</p>"
+		elseif kind == "image" then
+			out[#out + 1] = "<p><img " .. href(node.path) .. "></p>"
+		elseif kind == "display_math" then
+			out[#out + 1] = "<p>" .. escape("$$" .. node.content .. "$$") .. "</p>"
 		else
-			while #stack > 0 do close_list() end
-			local kind = node.type
-			if kind == "header" then
-				out[#out + 1] = "<h" .. node.level .. ">" .. inline_canonical(node.content) .. "</h" .. node.level .. ">"
-			elseif kind == "other" then
-				out[#out + 1] = paragraphs(inline_canonical(node.content))
-			elseif kind == "horizontal_rule" then
-				out[#out + 1] = "<hr>"
-			elseif kind == "code" then
-				out[#out + 1] = "<pre>" .. preformatted(node.content) .. "</pre>"
-			elseif kind == "blockquote" then
-				out[#out + 1] = "<blockquote>" .. blocks_canonical(node.content) .. "</blockquote>"
-			elseif kind == "latex" then
-				out[#out + 1] = "<p>" .. escape(node.content) .. "</p>"
-			elseif kind == "image" then
-				out[#out + 1] = "<p><img " .. href(node.path) .. "></p>"
-			elseif kind == "display_math" then
-				out[#out + 1] = "<p>" .. escape("$$" .. node.content .. "$$") .. "</p>"
-			else
-				out[#out + 1] = "{" .. kind .. "}"
-			end
+			out[#out + 1] = "{" .. kind .. "}"
 		end
 	end
-	while #stack > 0 do close_list() end
 	return table.concat(out)
 end
 

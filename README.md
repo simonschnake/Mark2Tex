@@ -560,7 +560,12 @@ The current parser intentionally supports only a small, tested subset:
   the starting number or letter (for example, `4.` or `c)`). Subsequent
   items count consecutively. Switching between alphabetic and numeric
   markers at the same indentation starts a new list.
-- some nested list forms
+- nested lists and block content in list items: lines indented further than
+  the item's marker belong to the item and may hold further paragraphs,
+  fenced code, blockquotes, tables, display math, and nested lists. The
+  indentation up to the item's content column is removed. A marker indented
+  further than its parent's marker always nests (`1. a` followed by
+  `  - b`); a line without indentation ends the list
 - single citations such as `@key`
 - Pandoc-style citation groups such as `[@key1; @key2]`, including locators such as `[@key, p. 433]`
 - referenced footnotes (`[^name]` with `[^name]: ...`) and inline footnotes (`^[...]`)

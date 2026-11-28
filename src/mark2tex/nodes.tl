@@ -142,16 +142,19 @@ local record RawHeader is NodeBase where self.type == "header"
 	indented: boolean
 end
 
-local record RawItem is NodeBase where self.type == "item"
-	level: integer
+-- A list item's source with the item's indentation removed. Like a
+-- blockquote, parse fills in its blocks while collecting definitions.
+local record RawListItem is NodeBase where self.type == "list_item"
 	content: string
+	blocks: {RawBlock}
 end
 
-local record RawEnum is NodeBase where self.type == "enum"
-	level: integer
-	content: string
-	style: string
+-- A list of consecutive items of one kind: "bullet", "decimal" or "alpha".
+-- Nested lists are blocks inside an item.
+local record RawList is NodeBase where self.type == "list"
+	kind: string
 	start: integer
+	content: {RawListItem}
 end
 
 local record RawOther is NodeBase where self.type == "other"
@@ -189,7 +192,7 @@ local record DivFence is NodeBase where self.type == "div_fence"
 	attributes: string
 end
 
-local type RawBlock = RawHeader | RawItem | RawEnum | RawOther | RawBlockquote
+local type RawBlock = RawHeader | RawList | RawOther | RawBlockquote
 	| RawTable | FootnoteDefinition | LinkDefinition | DivFence | HorizontalRule | Latex | Code
 	| DisplayMath | Image | SlideBreak | SlidePause | SlideNote | SlideFooter
 
@@ -203,16 +206,14 @@ local record Header is NodeBase where self.type == "header"
 	indented: boolean
 end
 
-local record Item is NodeBase where self.type == "item"
-	level: integer
-	content: {Inline}
+local record ListItem is NodeBase where self.type == "list_item"
+	content: {Block}
 end
 
-local record Enum is NodeBase where self.type == "enum"
-	level: integer
-	content: {Inline}
-	style: string
+local record List is NodeBase where self.type == "list"
+	kind: string
 	start: integer
+	content: {ListItem}
 end
 
 local record Blockquote is NodeBase where self.type == "blockquote"
@@ -245,7 +246,7 @@ local record SlideSubheading is NodeBase where self.type == "slide_subheading"
 	content: {Inline}
 end
 
-local type Block = Header | Item | Enum | Other | Blockquote | Table
+local type Block = Header | List | ListItem | Other | Blockquote | Table
 	| HorizontalRule | Latex | Code | DisplayMath | Image | SlideBreak
 	| SlidePause | SlideNote | SlideFooter | SlideFrame | LectureAnnotations
 	| SlideParagraph | SlideSubheading
@@ -300,8 +301,8 @@ local record nodes
 	type SlideFooter = SlideFooter
 
 	type RawHeader = RawHeader
-	type RawItem = RawItem
-	type RawEnum = RawEnum
+	type RawList = RawList
+	type RawListItem = RawListItem
 	type RawOther = RawOther
 	type RawBlockquote = RawBlockquote
 	type RawTable = RawTable
@@ -310,8 +311,8 @@ local record nodes
 	type DivFence = DivFence
 
 	type Header = Header
-	type Item = Item
-	type Enum = Enum
+	type List = List
+	type ListItem = ListItem
 	type Blockquote = Blockquote
 	type Table = Table
 	type SlideFrame = SlideFrame
@@ -363,12 +364,12 @@ function nodes.latex(content: string): Latex
 	return { type = "latex", content = content }
 end
 
-function nodes.item(level: integer, content: string): RawItem
-	return { type = "item", level = level, content = content }
+function nodes.raw_list(kind: string, start: integer): RawList
+	return { type = "list", kind = kind, start = start, content = {} }
 end
 
-function nodes.enum(level: integer, content: string, style: string, start: integer): RawEnum
-	return { type = "enum", level = level, content = content, style = style, start = start }
+function nodes.raw_list_item(content: string): RawListItem
+	return { type = "list_item", content = content }
 end
 
 function nodes.code(code_type: string, content: string): Code

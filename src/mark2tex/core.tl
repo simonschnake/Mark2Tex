@@ -23,7 +23,7 @@ local record core
 end
 -- Increase this whenever parser or writer behavior changes so existing output
 -- files are regenerated instead of serving stale LaTeX from the cache.
-local CACHE_VERSION = "v22"
+local CACHE_VERSION = "v23"
 
 local function copy_table(value: any): any
     if type(value) ~= "table" then

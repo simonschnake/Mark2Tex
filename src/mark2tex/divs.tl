@@ -50,6 +50,17 @@ local annotations: {string: AnnotationKind} = { notes = "slide_note", footer = "
 
 local function append_block(output: {RawBlock}, node: RawBlock)
 	local previous = output[#output]
+	-- Items of one list split by div fences (or the blank lines around them)
+	-- remain one list.
+	if node is nodes.RawList then
+		local before = previous
+		if before and before is nodes.RawOther and not before.content:find("%S") then before = output[#output - 1] end
+		if before and before is nodes.RawList and before.kind == node.kind then
+			for _, item in ipairs(node.content) do before.content[#before.content + 1] = item end
+			if before ~= previous then output[#output] = nil end
+			return
+		end
+	end
 	if previous and previous is nodes.RawOther and node is nodes.RawOther
 		and previous.content:find("%S") and node.content:find("%S") then
 		local gap = previous.content:match("%s*$") .. node.content:match("^%s*")

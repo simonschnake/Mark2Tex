@@ -16,7 +16,7 @@ a)Text
 \expandafter\edef\csname the\csname @enumctr\endcsname\endcsname{\expandafter\noexpand\csname int_to_alph:n\endcsname{\noexpand\value{\csname @enumctr\endcsname}}}
 \expandafter\def\csname @itemlabel\endcsname{\csname the\csname @enumctr\endcsname\endcsname)}
 \item First
-  Continuation
+Continuation
 \item Consecutive
 \end{enumerate}
 \begin{enumerate}

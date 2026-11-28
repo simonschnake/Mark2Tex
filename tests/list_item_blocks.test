@@ -1,0 +1,67 @@
+1. First item
+
+   A second paragraph in the same item.
+
+   ```python
+   print("code inside an item")
+   ```
+
+   > A quote inside the item.
+
+   | A | B |
+   | --- | --- |
+   | $x$ | **y** |
+  - nested with two spaces
+  - nested again
+2. Second item
+   $$
+   E = mc^2
+   $$
+3.14 is not a list item.
+
+- Note[^one]
+
+  [^one]: A footnote defined inside the item.
+- [Linked][ref]
+
+  [ref]: https://example.org
+..................................................
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
+\begin{enumerate}
+\item First item
+
+A second paragraph in the same item.
+
+\begin{verbatim}
+print("code inside an item")
+\end{verbatim}
+
+\begin{quote}
+A quote inside the item.
+\end{quote}
+
+\par\addvspace{\medskipamount}
+\noindent\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+A & B \\
+\midrule
+$x$ & \textbf{y} \\
+\bottomrule
+\end{tabularx}
+\par\addvspace{\medskipamount}
+\begin{itemize}
+\item nested with two spaces
+\item nested again
+\end{itemize}
+\item Second item
+\[
+E = mc^2
+\]
+\end{enumerate}
+3.14 is not a list item.
+
+\begin{itemize}
+\item Note\footnote{\label{mark2tex:footnote:b8ae30f184cb8d5ba9c34a3bdbb3a1cd:1}A footnote defined inside the item.}
+\item \href{\detokenize{https://example.org}}{Linked}
+\end{itemize}
+
