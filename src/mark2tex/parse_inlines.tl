@@ -3,6 +3,7 @@ local nodes = require("mark2tex.nodes")
 local math_parser = require("mark2tex.math")
 local links = require("mark2tex.links")
 local footnotes = require("mark2tex.footnotes")
+local placeholders = require("mark2tex.tokens")
 
 local type diagnostics = require("mark2tex.diagnostics")
 local type Issue = diagnostics.Issue
@@ -19,6 +20,8 @@ end
 local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
 
 local newline = P("\n")
+-- Placeholder frames: no key or command name may run into a placeholder.
+local marker = S(placeholders.markers)
 local escape = S("@$`*\\") + P("[@") + P("_") + P("~~")
 
 local grammar: {string | integer: lpeg.Pattern} = {}
@@ -27,8 +30,8 @@ local grammar: {string | integer: lpeg.Pattern} = {}
 -- Citation
 --------------------
 
-grammar.cite = C(P(P(1) - S("\n;,] ")) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] ")) ^ 1)
+grammar.cite = C(P(P(1) - S("\n;,] ") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] ") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
 grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]")) ^ 1)
@@ -67,7 +70,7 @@ grammar.verbatim = P("`")
 --------------------
 
 grammar.latex_cmd_in_verbatim = P("`")
-	* C(P("\\") * (1 - S("{[ `")) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
+	* C(P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
 	* P("`")
 	/ function(t: string): Inline
 		return nodes.latex_cmd(t)
@@ -76,7 +79,7 @@ grammar.latex_cmd_in_verbatim = P("`")
 grammar.brace_group = P("{") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("}")
 grammar.bracket_group = P("[") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("]")
 
-grammar.latex_cmd = C(P("\\") * (1 - S("{[ ")) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
+grammar.latex_cmd = C(P("\\") * (1 - S("{[ ") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
 	/ function(t: string): Inline
 		return nodes.latex_cmd(t)
 	end
@@ -139,8 +142,28 @@ end
 grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
-grammar[1] = Ct((V("elements") + V("text")) ^ 0)
+-- A special character that starts no construct (an unclosed `*`, a trailing
+-- backslash) stays literal instead of failing the whole paragraph.
+grammar.stray = C(P("[@") + S("@$`*\\_[~")) / function(t: string): Inline
+	return nodes.text(t)
+end
+
+grammar[1] = Ct((V("elements") + V("text") + V("stray")) ^ 0)
 local inline_pattern = P(grammar) * -1
+
+-- Join neighbouring text nodes, e.g. around a literal stray character.
+local function merge_text(list: {Inline}): {Inline}
+	local merged: {Inline} = {}
+	for _, node in ipairs(list) do
+		local previous = merged[#merged]
+		if node is nodes.Text and previous and previous is nodes.Text then
+			merged[#merged] = nodes.text(previous.content .. node.content)
+		else
+			merged[#merged + 1] = node
+		end
+	end
+	return merged
+end
 
 local function parse_inlines(str: string, options?: Options): {Inline}, {Issue}
 	options = options or {}
@@ -159,6 +182,7 @@ local function parse_inlines(str: string, options?: Options): {Inline}, {Issue}
 	if parsed == nil then
 		parsed = { nodes.text(protected) }
 	end
+	parsed = merge_text(parsed)
 	return links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens), warnings
 end
 

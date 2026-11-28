@@ -1,6 +1,7 @@
 -- Footnote syntax is protected before ordinary inline formatting is parsed.
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
+local placeholders = require("mark2tex.tokens")
 local type diagnostics = require("mark2tex.diagnostics")
 
 local type Inline = nodes.Inline
@@ -45,13 +46,12 @@ function footnotes.protect<W is Issue>(
 	parse_content: function(content: string): ({Inline}, {W}),
 	disabled?: boolean
 ): string, {Token}, {Issue}
-	local prefix = "MARKTWOTEXFOOTNOTE"
-	while source:find(prefix, 1, true) do prefix = prefix .. "X" end
+	local prefix = placeholders.prefix(source, "F")
 	local output: {string} = {}
 	local tokens: {Token} = {}
 	local warnings: {Issue} = {}
 	local function add(node: Inline)
-		local token = prefix .. tostring(#tokens + 1) .. "END"
+		local token = placeholders.make(prefix, #tokens + 1)
 		tokens[#tokens + 1] = { token = token, node = node }
 		output[#output + 1] = token
 	end

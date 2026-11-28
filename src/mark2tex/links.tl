@@ -1,6 +1,7 @@
 -- Recognize links before math/formatting, keeping destinations opaque.
 local autolinks = require("mark2tex.autolinks")
 local delimiters = require("mark2tex.delimiters")
+local placeholders = require("mark2tex.tokens")
 local nodes = require("mark2tex.nodes")
 
 local type Match = autolinks.Match
@@ -188,14 +189,13 @@ end
 -- Label warnings come from the inline parser and are passed through unchanged.
 function links.protect<W>(source: string, parse_label: function(string): ({Inline}, {W}), options?: Options): string, {Token}, {W}
 	options = options or {}
-	local prefix = "MARKTWOTEXLINK"
-	while source:find(prefix, 1, true) do prefix = prefix .. "X" end
+	local prefix = placeholders.prefix(source, "L")
 	local tokens: {Token} = {}
 	local output: {string} = {}
 	local warnings: {W} = {}
 	local index = 1
 	local function add(node: Inline)
-		local token = prefix .. tostring(#tokens + 1) .. "END"
+		local token = placeholders.make(prefix, #tokens + 1)
 		tokens[#tokens + 1] = { token = token, node = node }
 		output[#output + 1] = token
 	end

@@ -944,6 +944,7 @@ package.preload["mark2tex.footnotes"] = function(...)
 
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
+local placeholders = require("mark2tex.tokens")
 
 
 
@@ -988,13 +989,12 @@ function footnotes.protect(
    parse_content,
    disabled)
 
-   local prefix = "MARKTWOTEXFOOTNOTE"
-   while source:find(prefix, 1, true) do prefix = prefix .. "X" end
+   local prefix = placeholders.prefix(source, "F")
    local output = {}
    local tokens = {}
    local warnings = {}
    local function add(node)
-      local token = prefix .. tostring(#tokens + 1) .. "END"
+      local token = placeholders.make(prefix, #tokens + 1)
       tokens[#tokens + 1] = { token = token, node = node }
       output[#output + 1] = token
    end
@@ -1182,6 +1182,7 @@ package.preload["mark2tex.links"] = function(...)
 
 local autolinks = require("mark2tex.autolinks")
 local delimiters = require("mark2tex.delimiters")
+local placeholders = require("mark2tex.tokens")
 local nodes = require("mark2tex.nodes")
 
 
@@ -1369,14 +1370,13 @@ end
 
 function links.protect(source, parse_label, options)
    options = options or {}
-   local prefix = "MARKTWOTEXLINK"
-   while source:find(prefix, 1, true) do prefix = prefix .. "X" end
+   local prefix = placeholders.prefix(source, "L")
    local tokens = {}
    local output = {}
    local warnings = {}
    local index = 1
    local function add(node)
-      local token = prefix .. tostring(#tokens + 1) .. "END"
+      local token = placeholders.make(prefix, #tokens + 1)
       tokens[#tokens + 1] = { token = token, node = node }
       output[#output + 1] = token
    end
@@ -2633,6 +2633,7 @@ local nodes = require("mark2tex.nodes")
 local math_parser = require("mark2tex.math")
 local links = require("mark2tex.links")
 local footnotes = require("mark2tex.footnotes")
+local placeholders = require("mark2tex.tokens")
 
 
 
@@ -2649,6 +2650,8 @@ local footnotes = require("mark2tex.footnotes")
 local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
 
 local newline = P("\n")
+
+local marker = S(placeholders.markers)
 local escape = S("@$`*\\") + P("[@") + P("_") + P("~~")
 
 local grammar = {}
@@ -2657,8 +2660,8 @@ local grammar = {}
 
 
 
-grammar.cite = C(P(P(1) - S("\n;,] ")) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] ")) ^ 1)
+grammar.cite = C(P(P(1) - S("\n;,] ") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] ") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
 grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]")) ^ 1)
@@ -2697,7 +2700,7 @@ end
 
 
 grammar.latex_cmd_in_verbatim = P("`") *
-C(P("\\") * (1 - S("{[ `")) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) *
+C(P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) *
 P("`") /
 function(t)
    return nodes.latex_cmd(t)
@@ -2706,7 +2709,7 @@ end
 grammar.brace_group = P("{") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("}")
 grammar.bracket_group = P("[") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("]")
 
-grammar.latex_cmd = C(P("\\") * (1 - S("{[ ")) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) /
+grammar.latex_cmd = C(P("\\") * (1 - S("{[ ") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) /
 function(t)
    return nodes.latex_cmd(t)
 end
@@ -2769,8 +2772,28 @@ end
 grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
-grammar[1] = Ct((V("elements") + V("text")) ^ 0)
+
+
+grammar.stray = C(P("[@") + S("@$`*\\_[~")) / function(t)
+   return nodes.text(t)
+end
+
+grammar[1] = Ct((V("elements") + V("text") + V("stray")) ^ 0)
 local inline_pattern = P(grammar) * -1
+
+
+local function merge_text(list)
+   local merged = {}
+   for _, node in ipairs(list) do
+      local previous = merged[#merged]
+      if node.type == "text" and previous and previous.type == "text" then
+         merged[#merged] = nodes.text(previous.content .. node.content)
+      else
+         merged[#merged + 1] = node
+      end
+   end
+   return merged
+end
 
 local function parse_inlines(str, options)
    options = options or {}
@@ -2789,11 +2812,49 @@ local function parse_inlines(str, options)
    if parsed == nil then
       parsed = { nodes.text(protected) }
    end
+   parsed = merge_text(parsed)
    return links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens), warnings
 end
 
 return parse_inlines
 ]], "@src/mark2tex/parse_inlines.tl"))(...)
+end
+
+package.preload["mark2tex.tokens"] = function(...)
+	return assert(load([[
+
+
+
+
+
+local START = string.char(30)
+local FINISH = string.char(31)
+
+local tokens = {}
+
+
+
+
+tokens.markers = START .. FINISH
+
+
+
+
+function tokens.prefix(source, kind)
+   local prefix = START .. kind
+   while source:find(prefix, 1, true) do
+      prefix = prefix .. "x"
+   end
+   return prefix
+end
+
+
+function tokens.make(prefix, index)
+   return prefix .. tostring(index) .. FINISH
+end
+
+return tokens
+]], "@src/mark2tex/tokens.tl"))(...)
 end
 
 package.preload["mark2tex.write"] = function(...)
