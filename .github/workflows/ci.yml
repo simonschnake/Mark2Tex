@@ -39,7 +39,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             latexmk poppler-utils python3-setuptools python3-venv python3-wheel \
             texlive-fonts-extra texlive-fonts-recommended texlive-lang-german \
-            texlive-latex-extra texlive-luatex texlive-science
+            texlive-latex-extra texlive-luatex texlive-plain-generic
 
       - name: Compile and check LuaLaTeX documents
         if: github.event_name != 'schedule'
