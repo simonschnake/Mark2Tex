@@ -89,10 +89,15 @@ supported.
 
 ## Install the LaTeX package
 
-You can build a TeX Live package archive from this repository:
+Run `make` or `make dist` to type-check and generate Lua from Teal, run the
+Lua regression suite, and build the TeX Live archive. The build uses Teal
+0.24.1 from your PATH or a compiler command supplied with `TL=...`. If
+`tl` is missing, the first build downloads the pinned Teal and argparse
+sources via LuaRocks into `.luarocks/` and runs the compiler with `texlua`.
+Subsequent builds reuse that local copy.
 
 ```sh
-make dist
+make
 ```
 
 This produces `dist/mark2tex.tar.xz`. The archive contains a TDS structure and
@@ -758,11 +763,27 @@ Raw environments without a code fence are also recognized:
 
 Project layout:
 
-- `src/mark2tex/` contains the Lua implementation.
+- `src/mark2tex/` contains the Teal sources (`*.tl`) and the Lua modules
+  generated from them (`*.lua`, committed so the TeX package needs no Teal).
+- `src/*.d.tl` declare the types of the external Lua modules LPeg, LFS and MD5;
+  `src/mark2tex/issue.d.tl` holds the warning interface shared by all parsers.
 - `mark2tex.lua` is the compatibility entry point.
 - `mark2tex.sty` integrates Mark2TeX into LuaLaTeX.
 - `tests/` contains fixture tests, unit tests, and a LaTeX smoke test.
 - `scripts/` contains development helpers.
+
+Edit the `.tl` files, never the generated `.lua` files. Then regenerate and
+verify that the committed Lua matches its sources:
+
+```sh
+make teal-gen
+make teal-check
+```
+
+Both targets use the pinned Teal compiler described in
+[Install the LaTeX package](#install-the-latex-package). Compiler settings
+(include path, Lua 5.1 code without compatibility shims) live in
+`tlconfig.lua`, which editors and the Teal language server also read.
 
 Run regression tests:
 

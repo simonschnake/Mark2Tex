@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := dist
+
 LUA ?= lua
 PACKAGE ?= mark2tex
 VERSION ?= 0.2.0
@@ -13,6 +15,45 @@ TLMGR_USER_TREE ?= $(abspath $(DIST_DIR)/tlmgr-usertree)
 
 test:
 	$(LUA) tests/run.lua
+
+TEAL_VERSION := 0.24.1
+TEXLUA ?= texlua
+TEAL_LOCAL := .luarocks/teal-$(TEAL_VERSION)/tl
+ifeq ($(origin TL),undefined)
+TL := $(shell command -v tl 2>/dev/null)
+ifeq ($(TL),)
+TL := $(TEXLUA) $(TEAL_LOCAL)
+TEAL_PREREQUISITE := $(TEAL_LOCAL)
+endif
+endif
+TEAL_SOURCES := $(filter-out %.d.tl,$(wildcard src/mark2tex/*.tl))
+# Compiler settings (include path, gen target) live in tlconfig.lua.
+TEAL_GEN = $(TL) gen --check
+
+.PHONY: teal-version teal-gen teal-check
+teal-version: $(TEAL_PREREQUISITE)
+	@test "$$($(TL) --version)" = "$(TEAL_VERSION)" || { echo "Expected Teal $(TEAL_VERSION) (set TL to override the compiler command)" >&2; exit 1; }
+
+$(TEAL_LOCAL): scripts/bootstrap-teal.sh
+	sh scripts/bootstrap-teal.sh "$(TEAL_VERSION)" "$(@D)"
+
+# $(call teal_emit,source.tl,output.lua): compile and prepend a generated-file header.
+teal_emit = $(TEAL_GEN) -o "$(2)" "$(1)"; \
+	{ printf '%s\n' "-- Generated from $(1) by Teal $(TEAL_VERSION). Edit the .tl file and run 'make teal-gen'."; \
+	cat "$(2)"; } > "$$tmp.header"; mv "$$tmp.header" "$(2)"
+
+teal-gen: teal-version
+	@set -e; tmp=$$(mktemp); trap 'rm -f "$$tmp" "$$tmp.header"' EXIT; \
+	for src in $(TEAL_SOURCES); do \
+		$(call teal_emit,$$src,$${src%.tl}.lua); \
+	done
+
+teal-check: teal-version
+	@set -e; tmp=$$(mktemp); trap 'rm -f "$$tmp" "$$tmp.header"' EXIT; \
+	for src in $(TEAL_SOURCES); do \
+		$(call teal_emit,$$src,$$tmp); \
+		diff -u "$${src%.tl}.lua" "$$tmp"; \
+	done
 
 latex-smoke:
 	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
@@ -38,7 +79,9 @@ lecture-blocks: LECTURE_JOB = blocks
 lecture-handout lecture-slides lecture-blocks:
 	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
 
-dist: $(DIST_ARCHIVE)
+dist: teal-gen
+	$(MAKE) test
+	$(MAKE) "$(DIST_ARCHIVE)"
 
 overleaf-zip: $(OVERLEAF_ARCHIVE)
 
@@ -83,7 +126,7 @@ $(OVERLEAF_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/
 	@cd "$(OVERLEAF_BUILD_DIR)" && zip -qr "../../$(notdir $(OVERLEAF_ARCHIVE))" mark2tex.sty mark2tex.lua src README.md LICENSE
 	@echo "Built $(OVERLEAF_ARCHIVE)"
 
-tlmgr-install-dry-run: $(DIST_ARCHIVE)
+tlmgr-install-dry-run: dist
 	@if [ ! -f "$(TLMGR_USER_TREE)/tlpkg/texlive.tlpdb" ]; then \
 		tlmgr --usermode --usertree "$(TLMGR_USER_TREE)" init-usertree; \
 	fi
