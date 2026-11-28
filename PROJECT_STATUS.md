@@ -73,7 +73,8 @@ erhalten.
 
 - Inline-Links, URL- und E-Mail-Autolinks; Links setzen separat geladenes
   `hyperref` voraus.
-- Inline-Code escaped LaTeX-Sonderzeichen, normaler Text escaped Ampersands.
+- Inline-Code escaped LaTeX-Sonderzeichen, normaler Text escaped `&` und `%`
+  (Kommentare per `<!-- -->`).
 - Der Ausgabe-Cache berücksichtigt Inhalt, Konfiguration und die
   Versionskennung.
 - Markdown-Dateien werden im LuaTeX-Recorder registriert; `\mdincludeonly`

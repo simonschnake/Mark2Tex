@@ -155,7 +155,7 @@ local core = {}
 
 
 
-local CACHE_VERSION = "v19"
+local CACHE_VERSION = "v20"
 
 local function copy_table(value)
    if type(value) ~= "table" then
@@ -3219,8 +3219,10 @@ local write_blocks
 
 
 
+
+
 local function write_text(text)
-   return (text:gsub("&", "\\&"))
+   return (text:gsub("[&%%]", "\\%0"))
 end
 
 

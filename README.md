@@ -549,7 +549,8 @@ The output is LaTeX-like:
 - normal code blocks are emitted as `verbatim`
 - `tex` code blocks are emitted unchanged as LaTeX
 - `$$...$$` is normalized to `\\[...\\]`; `\\[...\\]` is kept in that form
-- normal text is mostly kept as written; ampersands are escaped for LaTeX
+- normal text is mostly kept as written; ampersands and percent signs are
+  escaped for LaTeX (`50%` stays a percent sign; write comments as `<!-- -->`)
 
 ### Links
 

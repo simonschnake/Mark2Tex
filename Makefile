@@ -16,6 +16,10 @@ TLMGR_USER_TREE ?= $(abspath $(DIST_DIR)/tlmgr-usertree)
 test:
 	$(LUA) tests/run.lua
 	$(LUA) tests/golden.lua
+	@$(MAKE) --no-print-directory fuzz FUZZ_SAMPLES=$(TEST_FUZZ_SAMPLES)
+
+# make test runs a short fuzz pass; make fuzz runs a long one.
+TEST_FUZZ_SAMPLES ?= 2000
 
 # Accept intended output changes into tests/golden/ (review the diff first).
 golden-update:

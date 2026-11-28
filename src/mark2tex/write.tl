@@ -175,10 +175,12 @@ end
 
 local write_blocks: function(ast: {Block}, config: Config, nested: boolean, comment_tokens?: {CommentToken}): string
 
--- An ampersand in ordinary prose is a LaTeX alignment character. Escape it
--- here, while leaving raw LaTeX nodes untouched.
+-- In ordinary prose an ampersand is a LaTeX alignment character and a percent
+-- sign would start a TeX comment that swallows the rest of the line, closing
+-- braces included. Escape both here, leaving raw LaTeX nodes untouched;
+-- Markdown comments are written as <!-- -->.
 local function write_text(text: string): string
-	return (text:gsub("&", "\\&"))
+	return (text:gsub("[&%%]", "\\%0"))
 end
 
 -- Inline code is literal text inside a TeX argument. Escape in one pass so

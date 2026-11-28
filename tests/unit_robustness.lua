@@ -49,6 +49,12 @@ return function(unit)
 		unit.assertEquals(output("[](^["), "[](\\textasciicircum{}[")
 	end
 
+	-- A percent sign in prose is a percent sign, not a TeX comment.
+	function test_robustness_percent_in_text()
+		unit.assertEquals(output("**50% faster** & more"), "\\textbf{50\\% faster} \\& more")
+		unit.assertEquals(output("`50%` and $x % y$ stay raw"), "\\texttt{50\\%} and $x % y$ stay raw")
+	end
+
 	-- A stray special character stays literal without dropping the formatting
 	-- of the rest of the paragraph.
 	function test_robustness_stray_character_keeps_formatting()
