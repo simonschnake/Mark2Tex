@@ -1,61 +1,120 @@
 # Mark2TeX Projektstatus
 
-Stand: 10. November 2026. Die genaue Syntax und Installation stehen in README.md.
+Stand: 28. November 2026. Die genaue Syntax und Installation stehen in README.md.
 
 ## Aktueller Stand
 
-Mark2TeX ist ein LuaLaTeX-Paket für einen bewusst LaTeX-nahen Markdown-Subset.
-Die Lua-Implementierung ist in Module für Block- und Inline-Parsing, Mathematik,
-Links, Kommentare, Diagnosen, AST-Knoten, Ausgabe und Konvertierung aufgeteilt.
+Mark2TeX ist ein LuaLaTeX-Paket für einen bewusst LaTeX-nahen Markdown-Subset,
+ergänzt um eine Python-CLI, die aus einer einzelnen Markdown-Datei ein PDF baut.
+Die Implementierung ist in Module für Block- und Inline-Parsing, Mathematik,
+Links, Fußnoten, Fenced Divs, Vorlesungslayout, Kommentare, Diagnosen,
+AST-Knoten, Ausgabe und Konvertierung aufgeteilt.
 
 Unterstützt werden Überschriften, Absätze, horizontale Linien, Formatierungen,
 Inline-Code, fenced Code und rohe TeX-Blöcke, Listen mit Verschachtelung,
-Blockquotes, Pipe-Tabellen, Zitationen, Mathematik und rohe LaTeX-Umgebungen.
-HTML-Kommentare bleiben als Kommentare im generierten TeX erhalten.
+Blockquotes, Pipe-Tabellen, Zitationen, Mathematik, rohe LaTeX-Umgebungen,
+Links und Fußnoten. HTML-Kommentare bleiben als Kommentare im generierten TeX
+erhalten.
 
-Die aktuellen Ergänzungen:
+### Teal
 
-- Referenzierte und Inline-Fußnoten mit Formatierung, mehrzeiligen Definitionen
-  und wiederholten Verweisen auf dieselbe Nummer; Warnungen bei ungültigen Markern.
-- Inline-Links, URL- und E-Mail-Autolinks mit geschützten Linkzielen.
-- Formatierung, Inline-Code und Mathematik in Linkbeschriftungen.
-- Lokale Dateiziele mit Leerzeichen und Verweise auf bestehende LaTeX-Labels.
-- Links setzen ein separat geladenes `hyperref` voraus; fehlendes `hyperref`
-  erzeugt eine gezielte Paketfehlermeldung. Linktitel werden nicht ausgegeben.
+- Alle Module in `src/mark2tex/` sind in Teal geschrieben. Die committeten
+  `.lua`-Dateien werden mit `make teal-gen` erzeugt, tragen einen
+  Generated-Header und sind als `linguist-generated` markiert. Das TeX-Paket
+  braucht zur Laufzeit kein Teal.
+- Teal 0.24.1 ist gepinnt. Ohne `tl` im `PATH` wird es per texlua nach
+  `.luarocks/` gebootstrappt. Compiler-Einstellungen liegen in `tlconfig.lua`.
+- `make teal-check` schlägt fehl, wenn das committete Lua von den Quellen
+  abweicht. `make dist` prüft das per `teal-check` und führt vor dem Packen die
+  Tests aus.
+- Typisiert sind AST (ein Record je Knotentyp, getrennt in die Stufen
+  `nodes.RawBlock` vor und `nodes.Block`/`nodes.Inline` nach dem Inline-Parsing,
+  dazu `nodes.Document`), Konfiguration
+  (`default_config` ist Typ und Default zugleich) und die gemeinsame
+  Warnungsschnittstelle `diagnostics.Issue`. Externe Module (LPeg, LFS, MD5)
+  sind über `.d.tl`-Dateien deklariert.
+
+### CLI und Vorlesungen
+
+- `mark2tex notes.md` baut ein PDF ohne eigenes LaTeX-Projekt; Installation
+  per `uv tool install .` oder pip. Die Wheel bündelt Lua-, TeX-Quellen und
+  Templates.
+- Formate `text`, `handout` und `slides` (Beamer) aus derselben Quelle,
+  jeweils auch als Dozentenausgabe (`--instructor`/`--dozent`). Dazu
+  Speaker-Notes, Schreibrand, `--slide-level`, `--h1 section|frame|hide`.
+- Eigene vollständige LaTeX-Templates können CLI-Optionen auswerten;
+  Beispiele liegen in `examples/cli/`.
+- `--watch`, `--cache` und `--cache-format` für schnelle Rebuilds. Der
+  LuaLaTeX-Fontcache wird in `.mark2tex-cache/tex-cache/` wiederverwendet und
+  atomar aktualisiert. Fehlgeschlagene Builds behalten das letzte PDF.
+- Paketoptionen `profile=handout|slides`, `slide-level`, `audience` und `h1`
+  bieten dasselbe Vorlesungslayout auch für `\mdinput` in eigenen Projekten.
+- Folienstruktur nach Pandoc-Beamer-Konventionen: Überschriften, `---` als
+  Fortsetzungsfolie, `. . .` als Overlay.
+- Fenced Divs im Pandoc-Stil steuern die Sichtbarkeit (`script`, `slides`,
+  `instructor`, `student`, auch kombiniert) und Annotationen (`footer`,
+  `notes`). Falsche Verschachtelung erzeugt Warnungen, fehlende oder
+  überzählige Schlusszäune einen Abbruch mit Zeilennummer. Die früheren
+  HTML-Kommentar-Direktiven sind ersetzt.
+- `columns`/`column`-, `figure`- und `caption`-Divs für Spaltenlayout und
+  Abbildungen (TikZ, `\input`, Bilder). Eigenständige Markdown-Bilder mit
+  `{width=…em}` werden unterstützt; das Paket lädt dafür TikZ und adjustbox.
+
+### Weitere Ergänzungen seit dem letzten Stand
+
+- Alphabetische Aufzählungen und Startwerte für nummerierte Listen.
+- Referenzierte und Inline-Fußnoten mit Formatierung, mehrzeiligen
+  Definitionen und wiederholten Verweisen; Warnungen bei ungültigen Markern.
+- Die Cache-Versionskennung steht bei v19.
+
+### Älterer Stand, weiterhin gültig
+
+- Inline-Links, URL- und E-Mail-Autolinks; Links setzen separat geladenes
+  `hyperref` voraus.
 - Inline-Code escaped LaTeX-Sonderzeichen, normaler Text escaped Ampersands.
-- Negative Zahlen in eingerückten Listeninhalten bleiben erhalten.
-- Der Ausgabe-Cache berücksichtigt Inhalt, Konfiguration und eine interne
-  Versionskennung, die bei Parser-/Writer-Änderungen erhöht wird.
-- Paketoptionen ersetzen die frühere Datei `mark2tex_config.lua`.
-- Markdown-Dateien werden im LuaTeX-Recorder registriert; `mdincludeonly`
+- Der Ausgabe-Cache berücksichtigt Inhalt, Konfiguration und die
+  Versionskennung.
+- Markdown-Dateien werden im LuaTeX-Recorder registriert; `\mdincludeonly`
   unterstützt selektive Includes.
 - `make dist` baut ein TeX-Live-Archiv; `make overleaf-zip` ein Upload-Bundle.
 
 ## Verifikation
 
-- `make test`: Lua-Unit-Tests und Markdown/TeX-Fixtures.
+- `make test`: Lua-Unit-Tests und Markdown/TeX-Fixtures (aktuell 143 Tests).
+- `make teal-check`: generiertes Lua stimmt mit den Teal-Quellen überein.
 - `make latex-smoke`: zwei LuaLaTeX-Läufe für aufgelöste Verweise,
-  Recorder-/Ausgabeprüfungen und Prüfung tatsächlicher PDF-Linkziele.
+  Recorder-/Ausgabeprüfungen und tatsächliche PDF-Linkziele.
+- `make -j2 latex-lecture`: Handout, Folien und Annotationen als PDFs bauen
+  und mit `pdfinfo`/`pdftotext` prüfen.
+- `python tests/cli_integration.py "$(command -v mark2tex)"`: CLI-Integration.
+  Dieser Test hängt noch nicht an einem Make-Target.
 
 Die Tests decken unter anderem reale Dissertationstexte, Listen, Tabellen,
-Mathematik, Kommentare, fehlerhafte Eingaben und Links ab. LuaLaTeX benötigt
-einen beschreibbaren Schriftcache. Build-Ausgaben sind über `.gitignore`
-ausgeschlossen.
+Mathematik, Kommentare, Fußnoten, Links, Vorlesungsprofile und fehlerhafte
+Eingaben ab. Das Testverzeichnis `tests/tmp/` wird bei frischen Checkouts
+automatisch angelegt.
 
 ## Offene Arbeiten
 
+- Eine CI fehlt. Sie sollte `make test`, `make teal-check`, die LaTeX-Tests
+  und den CLI-Integrationstest ausführen und damit auch die
+  Entwicklungs-Dependencies reproduzierbar festlegen.
+- Der AST ist nur teilweise streng typisiert: stufenabhängige Felder
+  (Inhalt, Titel, Tabellenzellen) sind eine lose Union, der Writer castet.
 - Die Blockebene nutzt weiterhin LPeg und flache Listen-Nodes mit Levelwerten.
   Ein zeilenorientierter Blockparser und echte List-/List-Item-Nodes bleiben
-  sinnvolle größere Umbauten.
-- Diagnosen existieren für Mathematik und LaTeX-Umgebungen; Positionsangaben
-  und Warnungen für weitere Parserfälle können verbessert werden.
-- Vollständige CommonMark-Kompatibilität ist kein Ziel. Bilder, Referenzlinks
-  und Task-Listen sind weiterhin nicht unterstützt.
+  sinnvolle größere Umbauten; die Teal-Typen erleichtern das jetzt.
+- Diagnosen existieren für Mathematik, LaTeX-Umgebungen und Fenced Divs;
+  Positionsangaben und Warnungen für weitere Parserfälle können verbessert werden.
+- Vollständige CommonMark-Kompatibilität ist kein Ziel. Inline-Bilder,
+  Referenzlinks und Task-Listen sind weiterhin nicht unterstützt. Die
+  README-Liste „Deliberately unsupported“ nennt Bilder noch pauschal und
+  sollte auf eigenständige Bilder hin präzisiert werden.
+- Die CLI verarbeitet keine Bibliographie (BibTeX/Biber sind deaktiviert).
 - Normaler Text wird bewusst nicht vollständig für LaTeX escaped. Rohe
   LaTeX-Kommandos und Mathematik bleiben Teil des Schreibstils.
 - Weitere Grenzfälle für verschachtelte Inlines, Include-Pfade und große
   Dateien sowie Performance sind noch nicht systematisch abgesichert.
-- Eine CI und eine reproduzierbare Entwicklungs-Dependency-Definition fehlen.
 - Die Archive sind eine Grundlage für Distribution; eine CTAN-Veröffentlichung
   und die dazugehörigen Prüfungen stehen noch aus.
 
@@ -64,4 +123,7 @@ ausgeschlossen.
 LaTeX-Funktionalität hat Vorrang vor strikter Markdown-Konformität. Unklare
 Eingaben sollen möglichst erhalten bleiben und gezielt Warnungen liefern.
 Caching soll konservativ bleiben. Ziel ist ein normal installierbares
-LaTeX-Paket; LuaRocks ist kein zentrales Distributionsziel.
+LaTeX-Paket; LuaRocks ist kein zentrales Distributionsziel. Teal ist ein
+reines Entwicklungswerkzeug, ausgeliefert wird generiertes Lua. Die CLI ist
+ein Zusatz für Einzeldokumente; die direkte Einbindung in LaTeX-Projekte
+bleibt ein Kernanwendungsfall, die Dissertation der Kompatibilitätsmaßstab.
