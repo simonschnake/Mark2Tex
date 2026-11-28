@@ -2895,6 +2895,25 @@ local nodes = require("mark2tex.nodes")
 
 
 
+local function emit(out, ...)
+   for index = 1, select("#", ...) do
+      out.parts[#out.parts + 1] = select(index, ...)
+   end
+end
+
+
+local function remove_trailing_indent(out)
+   local trimmed, removed = table.concat(out.parts):gsub("\n[ \t]+$", "\n")
+   out.parts = { trimmed }
+   return removed > 0
+end
+
+
+
+
+
+
+
 local function list_style(ast)
    if ast.type == "enum" then
       return ast.style or "decimal"
@@ -2911,7 +2930,7 @@ end
 
 local function close_list(out, stack)
    local current = table.remove(stack)
-   out[1] = out[1] .. "\n\\end{" .. list_environment(current.type) .. "}"
+   emit(out, "\n\\end{", list_environment(current.type), "}")
 end
 
 local function close_lists_until(out, stack, level)
@@ -2928,19 +2947,19 @@ end
 
 local function open_list(out, stack, ast)
    table.insert(stack, { type = ast.type, level = ast.level, style = list_style(ast) })
-   out[1] = out[1] .. "\n\\begin{" .. list_environment(ast.type) .. "}"
+   emit(out, "\n\\begin{", list_environment(ast.type), "}")
    if ast.type == "enum" then
       local counter = "\\csname @enumctr\\endcsname"
       if ast.style == "alpha" then
 
-         out[1] = out[1] .. "\n\\expandafter\\edef\\csname the" .. counter .. "\\endcsname{" ..
-         "\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname" ..
-         "{\\noexpand\\value{" .. counter .. "}}}" ..
-         "\n\\expandafter\\def\\csname @itemlabel\\endcsname{" ..
-         "\\csname the" .. counter .. "\\endcsname)}"
+         emit(out, "\n\\expandafter\\edef\\csname the", counter, "\\endcsname{",
+         "\\expandafter\\noexpand\\csname int_to_alph:n\\endcsname",
+         "{\\noexpand\\value{", counter, "}}}",
+         "\n\\expandafter\\def\\csname @itemlabel\\endcsname{",
+         "\\csname the", counter, "\\endcsname)}")
       end
       if ast.start and ast.start ~= 1 then
-         out[1] = out[1] .. "\n\\setcounter{" .. counter .. "}{" .. tostring(ast.start - 1) .. "}"
+         emit(out, "\n\\setcounter{", counter, "}{", tostring(ast.start - 1), "}")
       end
    end
 end
@@ -3025,14 +3044,15 @@ end
 
 
 
+local INLINE_CODE_ESCAPES = {
+   ["\\"] = "\\textbackslash{}",
+   ["^"] = "\\textasciicircum{}",
+   ["~"] = "\\textasciitilde{}",
+}
+
 local function write_inline_code(text)
-   local escapes = {
-      ["\\"] = "\\textbackslash{}",
-      ["^"] = "\\textasciicircum{}",
-      ["~"] = "\\textasciitilde{}",
-   }
    return (text:gsub("[\\%%{}#&_$^~]", function(character)
-      return escapes[character] or "\\" .. character
+      return INLINE_CODE_ESCAPES[character] or "\\" .. character
    end))
 end
 
@@ -3052,6 +3072,12 @@ local function has_verbatim(blocks)
    return false
 end
 
+
+
+
+
+
+
 local walk
 
 local function walk_nodes(list, out, config)
@@ -3060,171 +3086,215 @@ local function walk_nodes(list, out, config)
    end
 end
 
-walk = function(ast, out, config)
-   if ast.type == "header" then
-      out[1] = out[1] .. "\n\\"
-      if ast.level > #config.header then
-         ast.level = #config.header
-      end
-      out[1] = out[1] .. config.header[ast.level]
 
-      out[1] = out[1] .. "{"
-      walk_nodes(ast.content, out, config)
-      out[1] = out[1] .. "}"
-   elseif ast.type == "slide_frame" then
-      local options = has_verbatim(ast.content) and "t,fragile" or "t"
-      out[1] = out[1] .. "\n\\begin{frame}[" .. options .. "]\n"
-      if ast.title then
-         out[1] = out[1] .. "\\frametitle{"
-         walk_nodes(ast.title, out, config)
-         out[1] = out[1] .. "}\n"
-      end
-      if ast.footer then
-         out[1] = out[1] .. "\\SlideFooter{" .. write_annotation(ast.footer) .. "}\n"
-      end
-      if ast.notes and #ast.notes > 0 then
-         local notes = {}
-         for _, note in ipairs(ast.notes) do
-            notes[#notes + 1] = write_annotation(note)
-         end
-         out[1] = out[1] .. "\\note{" .. table.concat(notes, "\\par ") .. "}\n"
-      end
-      out[1] = out[1] .. write_blocks(ast.content, config, true) .. "\n\\end{frame}\n"
-   elseif ast.type == "slide_pause" then
-      out[1] = out[1] .. "\n\\par\\pause\n"
-   elseif ast.type == "slide_subheading" then
-      out[1] = out[1] .. "\n\\par\\medskip\\noindent\\textbf{"
-      walk_nodes(ast.content, out, config)
-      out[1] = out[1] .. "}\\par\n"
-   elseif ast.type == "lecture_annotations" then
-      if ast.footer then
-         out[1] = out[1] .. "\n\\par\\noindent{\\small " .. write_annotation(ast.footer) .. "}\\par\n"
-      end
+local function wrapped(command)
+   return function(ast, out, config)
+      emit(out, command, "{")
+      walk_nodes(nodes.content(ast), out, config)
+      emit(out, "}")
+   end
+end
+
+local function write_header(ast, out, config)
+
+   local level = math.min(ast.level, #config.header)
+   emit(out, "\n\\", config.header[level], "{")
+   walk_nodes(ast.content, out, config)
+   emit(out, "}")
+end
+
+local function write_slide_frame(ast, out, config)
+   local options = has_verbatim(ast.content) and "t,fragile" or "t"
+   emit(out, "\n\\begin{frame}[", options, "]\n")
+   if ast.title then
+      emit(out, "\\frametitle{")
+      walk_nodes(ast.title, out, config)
+      emit(out, "}\n")
+   end
+   if ast.footer then
+      emit(out, "\\SlideFooter{", write_annotation(ast.footer), "}\n")
+   end
+   if ast.notes and #ast.notes > 0 then
+      local notes = {}
       for _, note in ipairs(ast.notes) do
-         out[1] = out[1] .. "\n\\par\\noindent\\textbf{Vortragsnotiz:} " ..
-         write_annotation(note) .. "\\par\n"
+         notes[#notes + 1] = write_annotation(note)
       end
-   elseif ast.type == "slide_paragraph" then
-      out[1] = out[1] .. "\n\\par\n"
-   elseif ast.type == "horizontal_rule" then
-      out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"
-   elseif ast.type == "image" then
-      local size = ast.width ~= "" and ("width=" .. ast.width .. ",") or ""
-      out[1] = out[1] .. "\n\\adjustbox{" .. size .. "max width=\\linewidth}{\\includegraphics{" .. ast.path .. "}}"
-   elseif ast.type == "latex" then
-      out[1] = out[1] .. "\n" .. ast.content
-   elseif ast.type == "item" then
-      out[1] = out[1] .. "\n\\item "
-      walk_nodes(ast.content, out, config)
-   elseif ast.type == "enum" then
-      out[1] = out[1] .. "\n\\item"
-      walk_nodes(ast.content, out, config)
-   elseif ast.type == "code" then
+      emit(out, "\\note{", table.concat(notes, "\\par "), "}\n")
+   end
+   emit(out, write_blocks(ast.content, config, true), "\n\\end{frame}\n")
+end
 
-      out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
-   elseif ast.type == "blockquote" then
-      out[1] = out[1] .. "\n\\begin{quote}\n"
-      out[1] = out[1] .. write_blocks(ast.content, config, true)
-      out[1] = out[1] .. "\n\\end{quote}"
-   elseif ast.type == "table" then
-      out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\begin{tabularx}{\\linewidth}{" .. table_columns(ast) .. "}\n\\toprule\n"
+local function write_slide_subheading(ast, out, config)
+   emit(out, "\n\\par\\medskip\\noindent\\textbf{")
+   walk_nodes(ast.content, out, config)
+   emit(out, "}\\par\n")
+end
+
+local function write_lecture_annotations(ast, out)
+   if ast.footer then
+      emit(out, "\n\\par\\noindent{\\small ", write_annotation(ast.footer), "}\\par\n")
+   end
+   for _, note in ipairs(ast.notes) do
+      emit(out, "\n\\par\\noindent\\textbf{Vortragsnotiz:} ", write_annotation(note), "\\par\n")
+   end
+end
+
+local function write_image(ast, out)
+   local size = ast.width ~= "" and ("width=" .. ast.width .. ",") or ""
+   emit(out, "\n\\adjustbox{", size, "max width=\\linewidth}{\\includegraphics{", ast.path, "}}")
+end
+
+local function write_item(ast, out, config)
+   emit(out, "\n\\item ")
+   walk_nodes(ast.content, out, config)
+end
+
+local function write_enum(ast, out, config)
+   emit(out, "\n\\item")
+   walk_nodes(ast.content, out, config)
+end
+
+local function write_blockquote(ast, out, config)
+   emit(out, "\n\\begin{quote}\n", write_blocks(ast.content, config, true), "\n\\end{quote}")
+end
+
+local function write_table(ast, out, config)
+   emit(out, "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\begin{tabularx}{\\linewidth}{", table_columns(ast), "}\n\\toprule\n")
+   for index = 1, #ast.alignments do
+      if index > 1 then emit(out, " & ") end
+      if ast.headers[index] then walk_nodes(ast.headers[index], out, config) end
+   end
+   emit(out, " \\\\\n\\midrule")
+
+   for _, row in ipairs(ast.rows) do
+      emit(out, "\n")
       for index = 1, #ast.alignments do
-         if index > 1 then
-            out[1] = out[1] .. " & "
-         end
-         if ast.headers[index] then
-            walk_nodes(ast.headers[index], out, config)
-         end
+         if index > 1 then emit(out, " & ") end
+         if row[index] then walk_nodes(row[index], out, config) end
       end
-      out[1] = out[1] .. " \\\\\n\\midrule"
+      emit(out, " \\\\")
+   end
 
-      for _, row in ipairs(ast.rows) do
-         out[1] = out[1] .. "\n"
-         for index = 1, #ast.alignments do
-            if index > 1 then
-               out[1] = out[1] .. " & "
-            end
-            if row[index] then
-               walk_nodes(row[index], out, config)
-            end
-         end
-         out[1] = out[1] .. " \\\\"
-      end
+   emit(out, "\n\\bottomrule\n\\end{tabularx}\n\\par\\addvspace{\\medskipamount}")
+end
 
-      out[1] = out[1] .. "\n\\bottomrule\n\\end{tabularx}\n\\par\\addvspace{\\medskipamount}"
-   elseif ast.type == "other" then
-      walk_nodes(ast.content, out, config)
-   elseif ast.type == "paren_citation" then
-      out[1] = out[1] .. "\\" .. config.paren_citation
-      if ast.locator then
-         out[1] = out[1] .. "[" .. ast.locator .. "]"
-      end
-      out[1] = out[1] .. "{" .. table.concat(ast.content, ", ") .. "}"
-   elseif ast.type == "link" then
-      local destination = ast.destination
-      if destination:match("^[%a][%w+.-]*:") then
-         destination = destination:gsub(" ", "%%20")
-      end
-      if ast.kind == "autolink" then
-         out[1] = out[1] .. "\\url{" .. links.tex_destination(destination) .. "}"
-      else
-         if destination:sub(1, 1) == "#" and #destination > 1 then
-            out[1] = out[1] .. "\\hyperref[" .. links.tex_destination(destination:sub(2)) .. "]{"
-         else
-            out[1] = out[1] .. "\\href{" .. links.tex_destination(destination) .. "}{"
-         end
-         if ast.kind == "email" then
-            local address = ast.destination:sub(8)
-            out[1] = out[1] .. "\\nolinkurl{" .. links.tex_destination(address) .. "}"
-         else
-            walk_nodes(ast.content, out, config)
-         end
-         out[1] = out[1] .. "}"
-      end
-   elseif ast.type == "footnote" then
-      if ast.repeated then
-         out[1] = out[1] .. "\\footref{" .. ast.label .. "}"
-      else
-         out[1] = out[1] .. "\\footnote{"
-         if ast.label then out[1] = out[1] .. "\\label{" .. ast.label .. "}" end
-         if ast.inline then walk_nodes(ast.content, out, config)
-         else out[1] = out[1] .. write_blocks(ast.blocks, config, true) end
-         out[1] = out[1] .. "}"
-      end
-   elseif ast.type == "literal" then
-      local escapes = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
-      out[1] = out[1] .. (escapes[ast.content] or ast.content:gsub("[%%{}#&_$]", "\\%0"))
-   elseif ast.type == "citation" then
-      out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
-   elseif ast.type == "verbatim" then
-      out[1] = out[1] .. "\\texttt{" .. write_inline_code(ast.content) .. "}"
-   elseif ast.type == "inline_math" or ast.type == "latex_cmd" then
-      out[1] = out[1] .. ast.content
-   elseif ast.type == "display_math" then
-      local trimmed, removed = out[1]:gsub("\n[ \t]+$", "\n")
-      out[1] = trimmed
-      if removed == 0 then
-         out[1] = out[1] .. "\n"
-      end
-      out[1] = out[1] .. "\\[" .. ast.content .. "\\]"
-   elseif ast.type == "italic" then
-      out[1] = out[1] .. "\\emph{"
-      walk_nodes(ast.content, out, config)
-      out[1] = out[1] .. "}"
-   elseif ast.type == "bold" then
-      out[1] = out[1] .. "\\textbf{"
-      walk_nodes(ast.content, out, config)
-      out[1] = out[1] .. "}"
-   elseif ast.type == "strikethrough" then
-      out[1] = out[1] .. "\\sout{"
-      walk_nodes(ast.content, out, config)
-      out[1] = out[1] .. "}"
-   elseif ast.type == "text" then
-      out[1] = out[1] .. write_text(ast.content)
+local function write_other(ast, out, config)
+   walk_nodes(ast.content, out, config)
+end
+
+local function write_paren_citation(ast, out, config)
+   emit(out, "\\", config.paren_citation)
+   if ast.locator then emit(out, "[", ast.locator, "]") end
+   emit(out, "{", table.concat(ast.content, ", "), "}")
+end
+
+local function write_link(ast, out, config)
+   local destination = ast.destination
+   if destination:match("^[%a][%w+.-]*:") then
+      destination = destination:gsub(" ", "%%20")
+   end
+   if ast.kind == "autolink" then
+      emit(out, "\\url{", links.tex_destination(destination), "}")
+      return
+   end
+   if destination:sub(1, 1) == "#" and #destination > 1 then
+      emit(out, "\\hyperref[", links.tex_destination(destination:sub(2)), "]{")
    else
+      emit(out, "\\href{", links.tex_destination(destination), "}{")
+   end
+   if ast.kind == "email" then
+      emit(out, "\\nolinkurl{", links.tex_destination(ast.destination:sub(8)), "}")
+   else
+      walk_nodes(ast.content, out, config)
+   end
+   emit(out, "}")
+end
 
+local function write_footnote(ast, out, config)
+   if ast.repeated then
+      emit(out, "\\footref{", ast.label, "}")
+      return
+   end
+   emit(out, "\\footnote{")
+   if ast.label then emit(out, "\\label{", ast.label, "}") end
+   if ast.inline then
+      walk_nodes(ast.content, out, config)
+   else
+      emit(out, write_blocks(ast.blocks, config, true))
+   end
+   emit(out, "}")
+end
+
+local LITERAL_ESCAPES = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
+
+local function write_literal(ast, out)
+   emit(out, LITERAL_ESCAPES[ast.content] or (ast.content:gsub("[%%{}#&_$]", "\\%0")))
+end
+
+local function write_display_math(ast, out)
+
+   if not remove_trailing_indent(out) then emit(out, "\n") end
+   emit(out, "\\[", ast.content, "\\]")
+end
+
+local function raw(prefix, suffix)
+   return function(ast, out)
+      emit(out, prefix, nodes.content(ast), suffix)
+   end
+end
+
+local function constant(text)
+   return function(_, out)
+      emit(out, text)
+   end
+end
+
+
+local WRITERS = {
+   header = write_header,
+   slide_frame = write_slide_frame,
+   slide_pause = constant("\n\\par\\pause\n"),
+   slide_subheading = write_slide_subheading,
+   lecture_annotations = write_lecture_annotations,
+   slide_paragraph = constant("\n\\par\n"),
+   horizontal_rule = constant("\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"),
+   image = write_image,
+   latex = raw("\n", ""),
+   item = write_item,
+   enum = write_enum,
+   code = raw("\n\\begin{verbatim}\n", "\\end{verbatim}"),
+   blockquote = write_blockquote,
+   table = write_table,
+   other = write_other,
+   paren_citation = write_paren_citation,
+   link = write_link,
+   footnote = write_footnote,
+   literal = write_literal,
+   verbatim = function(ast, out)
+      emit(out, "\\texttt{", write_inline_code(nodes.content(ast)), "}")
+   end,
+   inline_math = raw("", ""),
+   latex_cmd = raw("", ""),
+   display_math = write_display_math,
+   italic = wrapped("\\emph"),
+   bold = wrapped("\\textbf"),
+   strikethrough = wrapped("\\sout"),
+   text = function(ast, out)
+      emit(out, write_text(nodes.content(ast)))
+   end,
+}
+
+
+WRITERS.citation = function(ast, out, config)
+   emit(out, "\\", config.citation, "{", nodes.content(ast), "}")
+end
+
+walk = function(ast, out, config)
+   local writer = WRITERS[ast.type]
+   if not writer then
       error("Unknown type: " .. ast.type)
    end
+   writer(ast, out, config)
 end
 
 local contains_links
@@ -3249,22 +3319,22 @@ contains_links = function(list)
 end
 
 write_blocks = function(ast, config, nested, comment_tokens)
-   local output = { "" }
+   local out = { parts = {} }
    local list_stack = {}
 
    for _, node in ipairs(ast) do
       if node.type == "item" or node.type == "enum" then
-         ensure_list_environment(output, list_stack, node)
-         walk(node, output, config)
+         ensure_list_environment(out, list_stack, node)
       else
-         close_all_lists(output, list_stack)
-         walk(node, output, config)
+         close_all_lists(out, list_stack)
       end
+      walk(node, out, config)
    end
 
-   close_all_lists(output, list_stack)
+   close_all_lists(out, list_stack)
 
-   local result = comments.restore(output[1]:sub(2), comment_tokens)
+
+   local result = comments.restore(table.concat(out.parts):sub(2), comment_tokens)
    if not nested and contains_links(ast) then
       result = "\\ifcsname hyper@normalise\\endcsname\\else\\PackageError{mark2tex}{Markdown links require hyperref}{Load \\string\\usepackage{hyperref} in the document preamble.}\\fi\n" .. result
    end
