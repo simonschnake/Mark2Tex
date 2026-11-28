@@ -75,7 +75,10 @@ return function(unit)
 		for _, source in ipairs({ '[x](a b)', '[x](<a b)', '[x](a(b)', '[x](url "unclosed)' }) do
 			unit.assertEquals(helpers.transform(source .. ' **after**'), source .. ' \\textbf{after}')
 		end
-		unit.assertEquals(helpers.transform('[broken](foo_bar **after**'), '[broken](foo_bar \\textbf{after}')
+		-- The broken destination is kept literally, so its underscore is escaped.
+		unit.assertEquals(helpers.transform('[broken](foo_bar **after**'), '[broken](foo\\_bar \\textbf{after}')
+		-- The label stays inline text: code in it is still typeset as code.
+		unit.assertEquals(helpers.transform('[a `{`](b c'), '[a \\texttt{\\{}](b c')
 		unit.assertEquals(helpers.transform('[x][ref] **after**'), '[x][ref] \\textbf{after}')
 	end
 

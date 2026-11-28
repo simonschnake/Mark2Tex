@@ -4,6 +4,7 @@ local math_parser = require("mark2tex.math")
 local links = require("mark2tex.links")
 local footnotes = require("mark2tex.footnotes")
 local placeholders = require("mark2tex.tokens")
+local spans = require("mark2tex.spans")
 
 local type diagnostics = require("mark2tex.diagnostics")
 local type Issue = diagnostics.Issue
@@ -17,7 +18,7 @@ local record Options
 	resolve_footnote: function(string): nodes.Footnote
 end
 
-local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
+local P, S, C, Ct, V, Cp, Cmt = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V, lpeg.Cp, lpeg.Cmt
 
 local newline = P("\n")
 -- Placeholder frames: no key or command name may run into a placeholder.
@@ -30,11 +31,11 @@ local grammar: {string | integer: lpeg.Pattern} = {}
 -- Citation
 --------------------
 
-grammar.cite = C(P(P(1) - S("\n;,] ") - marker) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] ") - marker) ^ 1)
+grammar.cite = C(P(P(1) - S("\n;,] `\\{}") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
-grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]")) ^ 1)
+grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]`") - marker) ^ 1)
 
 grammar.paren_citation = V("citation_start")
 	* Ct(V("cite") * (V("citation_break") * V("cite")) ^ 0)
@@ -54,12 +55,31 @@ end
 -- Verbatim
 --------------------
 
-grammar.verbatim = P("`")
-	* C((P(1) - P("`")) ^ 1)
-	* P("`")
-	/ function(t: string): Inline
-		return nodes.verbatim(t)
+-- A single-backtick span holding exactly one TeX command stays raw TeX.
+local command_only: {string | integer: lpeg.Pattern} = {}
+command_only.command = P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace") + V("bracket")) ^ 0 * -1
+command_only.brace = P("{") * (V("brace") + V("bracket") + (P(1) - S("{}[]"))) ^ 0 * P("}")
+command_only.bracket = P("[") * (V("brace") + V("bracket") + (P(1) - S("{}[]"))) ^ 0 * P("]")
+command_only[1] = V("command")
+local raw_command = P(command_only)
+
+-- Code spans follow spans.code_end, the rule every pass shares: n backticks
+-- up to the next run of exactly n. With several backticks one space on each
+-- side is stripped, so a span can start or end with a backtick.
+grammar.code_span = Cmt(Cp() * P("`"), function(subject: string, _: integer, start: integer): integer | boolean, string, integer
+	local finish = spans.code_end(subject, start)
+	if not finish then return false end
+	local run = spans.run_length(subject, start)
+	return finish + 1, subject:sub(start + run, finish - run), run
+end) / function(content: string, run: integer): Inline
+	if run == 1 and raw_command:match(content) then
+		return nodes.latex_cmd(content)
 	end
+	if run > 1 and content:match("^ .* $") and content:find("[^ ]") then
+		content = content:sub(2, -2)
+	end
+	return nodes.verbatim(content)
+end
 
 --------------------
 -- Math
@@ -69,20 +89,18 @@ grammar.verbatim = P("`")
 -- Latex Command
 --------------------
 
-grammar.latex_cmd_in_verbatim = P("`")
-	* C(P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
-	* P("`")
-	/ function(t: string): Inline
-		return nodes.latex_cmd(t)
-	end
 
-grammar.brace_group = P("{") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("}")
-grammar.bracket_group = P("[") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("]")
-
-grammar.latex_cmd = C(P("\\") * (1 - S("{[ ") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0)
-	/ function(t: string): Inline
-		return nodes.latex_cmd(t)
-	end
+-- Raw TeX: a command with its arguments exactly as spans.command_end (and so
+-- every scanner) delimits it, or a control symbol such as \] or \\ on its own.
+grammar.latex_cmd = Cmt(Cp() * P("\\"), function(subject: string, _: integer, start: integer): integer | boolean, string
+	local finish = spans.command_end(subject, start)
+	if finish then return finish + 1, subject:sub(start, finish) end
+	local symbol = subject:sub(start + 1, start + 1)
+	if symbol == "" or placeholders.markers:find(symbol, 1, true) then return false end
+	return start + 2, subject:sub(start, start + 1)
+end) / function(t: string): Inline
+	return nodes.latex_cmd(t)
+end
 
 --------------------
 -- Formatting
@@ -139,12 +157,12 @@ end
 -- Inner
 --------------------
 
-grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("latex_cmd")
+grammar.final_elements = V("paren_citation") + V("citation") + V("code_span") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
 -- A special character that starts no construct (an unclosed `*`, a trailing
 -- backslash) stays literal instead of failing the whole paragraph.
-grammar.stray = C(P("[@") + S("@$`*\\_[~")) / function(t: string): Inline
+grammar.stray = C(P("[@") + P("`") ^ 1 + S("@$*\\_[~")) / function(t: string): Inline
 	return nodes.text(t)
 end
 
@@ -182,8 +200,8 @@ local function parse_inlines(str: string, options?: Options): {Inline}, {Issue}
 	if parsed == nil then
 		parsed = { nodes.text(protected) }
 	end
-	parsed = merge_text(parsed)
-	return links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens), warnings
+	local expanded = links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens)
+	return merge_text(expanded), warnings
 end
 
 return parse_inlines

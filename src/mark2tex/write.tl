@@ -187,10 +187,12 @@ local INLINE_CODE_ESCAPES: {string: string} = {
 	["\\"] = "\\textbackslash{}",
 	["^"] = "\\textasciicircum{}",
 	["~"] = "\\textasciitilde{}",
+	-- Only spans of several backticks contain one; TeX would print a quote.
+	["`"] = "\\textasciigrave{}",
 }
 
 local function write_inline_code(text: string): string
-	return (text:gsub("[\\%%{}#&_$^~]", function(character: string): string
+	return (text:gsub("[\\%%{}#&_$^~`]", function(character: string): string
 		return INLINE_CODE_ESCAPES[character] or "\\" .. character
 	end))
 end

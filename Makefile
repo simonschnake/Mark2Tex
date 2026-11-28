@@ -22,10 +22,19 @@ golden-update:
 	$(LUA) tests/golden.lua --update
 
 # Property-based fuzzing; failures are shrunk and written to tests/tmp/.
-FUZZ_SAMPLES ?= 2000
+# FUZZ_JOBS processes run in parallel, each with its own seed (FUZZ_SEED,
+# FUZZ_SEED+1, ...) and an equal share of FUZZ_SAMPLES.
+FUZZ_SAMPLES ?= 16000
 FUZZ_SEED ?= 20261128
+FUZZ_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 fuzz:
-	$(LUA) tests/fuzz.lua $(FUZZ_SAMPLES) $(FUZZ_SEED)
+	@mkdir -p tests/tmp; status=0; pids=""; \
+	share=$$(( ($(FUZZ_SAMPLES) + $(FUZZ_JOBS) - 1) / $(FUZZ_JOBS) )); \
+	for job in $$(seq 0 $$(( $(FUZZ_JOBS) - 1 ))); do \
+		$(LUA) tests/fuzz.lua $$share $$(( $(FUZZ_SEED) + job )) > tests/tmp/fuzz-job-$$job.log 2>&1 & pids="$$pids $$!"; \
+	done; \
+	for pid in $$pids; do wait $$pid || status=1; done; \
+	cat tests/tmp/fuzz-job-*.log; exit $$status
 
 TEAL_VERSION := 0.24.1
 TEXLUA ?= texlua

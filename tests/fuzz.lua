@@ -63,6 +63,14 @@ local WORDS = {
 	"'", "\"", "(", ")", "(x)", "[", "]", "<", ">", "/", "*", "_", "`", "$", "@", "!", "snake_case",
 	"Ümlaut", "é", "→", "a.b", "e-mail",
 }
+-- Words without characters that start or end a construct. Clean documents use
+-- only these, so every brace in them belongs to one generated construct.
+local CLEAN_WORDS = {}
+for _, word in ipairs(WORDS) do
+	if not word:find("[%$`%*_%[%]<>@~\\!]") then CLEAN_WORDS[#CLEAN_WORDS + 1] = word end
+end
+local noisy = true
+
 local MATH = { "x", "x^2", "a_b", "\\alpha", "\\frac{1}{2}", "{a}", "a+b", "\\sum_{i=1}^n i", "f(x)", "\\{x\\}" }
 local DESTINATIONS = {
 	"https://example.org", "https://example.org/a_b%20c?x=1&y=2#frag", "#sec:intro", "file name.pdf",
@@ -76,7 +84,7 @@ local inline
 
 local function words(count)
 	local parts = {}
-	for _ = 1, count do parts[#parts + 1] = pick(WORDS) end
+	for _ = 1, count do parts[#parts + 1] = pick(noisy and WORDS or CLEAN_WORDS) end
 	return table.concat(parts, " ")
 end
 
@@ -95,6 +103,9 @@ end
 local INLINE_ATOMS = {
 	function() return words(random(1, 4)) end,
 	function() return "`" .. code_content() .. "`" end,
+	function() return "``" .. pick({ "a ` b", " `x` ", "``", "$x$" }) .. "``" end,
+	-- Lone backtick runs shift code span pairing; only noisy documents get them.
+	function() return noisy and pick({ "`", "``", "```" }) .. words(1) or words(1) end,
 	function() return "$" .. math_content() .. "$" end,
 	function() return "\\(" .. math_content() .. "\\)" end,
 	function() return "$$" .. math_content() .. "$$" end,
@@ -112,9 +123,11 @@ local INLINE_ATOMS = {
 	function() return "@" .. pick({ "key", "Turing1950" }) end,
 	function() return "[@a; @b" .. (chance(50) and ", p. 3" or "") .. "]" end,
 	function() return "<!-- " .. words(2) .. " -->" end,
-	function(depth) return "\\textbf{" .. inline(depth + 1) .. "}" end,
+	-- TeX command arguments are raw TeX by design, so only TeX-safe text goes in.
+	function() return "\\textbf{" .. words(2) .. (chance(50) and " $" .. math_content() .. "$" or "") .. "}" end,
 	function() return "\\ref{" .. pick({ "a", "fig:x" }) .. "}" end,
-	function() return pick({ "\\*", "\\_", "\\$", "\\[", "\\]", "\\`", "\\\\" }) end,
+	-- \[ and \] are display math delimiters, not escapes.
+	function() return pick({ "\\*", "\\_", "\\$", "\\`", "\\\\" }) end,
 }
 
 inline = function(depth)
@@ -124,7 +137,15 @@ inline = function(depth)
 		local atom = depth > 3 and INLINE_ATOMS[1] or pick(INLINE_ATOMS)
 		parts[#parts + 1] = atom(depth)
 	end
-	return table.concat(parts, pick({ " ", "", " ", "\n" }))
+	-- Adjacent code spans would merge their backtick runs into one, which
+	-- changes their meaning; such neighbours get a space.
+	local text = parts[1]
+	for index = 2, #parts do
+		local separator = pick({ " ", "", " ", "\n" })
+		if separator == "" and text:sub(-1) == "`" and parts[index]:sub(1, 1) == "`" then separator = " " end
+		text = text .. separator .. parts[index]
+	end
+	return text
 end
 
 local block
@@ -142,6 +163,8 @@ local BLOCKS = {
 			.. "\n" .. row(function() return inline(3) end)
 	end,
 	function() return "```" .. pick({ "", "lua" }) .. "\n" .. code_content() .. "\n```" end,
+	function() return "~~~" .. pick({ "", "python" }) .. "\n" .. code_content() .. "\n~~~" end,
+	function() return "````\n```\n" .. code_content() .. "\n````" end,
 	-- A tex fence is raw TeX, so its content has balanced braces.
 	function() return "```tex\n" .. math_content() .. "\n```" end,
 	function() return "\\begin{" .. pick({ "center", "align", "quote" }) .. "}\n" .. math_content() .. "\n\\end{center}" end,
@@ -160,6 +183,7 @@ block = function(depth)
 end
 
 local function document()
+	noisy = chance(50)
 	local blocks = {}
 	for _ = 1, random(1, 8) do blocks[#blocks + 1] = block() end
 	local source = table.concat(blocks, pick({ "\n\n", "\n", "\n\n\n" }))
@@ -175,7 +199,8 @@ local function document()
 		source = source:sub(1, position - 1) .. pick({ "`", "$", "*", "[", "]", "\n", "::: .notes\n" }) .. source:sub(position)
 		damaged = true
 	end
-	return source, damaged
+	-- Brace balance is only meaningful for clean, undamaged documents.
+	return source, damaged or noisy
 end
 
 --------------------
@@ -210,8 +235,45 @@ end
 
 -- Raw TeX passes through unchanged, so output braces can only balance when the
 -- input braces outside code do.
+-- Remove code spans and fences by the CommonMark rule (a run of n backticks
+-- closed by the next run of exactly n in the paragraph), written
+-- independently of src/mark2tex/spans.tl so the two can be compared.
+local function strip_code(source)
+	local output, index = {}, 1
+	while index <= #source do
+		local run = source:match("^[`~]+", index)
+		local at_line_start = index == 1 or source:sub(index - 1, index - 1) == "\n"
+		if run and at_line_start and #run >= 3 then
+			local closing = nil
+			local search = index + #run
+			while true do
+				local first, last = source:find(run:sub(1, 1) == "`" and "`+" or "~+", search)
+				if not first then break end
+				if last - first + 1 >= #run then closing = last break end
+				search = last + 1
+			end
+			if closing then index = closing + 1 else output[#output + 1] = run; index = index + #run end
+		elseif run and run:sub(1, 1) == "`" and source:sub(index - 1, index - 1) ~= "\\" then
+			run = source:match("^`+", index)
+			local paragraph = source:find("\n[ \t]*\n", index) or #source + 1
+			local closing, search = nil, index + #run
+			while true do
+				local first, last = source:find("`+", search)
+				if not first or first >= paragraph then break end
+				if last - first + 1 == #run then closing = last break end
+				search = last + 1
+			end
+			if closing then index = closing + 1 else output[#output + 1] = run; index = index + #run end
+		else
+			output[#output + 1] = source:sub(index, index)
+			index = index + 1
+		end
+	end
+	return table.concat(output)
+end
+
 local function input_balanced(source)
-	local text = source:gsub("```.-```", ""):gsub("(`+).-%1", "")
+	local text = strip_code(source)
 	local depth, index = 0, 1
 	while index <= #text do
 		local character = text:sub(index, index)
@@ -318,7 +380,8 @@ for sample = 1, SAMPLES do
 			failures = failures + 1
 			local minimal = shrink(source, problem, damaged)
 			local minimal_problem, minimal_variant = failure(minimal, damaged)
-			local path = ("%s/fuzz-failure-%d.md"):format(TMP_DIR, failures)
+			-- The seed in the name keeps parallel runs (make fuzz) apart.
+			local path = ("%s/fuzz-%d-failure-%d.md"):format(TMP_DIR, SEED, failures)
 			for target, content in pairs({ [path] = minimal, [path:gsub("%.md$", ".original.md")] = source }) do
 				local file = assert(io.open(target, "w"))
 				file:write(content)

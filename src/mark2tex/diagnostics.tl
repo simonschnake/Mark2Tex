@@ -1,5 +1,6 @@
 local type ParserIssue = require("mark2tex.issue")
 local delimiters = require("mark2tex.delimiters")
+local spans = require("mark2tex.spans")
 
 local enum WarningCategory
 	"math-delimiter"
@@ -50,45 +51,25 @@ local function warning(source: string, position: integer, fields: Warning): Warn
 	return fields
 end
 
-local function mask_inline_code(line: string): string
-	local output: {string} = {}
-	local position = 1
-	while position <= #line do
-		local opening = line:find("`", position, true)
-		if not opening then
-			output[#output + 1] = line:sub(position)
-			break
-		end
-		output[#output + 1] = line:sub(position, opening - 1)
-		local closing = line:find("`", opening + 1, true)
-		local last = closing or #line
-		output[#output + 1] = string.rep(" ", last - opening + 1)
-		position = last + 1
-	end
-	return table.concat(output)
-end
-
+-- Blank out fenced code and code spans (keeping newlines, so positions stay
+-- valid) with the rules every pass shares (see spans).
 local function mask_code(source: string): string
 	local output: {string} = {}
 	local position = 1
-	local in_fence = false
 	while position <= #source do
-		local newline = source:find("\n", position, true)
-		local last = newline and newline - 1 or #source
-		local line = source:sub(position, last)
-		local fence = line:match("^%s*```") ~= nil
-		if in_fence or fence then
-			output[#output + 1] = string.rep(" ", #line)
+		local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
+		local indent = at_line_start and #source:match("^[ \t]*", position) or 0
+		local fence = at_line_start and spans.fence_end(source, position + indent) or nil
+		local code = not fence and source:sub(position, position) == "`" and spans.code_end(source, position) or nil
+		local ending = fence or code
+		if ending then
+			output[#output + 1] = (source:sub(position, ending):gsub("[^\n]", " "))
+			position = ending + 1
 		else
-			output[#output + 1] = mask_inline_code(line)
+			local run = math.max(spans.run_length(source, position), 1)
+			output[#output + 1] = source:sub(position, position + run - 1)
+			position = position + run
 		end
-		if fence then
-			in_fence = not in_fence
-		end
-		if newline then
-			output[#output + 1] = "\n"
-		end
-		position = last + 2
 	end
 	return table.concat(output)
 end

@@ -1,185 +1,189 @@
 %%% variant: default
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 
 %%% variant: instructor
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 
 %%% variant: handout
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 
 %%% variant: slides
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 \begin{frame}[t]
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 
@@ -187,48 +191,49 @@ Trailing backslash \
 
 %%% variant: slides-dozent-h1-frame
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 \begin{frame}[t]
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 
@@ -236,48 +241,49 @@ Trailing backslash \
 
 %%% variant: slides-h1-hide-level-1
 %%% warning: math-delimiter unclosed 22:45 delimiter=\[
+\ifcsname hyper@normalise\endcsname\else\PackageError{mark2tex}{Markdown links require hyperref}{Load \string\usepackage{hyperref} in the document preamble.}\fi
 \begin{frame}[t]
 Edge cases for inline scanning. Every paragraph is independent; the golden
 snapshots record how each pass treats it.
 
 Single backtick code \texttt{a\_b \{x\} \%} and code with a link inside \texttt{[l](u)}.
 
-Double backtick code `\texttt{a } b`\texttt{ and triple }`\texttt{x }\texttt{ y}`\texttt{.
+Double backtick code \texttt{a \textasciigrave{} b} and triple \texttt{x \textasciigrave{}\textasciigrave{} y}.
 
-Unclosed code }open \textbf{bold} $x$ [link](https://e.org) ^[note].
+Unclosed code `open \textbf{bold} $x$ \href{\detokenize{https://e.org}}{link} \footnote{note}.
 
-Unclosed double backtick `\texttt{open and then }closed\texttt{ text.
+Unclosed double backtick ``open and then \texttt{closed} text.
 
-Empty pair }\texttt{ and a lone } backtick.
+Empty pair `` and a lone ` backtick.
 
-Code then math $` and $\texttt{y}$ after.
+Code then math \texttt{\$} and $y$ after.
 
-Math with code inside $\texttt{a}b\texttt{c}$ and code with math inside `$\texttt{x}$`.
+Math with code inside $a`b`c$ and code with math inside \texttt{\$x\$}.
 
-Escaped dollar \$5 and \$10, then real $\texttt{x}$.
+Escaped dollar \$5 and \$10, then real $x$.
 
-Math inside a TeX argument \textbf{$\texttt{x}$ and $\texttt{y}$} and \text{a $\texttt{b}$ c}.
+Math inside a TeX argument \textbf{$x$ and $y$} and \text{a $b$ c}.
 
 Display delimiters inside a TeX argument \f{\[} and \g{\(}.
 
-Broken math inside an argument \textbf{$\texttt{x\} stays raw TeX.
+Broken math inside an argument \textbf{$x} stays raw TeX.
 
-Command with option and argument \textbackslash{}cmd[o]\{}$a$\texttt{\} then }$b$\texttt{.
+Command with option and argument \cmd[o]{$a$} then $b$.
 
-Link label with code L1 and destination with code L2.
+Link label with code \href{\detokenize{https://e.org}}{\texttt{a]b}} and destination with code \href{\detokenize{`y`}}{x}.
 
-Malformed link with code L3 b] and L4 }e\texttt{.
+Malformed link with code [a \texttt{](} b] and [c](d \texttt{e}.
 
-Footnote inside code }^[not a note]\texttt{ and a real noteF1.
+Footnote inside code \texttt{\textasciicircum{}[not a note]} and a real note\footnote{yes}.
 
-Footnote after code }x\texttt{F2 and after math }$x$\texttt{F3.
+Footnote after code \texttt{x}\footnote{note} and after math $x$\footnote{note}.
 
-Citation next to code @key}c\texttt{ and [@a; @b] }d\texttt{.
+Citation next to code \cite{key}\texttt{c} and \parencite{a, b} \texttt{d}.
 
-Comment inside code }<!-- kept -->\texttt{ and outside % removed 
+Comment inside code \texttt{<!-- kept -->} and outside % removed 
 .
 
-Backslash before backtick \textbackslash{}}not code\` and \\`code`.
+Backslash before backtick \`not code\` and \\\texttt{code}.
 
 Trailing backslash \
 

@@ -1,4 +1,5 @@
 local delimiters = require("mark2tex.delimiters")
+local spans = require("mark2tex.spans")
 local nodes = require("mark2tex.nodes")
 local type diagnostics = require("mark2tex.diagnostics")
 
@@ -63,20 +64,22 @@ function math_parser.protect_inlines(input: string, options?: Options): string, 
 	local warnings: {Warning} = {}
 	local output: {string} = {}
 	local index = 1
-	local in_code = false
 
 	while index <= #input do
 		local character = input:sub(index, index)
+		-- Code spans and TeX commands with their arguments stay opaque, exactly as
+		-- in every other pass (see spans).
+		local opaque = (character == "`" and not delimiters.is_escaped(input, index)
+			and spans.code_or_run_end(input, index))
+			or (character == "\\" and spans.command_end(input, index))
 
-		if character == "`" and not delimiters.is_escaped(input, index) then
-			in_code = not in_code
-			output[#output + 1] = character
-			index = index + 1
-		elseif in_code then
-			output[#output + 1] = character
-			index = index + 1
-		elseif input:sub(index, index + 1) == "\\(" and not delimiters.is_escaped(input, index) then
-			local closing = delimiters.find_unescaped(input, "\\)", index + 2)
+		-- Delimiters pair exactly as in every other pass (spans.math_span).
+		local opening, closing = spans.math_span(input, index)
+
+		if opaque then
+			output[#output + 1] = input:sub(index, opaque)
+			index = opaque + 1
+		elseif opening == "\\(" then
 			if closing and closing > index + 2 then
 				output[#output + 1] = add_token(tokens, nodes.inline_math(input:sub(index, closing + 1)))
 				index = closing + 2
@@ -86,8 +89,7 @@ function math_parser.protect_inlines(input: string, options?: Options): string, 
 				output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
 				index = ending + 1
 			end
-		elseif input:sub(index, index + 1) == "\\[" and not delimiters.is_escaped(input, index) then
-			local closing = delimiters.find_unescaped(input, "\\]", index + 2)
+		elseif opening == "\\[" then
 			if closing and closing > index + 2 and allow_display then
 				output[#output + 1] = add_token(tokens, nodes.display_math(input:sub(index + 2, closing - 1)))
 				index = closing + 2
@@ -101,8 +103,7 @@ function math_parser.protect_inlines(input: string, options?: Options): string, 
 				output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
 				index = ending + 1
 			end
-		elseif input:sub(index, index + 1) == "$$" and not delimiters.is_escaped(input, index) then
-			local closing = delimiters.find_unescaped(input, "$$", index + 2)
+		elseif opening == "$$" then
 			if closing and closing > index + 2 and allow_display then
 				output[#output + 1] = add_token(tokens, nodes.display_math(input:sub(index + 2, closing - 1)))
 				index = closing + 2
@@ -116,11 +117,7 @@ function math_parser.protect_inlines(input: string, options?: Options): string, 
 				output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
 				index = ending + 1
 			end
-		elseif character == "$" and not delimiters.is_escaped(input, index) then
-			local closing = delimiters.find_unescaped(input, "$", index + 1)
-			while closing and input:sub(closing, closing + 1) == "$$" do
-				closing = delimiters.find_unescaped(input, "$", closing + 2)
-			end
+		elseif opening == "$" then
 			if closing and closing > index + 1 then
 				output[#output + 1] = add_token(tokens, nodes.inline_math(input:sub(index, closing)))
 				index = closing + 1

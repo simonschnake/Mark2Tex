@@ -25,6 +25,7 @@ local record lpeg
 	Ct: function(Pattern): Pattern
 	Cp: function(): Pattern
 	Cmt: function<A, B, R>(Pattern, function(string, integer, A, B): (integer, R)): Pattern
+	Cmt: function<A, B, C, R, S>(Pattern, function(string, integer, A, B, C): (integer | boolean, R, S)): Pattern
 	match: function(Pattern, string): any
 	V: function(string): Pattern
 end

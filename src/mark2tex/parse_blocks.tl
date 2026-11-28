@@ -1,6 +1,7 @@
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
+local spans = require("mark2tex.spans")
 
 local type RawBlock = nodes.RawBlock
 local type Pattern = lpeg.Pattern
@@ -164,12 +165,22 @@ grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
 -- Code
 --------------------
 
-grammar.code = newline
-	* P("`") ^ 3
-	* C(rest_of_line ^ -1)
-	* newline
-	* C((P(1) - P("`") ^ 3) ^ 1)
-	* P("`") ^ 3
+-- A fence of three or more backticks or tildes, closed by a run of the same
+-- character at least as long (spans.fence_end, shared with every pass).
+local function fenced(character: string): Pattern
+	return newline * Cmt(Cp() * P(character) ^ 3 * C(rest_of_line ^ -1) * newline * Cp(),
+		function(subject: string, _: integer, start: integer, info: string, content_start: integer): integer | boolean, string, string
+			local finish = spans.fence_end(subject, start)
+			if not finish then return false end
+			local closing = finish
+			while subject:sub(closing - 1, closing - 1) == character do closing = closing - 1 end
+			-- The fence needs content; the closing run must follow it.
+			if closing <= content_start then return false end
+			return finish + 1, info, subject:sub(content_start, closing - 1)
+		end)
+end
+
+grammar.code = (fenced("`") + fenced("~"))
 	/ function(code_type: string, content: string): RawBlock
 		if code_type == "tex" then
 			return nodes.latex(content)
@@ -209,20 +220,22 @@ local function split_table_row(line: string): {string}
 	local cell_start = 1
 	local in_math = false
 	local scanned = links.mask_destinations(line)
-	local in_code = false
+	local index = 1
 
-	for index = 1, #line do
+	while index <= #line do
 		local character = scanned:sub(index, index)
 		local previous = index > 1 and line:sub(index - 1, index - 1) or ""
 
 		if character == "`" and previous ~= "\\" and not in_math then
-			in_code = not in_code
-		elseif character == "$" and previous ~= "\\" and not in_code then
+			-- Pipes inside a code span do not split cells (see spans).
+			index = spans.code_or_run_end(scanned, index)
+		elseif character == "$" and previous ~= "\\" then
 			in_math = not in_math
-		elseif character == "|" and previous ~= "\\" and not in_math and not in_code then
+		elseif character == "|" and previous ~= "\\" and not in_math then
 			table.insert(cells, trim(line:sub(cell_start, index - 1)))
 			cell_start = index + 1
 		end
+		index = index + 1
 	end
 
 	table.insert(cells, trim(line:sub(cell_start)))

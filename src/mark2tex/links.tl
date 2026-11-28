@@ -2,6 +2,7 @@
 local autolinks = require("mark2tex.autolinks")
 local delimiters = require("mark2tex.delimiters")
 local placeholders = require("mark2tex.tokens")
+local spans = require("mark2tex.spans")
 local nodes = require("mark2tex.nodes")
 
 local type Match = autolinks.Match
@@ -33,43 +34,20 @@ local function unescape(value: string): string
 end
 
 -- Skip code, complete math and raw TeX command arguments during link scanning.
+-- The rules live in spans, which every pass shares.
 local function protected_end(source: string, position: integer): integer
 	local character = source:sub(position, position)
 	if character == "`" and not delimiters.is_escaped(source, position) then
-		local delimiter = source:match("^`+", position)
-		local last = source:find(delimiter, position + #delimiter, true)
-		return last and last + #delimiter - 1 or #source
+		return spans.code_or_run_end(source, position)
 	end
-	local delimiter, finish: string, string
-	if character == "$" and not delimiters.is_escaped(source, position) then
-		delimiter = source:sub(position, position + 1) == "$$" and "$$" or "$"
-		finish = delimiter
-	elseif source:sub(position, position + 1) == "\\(" then
-		delimiter, finish = "\\(", "\\)"
-	elseif source:sub(position, position + 1) == "\\[" then
-		delimiter, finish = "\\[", "\\]"
-	end
-	if delimiter then
-		local last = delimiters.find_unescaped(source, finish, position + #delimiter)
-		if last then return last + #finish - 1 end
+	local opening, closing = spans.math_span(source, position)
+	if opening then
+		-- An unclosed delimiter is skipped as a whole, as the math pass does.
+		return closing and closing + #spans.math_closer(opening) - 1 or position + #opening - 1
 	end
 	if character == "\\" then
-		local command = source:match("^\\[%a@]+%*?", position)
-		if command then
-			local index = position + #command
-			while source:sub(index, index) == "{" or source:sub(index, index) == "[" do
-				local stack = { source:sub(index, index) == "{" and "}" or "]" }
-				index = index + 1
-				while #stack > 0 and index <= #source do
-					local c = source:sub(index, index)
-					if c == "\\" then index = index + 1
-					elseif c == "{" or c == "[" then stack[#stack + 1] = c == "{" and "}" or "]"
-					elseif c == stack[#stack] then table.remove(stack) end
-					index = index + 1
-				end
-			end
-			return index - 1
-		end
+		local command = spans.command_end(source, position)
+		if command then return command end
 		if punctuation:find(source:sub(position + 1, position + 1), 1, true) then
 			return position + 1
 		end
@@ -89,15 +67,52 @@ end
 
 -- Recover a malformed inline-link candidate as literal source, without hiding
 -- following formatting after an unclosed destination.
-local function malformed_end(source: string, position: integer): integer
+-- Returns the end of the candidate and the index of its closing label bracket.
+local function malformed_end(source: string, position: integer): integer, integer
 	if source:sub(position, position) ~= "[" then return nil end
-	local label_end = source:find("](", position + 1, true)
-	if not label_end or source:sub(position, label_end):find("\n") then return nil end
+	-- Only the bracket that closes this label counts, skipping code, math and
+	-- nested brackets; a later "](" on the line belongs to another candidate.
+	local depth, label_end = 1, position + 1
+	while label_end <= #source do
+		local character = source:sub(label_end, label_end)
+		local protected = protected_end(source, label_end)
+		if character == "\n" then return nil end
+		if protected then
+			label_end = protected + 1
+		else
+			if character == "[" then depth = depth + 1 end
+			if character == "]" then depth = depth - 1 end
+			if depth == 0 then break end
+			label_end = label_end + 1
+		end
+	end
+	if depth ~= 0 or source:sub(label_end + 1, label_end + 1) ~= "(" then return nil end
 	local finish = source:find(")", label_end + 2, true)
 	local newline = source:find("\n", label_end + 2, true)
-	if finish and (not newline or finish < newline) then return finish end
+	if finish and (not newline or finish < newline) then return finish, label_end end
 	local space = source:find("[ \t\r\n]", label_end + 2)
-	return space and space - 1 or #source
+	return space and space - 1 or #source, label_end
+end
+
+-- The source of a construct that is not a link here, with the part after the
+-- label as literal characters so URL characters cannot break the TeX.
+local function literal_suffix(source: string, first: integer, last: integer): Inline
+	local kept: {Inline} = {}
+	local text = source:sub(first, last)
+	local index = 1
+	while index <= #text do
+		local character = text:sub(index, index)
+		local token_end = placeholders.markers:sub(1, 1) == character and text:find(placeholders.markers:sub(2, 2), index, true)
+		if token_end then
+			-- A placeholder of an earlier pass stays whole, so it is still expanded.
+			kept[#kept + 1] = nodes.text(text:sub(index, token_end))
+			index = token_end + 1
+		else
+			kept[#kept + 1] = nodes.literal(character)
+			index = index + 1
+		end
+	end
+	return nodes.other(kept)
 end
 
 local function suffix(source: string, start: integer): Match
@@ -199,14 +214,26 @@ function links.protect<W>(source: string, parse_label: function(string): ({Inlin
 		tokens[#tokens + 1] = { token = token, node = node }
 		output[#output + 1] = token
 	end
+	-- For a candidate that is not a link here, scanning continues inside its
+	-- label (so nested constructs are handled) and its "](destination" part,
+	-- registered by start index, is kept as literal characters.
+	local literal_until: {integer: integer} = {}
 	while index <= #source do
-		local last = protected_end(source, index)
-		local match = not last and links.match(source, index)
-		local malformed = not last and not match and malformed_end(source, index)
-		if match then
+		local literal_end = literal_until[index]
+		local last = not literal_end and protected_end(source, index)
+		local match = not literal_end and not last and links.match(source, index)
+		local malformed, malformed_label: integer, integer
+		if not literal_end and not last and not match then malformed, malformed_label = malformed_end(source, index) end
+		if literal_end then
+			add(literal_suffix(source, index, literal_end))
+			index = literal_end + 1
+		elseif match then
 			local image = index > 1 and source:sub(index - 1, index - 1) == "!" and not delimiters.is_escaped(source, index - 1)
 			if image or options.disable_links then
-				add(nodes.text(source:sub(index, match.finish)))
+				-- Not a link here (an image, or a link inside a link label).
+				output[#output + 1] = source:sub(index, index)
+				literal_until[match.label_end + 1] = match.finish
+				index = index + 1
 			else
 				local content: {Inline} = { nodes.text(match.label) }
 				if match.kind == "inline" then
@@ -215,11 +242,13 @@ function links.protect<W>(source: string, parse_label: function(string): ({Inlin
 					for _, warning in ipairs(label_warnings) do warnings[#warnings + 1] = warning end
 				end
 				add(nodes.link(match.destination, content, match.title, match.kind))
+				index = match.finish + 1
 			end
-			index = match.finish + 1
 		elseif malformed then
-			add(nodes.text(source:sub(index, malformed)))
-			index = malformed + 1
+			-- A broken link: the label stays inline text.
+			output[#output + 1] = source:sub(index, index)
+			literal_until[malformed_label + 1] = malformed
+			index = index + 1
 		elseif options.link_label and not (last and source:sub(index, index + 1) == "\\(") and source:sub(index, index) == "\\" and punctuation:find(source:sub(index + 1, index + 1), 1, true) then
 			add(nodes.literal(source:sub(index + 1, index + 1)))
 			index = index + 2

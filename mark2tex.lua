@@ -54,6 +54,7 @@ end
 package.preload["mark2tex.comments"] = function(...)
 	return assert(load([[
 
+local spans = require("mark2tex.spans")
 
 
 
@@ -74,11 +75,14 @@ function comments.protect(source)
    local tokens = {}
    local position, protected_position = 1, 1
    while position <= #source do
-      local first, last = source:find("^`+", position)
-      if first then
-         local delimiter = source:sub(first, last)
-         local closing = source:find(delimiter, last + 1, true)
-         local ending = closing and closing + #delimiter - 1 or #source
+
+      local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
+      local code_end = at_line_start and spans.fence_end(source, position) or nil
+      if not code_end and source:sub(position, position) == "`" then
+         code_end = spans.code_or_run_end(source, position)
+      end
+      if code_end then
+         local ending = code_end
          local code = source:sub(position, ending)
          output[#output + 1], masked[#masked + 1] = code, code
          position = ending + 1
@@ -438,6 +442,7 @@ package.preload["mark2tex.diagnostics"] = function(...)
 	return assert(load([[
 
 local delimiters = require("mark2tex.delimiters")
+local spans = require("mark2tex.spans")
 
 
 
@@ -488,45 +493,25 @@ local function warning(source, position, fields)
    return fields
 end
 
-local function mask_inline_code(line)
-   local output = {}
-   local position = 1
-   while position <= #line do
-      local opening = line:find("`", position, true)
-      if not opening then
-         output[#output + 1] = line:sub(position)
-         break
-      end
-      output[#output + 1] = line:sub(position, opening - 1)
-      local closing = line:find("`", opening + 1, true)
-      local last = closing or #line
-      output[#output + 1] = string.rep(" ", last - opening + 1)
-      position = last + 1
-   end
-   return table.concat(output)
-end
+
 
 local function mask_code(source)
    local output = {}
    local position = 1
-   local in_fence = false
    while position <= #source do
-      local newline = source:find("\n", position, true)
-      local last = newline and newline - 1 or #source
-      local line = source:sub(position, last)
-      local fence = line:match("^%s*```") ~= nil
-      if in_fence or fence then
-         output[#output + 1] = string.rep(" ", #line)
+      local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
+      local indent = at_line_start and #source:match("^[ \t]*", position) or 0
+      local fence = at_line_start and spans.fence_end(source, position + indent) or nil
+      local code = not fence and source:sub(position, position) == "`" and spans.code_end(source, position) or nil
+      local ending = fence or code
+      if ending then
+         output[#output + 1] = (source:sub(position, ending):gsub("[^\n]", " "))
+         position = ending + 1
       else
-         output[#output + 1] = mask_inline_code(line)
+         local run = math.max(spans.run_length(source, position), 1)
+         output[#output + 1] = source:sub(position, position + run - 1)
+         position = position + run
       end
-      if fence then
-         in_fence = not in_fence
-      end
-      if newline then
-         output[#output + 1] = "\n"
-      end
-      position = last + 2
    end
    return table.concat(output)
 end
@@ -1183,6 +1168,7 @@ package.preload["mark2tex.links"] = function(...)
 local autolinks = require("mark2tex.autolinks")
 local delimiters = require("mark2tex.delimiters")
 local placeholders = require("mark2tex.tokens")
+local spans = require("mark2tex.spans")
 local nodes = require("mark2tex.nodes")
 
 
@@ -1214,43 +1200,20 @@ local function unescape(value)
 end
 
 
+
 local function protected_end(source, position)
    local character = source:sub(position, position)
    if character == "`" and not delimiters.is_escaped(source, position) then
-      local delimiter = source:match("^`+", position)
-      local last = source:find(delimiter, position + #delimiter, true)
-      return last and last + #delimiter - 1 or #source
+      return spans.code_or_run_end(source, position)
    end
-   local delimiter, finish
-   if character == "$" and not delimiters.is_escaped(source, position) then
-      delimiter = source:sub(position, position + 1) == "$$" and "$$" or "$"
-      finish = delimiter
-   elseif source:sub(position, position + 1) == "\\(" then
-      delimiter, finish = "\\(", "\\)"
-   elseif source:sub(position, position + 1) == "\\[" then
-      delimiter, finish = "\\[", "\\]"
-   end
-   if delimiter then
-      local last = delimiters.find_unescaped(source, finish, position + #delimiter)
-      if last then return last + #finish - 1 end
+   local opening, closing = spans.math_span(source, position)
+   if opening then
+
+      return closing and closing + #spans.math_closer(opening) - 1 or position + #opening - 1
    end
    if character == "\\" then
-      local command = source:match("^\\[%a@]+%*?", position)
-      if command then
-         local index = position + #command
-         while source:sub(index, index) == "{" or source:sub(index, index) == "[" do
-            local stack = { source:sub(index, index) == "{" and "}" or "]" }
-            index = index + 1
-            while #stack > 0 and index <= #source do
-               local c = source:sub(index, index)
-               if c == "\\" then index = index + 1
-               elseif c == "{" or c == "[" then stack[#stack + 1] = c == "{" and "}" or "]"
-               elseif c == stack[#stack] then table.remove(stack) end
-               index = index + 1
-            end
-         end
-         return index - 1
-      end
+      local command = spans.command_end(source, position)
+      if command then return command end
       if punctuation:find(source:sub(position + 1, position + 1), 1, true) then
          return position + 1
       end
@@ -1270,15 +1233,52 @@ end
 
 
 
+
 local function malformed_end(source, position)
    if source:sub(position, position) ~= "[" then return nil end
-   local label_end = source:find("](", position + 1, true)
-   if not label_end or source:sub(position, label_end):find("\n") then return nil end
+
+
+   local depth, label_end = 1, position + 1
+   while label_end <= #source do
+      local character = source:sub(label_end, label_end)
+      local protected = protected_end(source, label_end)
+      if character == "\n" then return nil end
+      if protected then
+         label_end = protected + 1
+      else
+         if character == "[" then depth = depth + 1 end
+         if character == "]" then depth = depth - 1 end
+         if depth == 0 then break end
+         label_end = label_end + 1
+      end
+   end
+   if depth ~= 0 or source:sub(label_end + 1, label_end + 1) ~= "(" then return nil end
    local finish = source:find(")", label_end + 2, true)
    local newline = source:find("\n", label_end + 2, true)
-   if finish and (not newline or finish < newline) then return finish end
+   if finish and (not newline or finish < newline) then return finish, label_end end
    local space = source:find("[ \t\r\n]", label_end + 2)
-   return space and space - 1 or #source
+   return space and space - 1 or #source, label_end
+end
+
+
+
+local function literal_suffix(source, first, last)
+   local kept = {}
+   local text = source:sub(first, last)
+   local index = 1
+   while index <= #text do
+      local character = text:sub(index, index)
+      local token_end = placeholders.markers:sub(1, 1) == character and text:find(placeholders.markers:sub(2, 2), index, true)
+      if token_end then
+
+         kept[#kept + 1] = nodes.text(text:sub(index, token_end))
+         index = token_end + 1
+      else
+         kept[#kept + 1] = nodes.literal(character)
+         index = index + 1
+      end
+   end
+   return nodes.other(kept)
 end
 
 local function suffix(source, start)
@@ -1380,14 +1380,26 @@ function links.protect(source, parse_label, options)
       tokens[#tokens + 1] = { token = token, node = node }
       output[#output + 1] = token
    end
+
+
+
+   local literal_until = {}
    while index <= #source do
-      local last = protected_end(source, index)
-      local match = not last and links.match(source, index)
-      local malformed = not last and not match and malformed_end(source, index)
-      if match then
+      local literal_end = literal_until[index]
+      local last = not literal_end and protected_end(source, index)
+      local match = not literal_end and not last and links.match(source, index)
+      local malformed, malformed_label
+      if not literal_end and not last and not match then malformed, malformed_label = malformed_end(source, index) end
+      if literal_end then
+         add(literal_suffix(source, index, literal_end))
+         index = literal_end + 1
+      elseif match then
          local image = index > 1 and source:sub(index - 1, index - 1) == "!" and not delimiters.is_escaped(source, index - 1)
          if image or options.disable_links then
-            add(nodes.text(source:sub(index, match.finish)))
+
+            output[#output + 1] = source:sub(index, index)
+            literal_until[match.label_end + 1] = match.finish
+            index = index + 1
          else
             local content = { nodes.text(match.label) }
             if match.kind == "inline" then
@@ -1396,11 +1408,13 @@ function links.protect(source, parse_label, options)
                for _, warning in ipairs(label_warnings) do warnings[#warnings + 1] = warning end
             end
             add(nodes.link(match.destination, content, match.title, match.kind))
+            index = match.finish + 1
          end
-         index = match.finish + 1
       elseif malformed then
-         add(nodes.text(source:sub(index, malformed)))
-         index = malformed + 1
+
+         output[#output + 1] = source:sub(index, index)
+         literal_until[malformed_label + 1] = malformed
+         index = index + 1
       elseif options.link_label and not (last and source:sub(index, index + 1) == "\\(") and source:sub(index, index) == "\\" and punctuation:find(source:sub(index + 1, index + 1), 1, true) then
          add(nodes.literal(source:sub(index + 1, index + 1)))
          index = index + 2
@@ -1489,6 +1503,7 @@ end
 package.preload["mark2tex.math"] = function(...)
 	return assert(load([[
 local delimiters = require("mark2tex.delimiters")
+local spans = require("mark2tex.spans")
 local nodes = require("mark2tex.nodes")
 
 
@@ -1553,20 +1568,22 @@ function math_parser.protect_inlines(input, options)
    local warnings = {}
    local output = {}
    local index = 1
-   local in_code = false
 
    while index <= #input do
       local character = input:sub(index, index)
 
-      if character == "`" and not delimiters.is_escaped(input, index) then
-         in_code = not in_code
-         output[#output + 1] = character
-         index = index + 1
-      elseif in_code then
-         output[#output + 1] = character
-         index = index + 1
-      elseif input:sub(index, index + 1) == "\\(" and not delimiters.is_escaped(input, index) then
-         local closing = delimiters.find_unescaped(input, "\\)", index + 2)
+
+      local opaque = (character == "`" and not delimiters.is_escaped(input, index) and
+      spans.code_or_run_end(input, index)) or
+      (character == "\\" and spans.command_end(input, index))
+
+
+      local opening, closing = spans.math_span(input, index)
+
+      if opaque then
+         output[#output + 1] = input:sub(index, opaque)
+         index = opaque + 1
+      elseif opening == "\\(" then
          if closing and closing > index + 2 then
             output[#output + 1] = add_token(tokens, nodes.inline_math(input:sub(index, closing + 1)))
             index = closing + 2
@@ -1576,8 +1593,7 @@ function math_parser.protect_inlines(input, options)
             output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
             index = ending + 1
          end
-      elseif input:sub(index, index + 1) == "\\[" and not delimiters.is_escaped(input, index) then
-         local closing = delimiters.find_unescaped(input, "\\]", index + 2)
+      elseif opening == "\\[" then
          if closing and closing > index + 2 and allow_display then
             output[#output + 1] = add_token(tokens, nodes.display_math(input:sub(index + 2, closing - 1)))
             index = closing + 2
@@ -1591,8 +1607,7 @@ function math_parser.protect_inlines(input, options)
             output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
             index = ending + 1
          end
-      elseif input:sub(index, index + 1) == "$$" and not delimiters.is_escaped(input, index) then
-         local closing = delimiters.find_unescaped(input, "$$", index + 2)
+      elseif opening == "$$" then
          if closing and closing > index + 2 and allow_display then
             output[#output + 1] = add_token(tokens, nodes.display_math(input:sub(index + 2, closing - 1)))
             index = closing + 2
@@ -1606,11 +1621,7 @@ function math_parser.protect_inlines(input, options)
             output[#output + 1] = add_token(tokens, nodes.text(input:sub(index, ending)))
             index = ending + 1
          end
-      elseif character == "$" and not delimiters.is_escaped(input, index) then
-         local closing = delimiters.find_unescaped(input, "$", index + 1)
-         while closing and input:sub(closing, closing + 1) == "$$" do
-            closing = delimiters.find_unescaped(input, "$", closing + 2)
-         end
+      elseif opening == "$" then
          if closing and closing > index + 1 then
             output[#output + 1] = add_token(tokens, nodes.inline_math(input:sub(index, closing)))
             index = closing + 1
@@ -2286,6 +2297,7 @@ package.preload["mark2tex.parse_blocks"] = function(...)
 local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
+local spans = require("mark2tex.spans")
 
 
 
@@ -2449,12 +2461,22 @@ end
 
 
 
-grammar.code = newline *
-P("`") ^ 3 *
-C(rest_of_line ^ (-1)) *
-newline *
-C((P(1) - P("`") ^ 3) ^ 1) *
-P("`") ^ 3 /
+
+
+local function fenced(character)
+   return newline * Cmt(Cp() * P(character) ^ 3 * C(rest_of_line ^ (-1)) * newline * Cp(),
+   function(subject, _, start, info, content_start)
+      local finish = spans.fence_end(subject, start)
+      if not finish then return false end
+      local closing = finish
+      while subject:sub(closing - 1, closing - 1) == character do closing = closing - 1 end
+
+      if closing <= content_start then return false end
+      return finish + 1, info, subject:sub(content_start, closing - 1)
+   end)
+end
+
+grammar.code = (fenced("`") + fenced("~")) /
 function(code_type, content)
    if code_type == "tex" then
       return nodes.latex(content)
@@ -2494,20 +2516,22 @@ local function split_table_row(line)
    local cell_start = 1
    local in_math = false
    local scanned = links.mask_destinations(line)
-   local in_code = false
+   local index = 1
 
-   for index = 1, #line do
+   while index <= #line do
       local character = scanned:sub(index, index)
       local previous = index > 1 and line:sub(index - 1, index - 1) or ""
 
       if character == "`" and previous ~= "\\" and not in_math then
-         in_code = not in_code
-      elseif character == "$" and previous ~= "\\" and not in_code then
+
+         index = spans.code_or_run_end(scanned, index)
+      elseif character == "$" and previous ~= "\\" then
          in_math = not in_math
-      elseif character == "|" and previous ~= "\\" and not in_math and not in_code then
+      elseif character == "|" and previous ~= "\\" and not in_math then
          table.insert(cells, trim(line:sub(cell_start, index - 1)))
          cell_start = index + 1
       end
+      index = index + 1
    end
 
    table.insert(cells, trim(line:sub(cell_start)))
@@ -2634,6 +2658,7 @@ local math_parser = require("mark2tex.math")
 local links = require("mark2tex.links")
 local footnotes = require("mark2tex.footnotes")
 local placeholders = require("mark2tex.tokens")
+local spans = require("mark2tex.spans")
 
 
 
@@ -2647,7 +2672,7 @@ local placeholders = require("mark2tex.tokens")
 
 
 
-local P, S, C, Ct, V = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V
+local P, S, C, Ct, V, Cp, Cmt = lpeg.P, lpeg.S, lpeg.C, lpeg.Ct, lpeg.V, lpeg.Cp, lpeg.Cmt
 
 local newline = P("\n")
 
@@ -2660,11 +2685,11 @@ local grammar = {}
 
 
 
-grammar.cite = C(P(P(1) - S("\n;,] ") - marker) ^ 1)
-grammar.cite2 = C(P(P(1) - S("\n;, .] ") - marker) ^ 1)
+grammar.cite = C(P(P(1) - S("\n;,] `\\{}") - marker) ^ 1)
+grammar.cite2 = C(P(P(1) - S("\n;, .] `\\{}") - marker) ^ 1)
 grammar.citation_start = P("[@") + P("[\n@")
 grammar.citation_break = ((S(",; ") ^ 0 * newline) + S(",; ") ^ 1) * newline ^ 0 * P("@")
-grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]")) ^ 1)
+grammar.citation_locator = P(",") * S(" ") ^ 0 * C((P(1) - S("\n]`") - marker) ^ 1)
 
 grammar.paren_citation = V("citation_start") *
 Ct(V("cite") * (V("citation_break") * V("cite")) ^ 0) *
@@ -2684,11 +2709,30 @@ end
 
 
 
-grammar.verbatim = P("`") *
-C((P(1) - P("`")) ^ 1) *
-P("`") /
-function(t)
-   return nodes.verbatim(t)
+
+local command_only = {}
+command_only.command = P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace") + V("bracket")) ^ 0 * -1
+command_only.brace = P("{") * (V("brace") + V("bracket") + (P(1) - S("{}[]"))) ^ 0 * P("}")
+command_only.bracket = P("[") * (V("brace") + V("bracket") + (P(1) - S("{}[]"))) ^ 0 * P("]")
+command_only[1] = V("command")
+local raw_command = P(command_only)
+
+
+
+
+grammar.code_span = Cmt(Cp() * P("`"), function(subject, _, start)
+   local finish = spans.code_end(subject, start)
+   if not finish then return false end
+   local run = spans.run_length(subject, start)
+   return finish + 1, subject:sub(start + run, finish - run), run
+end) / function(content, run)
+   if run == 1 and raw_command:match(content) then
+      return nodes.latex_cmd(content)
+   end
+   if run > 1 and content:match("^ .* $") and content:find("[^ ]") then
+      content = content:sub(2, -2)
+   end
+   return nodes.verbatim(content)
 end
 
 
@@ -2699,18 +2743,16 @@ end
 
 
 
-grammar.latex_cmd_in_verbatim = P("`") *
-C(P("\\") * (1 - S("{[ `") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) *
-P("`") /
-function(t)
-   return nodes.latex_cmd(t)
-end
 
-grammar.brace_group = P("{") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("}")
-grammar.bracket_group = P("[") * (V("brace_group") + V("bracket_group") + (P(1) - S("{}[]"))) ^ 0 * P("]")
 
-grammar.latex_cmd = C(P("\\") * (1 - S("{[ ") - marker) ^ 1 * (V("brace_group") + V("bracket_group")) ^ 0) /
-function(t)
+
+grammar.latex_cmd = Cmt(Cp() * P("\\"), function(subject, _, start)
+   local finish = spans.command_end(subject, start)
+   if finish then return finish + 1, subject:sub(start, finish) end
+   local symbol = subject:sub(start + 1, start + 1)
+   if symbol == "" or placeholders.markers:find(symbol, 1, true) then return false end
+   return start + 2, subject:sub(start, start + 1)
+end) / function(t)
    return nodes.latex_cmd(t)
 end
 
@@ -2769,12 +2811,12 @@ end
 
 
 
-grammar.final_elements = V("paren_citation") + V("citation") + V("latex_cmd_in_verbatim") + V("verbatim") + V("latex_cmd")
+grammar.final_elements = V("paren_citation") + V("citation") + V("code_span") + V("latex_cmd")
 grammar.elements = V("final_elements") + V("italic") + V("bold") + V("strikethrough")
 
 
 
-grammar.stray = C(P("[@") + S("@$`*\\_[~")) / function(t)
+grammar.stray = C(P("[@") + P("`") ^ 1 + S("@$*\\_[~")) / function(t)
    return nodes.text(t)
 end
 
@@ -2812,12 +2854,151 @@ local function parse_inlines(str, options)
    if parsed == nil then
       parsed = { nodes.text(protected) }
    end
-   parsed = merge_text(parsed)
-   return links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens), warnings
+   local expanded = links.expand(links.expand(math_parser.expand_tokens(parsed, tokens), link_tokens), footnote_tokens)
+   return merge_text(expanded), warnings
 end
 
 return parse_inlines
 ]], "@src/mark2tex/parse_inlines.tl"))(...)
+end
+
+package.preload["mark2tex.spans"] = function(...)
+	return assert(load([[
+
+
+
+
+
+local delimiters = require("mark2tex.delimiters")
+local placeholders = require("mark2tex.tokens")
+
+local spans = {}
+
+
+
+local function paragraph_end(source, position)
+   return (source:find("\n[ \t]*\n", position))
+end
+
+
+function spans.run_length(source, position)
+   local run = source:match("^`+", position)
+   return run and #run or 0
+end
+
+
+
+
+
+function spans.code_end(source, position)
+   if source:sub(position, position) ~= "`" or delimiters.is_escaped(source, position) then
+      return nil
+   end
+   local length = spans.run_length(source, position)
+   local limit = paragraph_end(source, position + length) or #source + 1
+   local index = position + length
+   while true do
+      local first, last = source:find("`+", index)
+      if not first or first >= limit then return nil end
+      if last - first + 1 == length then return last end
+      index = last + 1
+   end
+end
+
+
+
+function spans.code_or_run_end(source, position)
+   return spans.code_end(source, position) or position + spans.run_length(source, position) - 1
+end
+
+
+function spans.find_closing(source, delimiter, start)
+   local limit = paragraph_end(source, start) or #source + 1
+   local found = delimiters.find_unescaped(source, delimiter, start)
+   if found and found < limit then return found end
+   return nil
+end
+
+
+
+
+function spans.math_span(source, position)
+   local character = source:sub(position, position)
+   local pair = source:sub(position, position + 1)
+   if (pair == "\\(" or pair == "\\[") and not delimiters.is_escaped(source, position) then
+      return pair, spans.find_closing(source, pair == "\\(" and "\\)" or "\\]", position + 2)
+   end
+   if character ~= "$" or delimiters.is_escaped(source, position) then return nil end
+   if pair == "$$" then
+      return "$$", spans.find_closing(source, "$$", position + 2)
+   end
+   local closing = spans.find_closing(source, "$", position + 1)
+   while closing and source:sub(closing, closing + 1) == "$$" do
+      closing = spans.find_closing(source, "$", closing + 2)
+   end
+   return "$", closing
+end
+
+
+function spans.math_closer(opening)
+   if opening == "\\(" then return "\\)" end
+   if opening == "\\[" then return "\\]" end
+   return opening
+end
+
+
+
+
+function spans.command_end(source, position)
+   local command = source:match("^\\[%a@]+%*?", position)
+   if not command then return nil end
+   local index = position + #command
+   while source:sub(index, index) == "{" or source:sub(index, index) == "[" do
+      local opening = source:sub(index, index)
+      local stack = { opening == "{" and "}" or "]" }
+      local group = index + 1
+      while #stack > 0 and group <= #source do
+         local character = source:sub(group, group)
+         if character == "\\" then group = group + 1
+         elseif character == "{" or character == "[" then stack[#stack + 1] = character == "{" and "}" or "]"
+         elseif character == stack[#stack] then table.remove(stack) end
+         group = group + 1
+      end
+
+
+
+      local following = source:sub(group, group)
+      if opening == "[" and #stack == 0 and following ~= "" and
+         (following == "(" or placeholders.markers:find(following, 1, true)) then          break end
+
+      if opening == "[" and #stack > 0 then break end
+      index = group
+   end
+
+   return math.min(index - 1, #source)
+end
+
+
+
+
+
+function spans.fence_end(source, position)
+   local character = source:sub(position, position)
+   if character ~= "`" and character ~= "~" then return nil end
+   local pattern = character == "`" and "`+" or "~+"
+   local run = source:match("^" .. pattern, position)
+   if #run < 3 then return nil end
+   local index = position + #run
+   while true do
+      local first, last = source:find(pattern, index)
+      if not first then return nil end
+      if last - first + 1 >= #run then return last end
+      index = last + 1
+   end
+end
+
+return spans
+]], "@src/mark2tex/spans.tl"))(...)
 end
 
 package.preload["mark2tex.tokens"] = function(...)
@@ -3048,10 +3229,12 @@ local INLINE_CODE_ESCAPES = {
    ["\\"] = "\\textbackslash{}",
    ["^"] = "\\textasciicircum{}",
    ["~"] = "\\textasciitilde{}",
+
+   ["`"] = "\\textasciigrave{}",
 }
 
 local function write_inline_code(text)
-   return (text:gsub("[\\%%{}#&_$^~]", function(character)
+   return (text:gsub("[\\%%{}#&_$^~`]", function(character)
       return INLINE_CODE_ESCAPES[character] or "\\" .. character
    end))
 end

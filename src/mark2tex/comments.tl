@@ -1,4 +1,5 @@
 -- Hide HTML comments from Markdown parsing, then restore them as TeX comments.
+local spans = require("mark2tex.spans")
 local record CommentToken
 	token: string
 	content: string
@@ -19,11 +20,14 @@ function comments.protect(source: string): string, {CommentToken}, string
 	local tokens: {CommentToken} = {}
 	local position, protected_position = 1, 1
 	while position <= #source do
-		local first, last = source:find("^`+", position)
-		if first then
-			local delimiter = source:sub(first, last)
-			local closing = source:find(delimiter, last + 1, true)
-			local ending = closing and closing + #delimiter - 1 or #source
+		-- Comments inside fenced code and code spans stay literal (see spans).
+		local at_line_start = position == 1 or source:sub(position - 1, position - 1) == "\n"
+		local code_end = at_line_start and spans.fence_end(source, position) or nil
+		if not code_end and source:sub(position, position) == "`" then
+			code_end = spans.code_or_run_end(source, position)
+		end
+		if code_end then
+			local ending = code_end
 			local code = source:sub(position, ending)
 			output[#output + 1], masked[#masked + 1] = code, code
 			position = ending + 1
