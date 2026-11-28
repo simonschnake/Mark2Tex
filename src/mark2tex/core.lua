@@ -12,6 +12,7 @@ local default_config = require("mark2tex.default_config")
 
 
 
+
 local parse = require("mark2tex.parse")
 local write = require("mark2tex.write")
 local lecture = require("mark2tex.lecture")

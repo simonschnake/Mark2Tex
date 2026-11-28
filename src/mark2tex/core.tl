@@ -3,7 +3,8 @@ local default_config = require "mark2tex.default_config"
 local type Config = default_config
 
 -- Configuration overrides and cache keys can contain arbitrary Lua values.
-local type ConfigOverrides = {any: any}
+-- User-supplied settings before validation; keys are option names.
+local type ConfigOverrides = {string: any}
 
 local record Kpse
     record_input_file: function(string)

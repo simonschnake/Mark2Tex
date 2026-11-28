@@ -14,8 +14,12 @@ local enum WarningKind
 	"display-in-table"
 end
 
+local enum WarningCategory
+	"math-delimiter"
+end
+
 local record Warning is diagnostics.Issue
-	category: string
+	category: WarningCategory
 	kind: WarningKind
 	delimiter: string
 end
@@ -23,6 +27,7 @@ end
 -- Types are exported as aliases: nested records would emit runtime tables.
 local record math_parser
 	type Options = Options
+	type WarningCategory = WarningCategory
 	type WarningKind = WarningKind
 	type Warning = Warning
 	expand_tokens: function({Inline}, {Inline}): {Inline}
