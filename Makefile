@@ -11,10 +11,15 @@ OVERLEAF_BUILD_DIR := $(DIST_DIR)/build/$(PACKAGE)-overleaf
 OVERLEAF_ARCHIVE := $(DIST_DIR)/$(PACKAGE)-overleaf.zip
 TLMGR_USER_TREE ?= $(abspath $(DIST_DIR)/tlmgr-usertree)
 
-.PHONY: test latex-smoke latex-lecture lecture-handout lecture-slides lecture-blocks dist overleaf-zip clean-dist tlmgr-install-dry-run
+.PHONY: test golden-update latex-smoke latex-lecture lecture-handout lecture-slides lecture-blocks dist overleaf-zip clean-dist tlmgr-install-dry-run
 
 test:
 	$(LUA) tests/run.lua
+	$(LUA) tests/golden.lua
+
+# Accept intended output changes into tests/golden/ (review the diff first).
+golden-update:
+	$(LUA) tests/golden.lua --update
 
 TEAL_VERSION := 0.24.1
 TEXLUA ?= texlua
