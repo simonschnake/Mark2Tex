@@ -16,7 +16,7 @@ class BuildWithTeX(build_py):
             shutil.rmtree(destination)
         sources = [
             root / "mark2tex.lua", root / "mark2tex.sty",
-            root / "scripts/convert.lua", *sorted(root.glob("src/mark2tex/*.lua")),
+            root / "scripts/convert.lua",
         ]
         for source in sources:
             target = destination / source.relative_to(root)

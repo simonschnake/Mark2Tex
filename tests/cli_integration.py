@@ -167,7 +167,7 @@ def integration(binary, work):
 
     # Changing either bundled asset must invalidate a build for unchanged source.
     source.write_text(DOCUMENT)
-    for asset in (TEMPLATES / "common.tex", TEX / "src/mark2tex/core.lua"):
+    for asset in (TEMPLATES / "common.tex", TEX / "mark2tex.lua"):
         original = asset.read_bytes()
         try:
             asset.write_bytes(original + b"\n")

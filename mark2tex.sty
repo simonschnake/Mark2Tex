@@ -42,61 +42,7 @@
     return
   end
 
-  local mark2tex_dir = mark2tex_path:match("^(.*)[/\\][^/\\]-$")
-  if mark2tex_dir then
-    package.path = mark2tex_dir .. "/?.lua;" .. mark2tex_dir .. "/?/init.lua;"
-      .. mark2tex_dir .. "/src/?.lua;" .. mark2tex_dir .. "/src/?/init.lua;"
-      .. package.path
-    package.preload["mark2tex.nodes"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/nodes.lua")
-    end
-    package.preload["mark2tex.default_config"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/default_config.lua")
-    end
-    package.preload["mark2tex.fileutils"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/fileutils.lua")
-    end
-    package.preload["mark2tex.parse_blocks"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/parse_blocks.lua")
-    end
-    package.preload["mark2tex.math"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/math.lua")
-    end
-    package.preload["mark2tex.autolinks"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/autolinks.lua")
-    end
-    package.preload["mark2tex.links"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/links.lua")
-    end
-    package.preload["mark2tex.delimiters"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/delimiters.lua")
-    end
-    package.preload["mark2tex.diagnostics"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/diagnostics.lua")
-    end
-    package.preload["mark2tex.comments"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/comments.lua")
-    end
-    package.preload["mark2tex.divs"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/divs.lua")
-    end
-    package.preload["mark2tex.parse_inlines"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/parse_inlines.lua")
-    end
-    package.preload["mark2tex.parse"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/parse.lua")
-    end
-    package.preload["mark2tex.write"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/write.lua")
-    end
-    package.preload["mark2tex.lecture"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/lecture.lua")
-    end
-    package.preload["mark2tex.core"] = function()
-      return dofile(mark2tex_dir .. "/src/mark2tex/core.lua")
-    end
-  end
-
+  -- mark2tex.lua bundles every Lua module and returns mark2tex.core.
   local mark2tex = dofile(mark2tex_path)
   local cfg = {}
   local includeonly_paths = nil

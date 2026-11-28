@@ -73,8 +73,9 @@ local function load_luaunit()
     return fallback
 end
 
-package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
 package.path = "./?.lua;" .. package.path
+-- Test the shipped bundle: loading it registers every mark2tex.* module.
+dofile("mark2tex.lua")
 
 local luaunit = load_luaunit()
 local helpers = require("tests.helpers")

@@ -133,14 +133,12 @@ directly into an Overleaf project:
 ```text
 mark2tex.sty
 mark2tex.lua
-src/mark2tex/*.lua
 README.md
 LICENSE
 ```
 
 In Overleaf, `mark2tex.sty` and `mark2tex.lua` must live at the top level of the
-project; the `src/mark2tex/` directory must remain relative to them. In the
-Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
+project. In the Overleaf menu, the compiler must be set to LuaLaTeX. After that, the package
 can be used like it is locally:
 
 ```tex
@@ -779,22 +777,27 @@ Raw environments without a code fence are also recognized:
 
 Project layout:
 
-- `src/mark2tex/` contains the Teal sources (`*.tl`) and the Lua modules
-  generated from them (`*.lua`, committed so the TeX package needs no Teal).
+- `src/mark2tex/` contains the Teal sources (`*.tl`), the only source of the
+  implementation.
 - `src/*.d.tl` declare the types of the external Lua modules LPeg, LFS and MD5;
   `src/mark2tex/issue.d.tl` holds the warning interface shared by all parsers.
-- `mark2tex.lua` is the compatibility entry point.
-- `mark2tex.sty` integrates Mark2TeX into LuaLaTeX.
-- `tests/` contains fixture tests, unit tests, and a LaTeX smoke test.
-- `scripts/` contains development helpers.
+- `mark2tex.lua` is generated from the Teal sources: one bundle that registers
+  every `mark2tex.*` module and returns `mark2tex.core`. It is committed so the
+  package, Overleaf and the CLI need no Teal, and git diffs hide its content.
+- `mark2tex.sty` integrates Mark2TeX into LuaLaTeX by loading that bundle.
+- `tests/` contains fixture tests, unit tests, golden snapshots, and LaTeX tests.
+- `scripts/` contains the bundler and development helpers.
 
-Edit the `.tl` files, never the generated `.lua` files. Then regenerate and
-verify that the committed Lua matches its sources:
+Edit the `.tl` files, never `mark2tex.lua`. Then regenerate the bundle and
+verify that it matches its sources:
 
 ```sh
 make teal-gen
 make teal-check
 ```
+
+`make teal-gen` compiles each module into `build/teal/` and combines them with
+`scripts/bundle.lua`.
 
 Both targets use the pinned Teal compiler described in
 [Install the LaTeX package](#install-the-latex-package). Compiler settings
@@ -805,6 +808,15 @@ Run regression tests:
 
 ```sh
 make test
+```
+
+Besides the unit tests and fixtures, `make test` renders every Markdown file
+under `examples/` and `tests/` in six profile variants and compares the TeX
+with the snapshots in `tests/golden/`. After an intended output change, review
+the difference and accept it with:
+
+```sh
+make golden-update
 ```
 
 Run individual fixtures:

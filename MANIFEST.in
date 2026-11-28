@@ -1,3 +1,2 @@
 include mark2tex.lua mark2tex.sty scripts/convert.lua
-recursive-include src/mark2tex *.lua
 recursive-include cli/mark2tex_cli/templates *.tex

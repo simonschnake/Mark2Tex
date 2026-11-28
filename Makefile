@@ -42,27 +42,33 @@ teal-version: $(TEAL_PREREQUISITE)
 $(TEAL_LOCAL): scripts/bootstrap-teal.sh
 	sh scripts/bootstrap-teal.sh "$(TEAL_VERSION)" "$(@D)"
 
-# $(call teal_emit,source.tl,output.lua): compile and prepend a generated-file header.
-teal_emit = $(TEAL_GEN) -o "$(2)" "$(1)"; \
-	{ printf '%s\n' "-- Generated from $(1) by Teal $(TEAL_VERSION). Edit the .tl file and run 'make teal-gen'."; \
-	cat "$(2)"; } > "$$tmp.header"; mv "$$tmp.header" "$(2)"
+# Per-module Lua is an intermediate build product; only the bundle is committed.
+TEAL_BUILD_DIR := build/teal
+TEAL_MODULES := $(patsubst src/mark2tex/%.tl,$(TEAL_BUILD_DIR)/%.lua,$(TEAL_SOURCES))
 
+# $(call teal_bundle,output.lua): compile every Teal module into $(TEAL_BUILD_DIR)
+# and combine them into one bundle (see scripts/bundle.lua).
+teal_bundle = mkdir -p $(TEAL_BUILD_DIR); \
+	for src in $(TEAL_SOURCES); do \
+		log=$$($(TEAL_GEN) -o "$(TEAL_BUILD_DIR)/$$(basename "$$src" .tl).lua" "$$src" 2>&1) || { echo "$$log" >&2; exit 1; }; \
+	done; \
+	$(LUA) scripts/bundle.lua "$(1)" "$(TEAL_VERSION)" $(TEAL_MODULES)
+
+# Regenerate the committed bundle after changing a Teal source.
 teal-gen: teal-version
-	@set -e; tmp=$$(mktemp); trap 'rm -f "$$tmp" "$$tmp.header"' EXIT; \
-	for src in $(TEAL_SOURCES); do \
-		$(call teal_emit,$$src,$${src%.tl}.lua); \
-	done
+	@set -e; $(call teal_bundle,mark2tex.lua); echo "Wrote mark2tex.lua"
 
+# Fail when the committed bundle does not match the Teal sources.
 teal-check: teal-version
-	@set -e; tmp=$$(mktemp); trap 'rm -f "$$tmp" "$$tmp.header"' EXIT; \
-	for src in $(TEAL_SOURCES); do \
-		$(call teal_emit,$$src,$$tmp); \
-		diff -u "$${src%.tl}.lua" "$$tmp"; \
-	done
+	@set -e; $(call teal_bundle,$(TEAL_BUILD_DIR)/bundle-check.lua); \
+	if ! cmp -s mark2tex.lua "$(TEAL_BUILD_DIR)/bundle-check.lua"; then \
+		diff -u mark2tex.lua "$(TEAL_BUILD_DIR)/bundle-check.lua" | head -40; \
+		echo "mark2tex.lua is out of date; run 'make teal-gen'." >&2; exit 1; \
+	fi
 
 latex-smoke:
-	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
-	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
+	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
+	cd tests/latex-smoke && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -recorder -interaction=nonstopmode -halt-on-error main.tex
 	grep -Eq '^INPUT (\./)?content\.md$$' tests/latex-smoke/main.fls
 	grep -Eq '^INPUT (\./)?chapter\.md$$' tests/latex-smoke/main.fls
 	! grep -Eq '^INPUT (\./)?excluded\.md$$' tests/latex-smoke/main.fls
@@ -73,16 +79,16 @@ latex-smoke:
 	$(LUA) tests/check_footnotes.lua
 
 latex-lecture: lecture-handout lecture-slides lecture-blocks
-	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error annotations.tex
-	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-dozent '\def\LectureDozent{}\input{annotations.tex}'
-	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-handout '\def\LectureHandout{}\input{annotations.tex}'
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -interaction=nonstopmode -halt-on-error annotations.tex
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-dozent '\def\LectureDozent{}\input{annotations.tex}'
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -interaction=nonstopmode -halt-on-error -jobname=annotations-handout '\def\LectureHandout{}\input{annotations.tex}'
 	cd tests/lecture && sh check-pdfs.sh
 
 lecture-handout: LECTURE_JOB = handout
 lecture-slides: LECTURE_JOB = folien
 lecture-blocks: LECTURE_JOB = blocks
 lecture-handout lecture-slides lecture-blocks:
-	cd tests/lecture && TEXINPUTS=.:$(CURDIR)//: LUAINPUTS=$(CURDIR)//: lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
+	cd tests/lecture && TEXINPUTS=.:$(CURDIR): LUAINPUTS=$(CURDIR): lualatex -recorder -interaction=nonstopmode -halt-on-error $(LECTURE_JOB).tex
 
 dist: teal-check
 	$(MAKE) test
@@ -91,14 +97,13 @@ dist: teal-check
 overleaf-zip: $(OVERLEAF_ARCHIVE)
 
 
-$(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark2tex/*.lua)
+$(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE
 	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/mark2tex"
-	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/src/mark2tex"
+	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex"
 	@mkdir -p "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/mark2tex"
 	@mkdir -p "$(DIST_BUILD_DIR)/tlpkg/tlpobj"
 	@cp mark2tex.sty "$(DIST_BUILD_DIR)/texmf-dist/tex/latex/mark2tex/"
 	@cp mark2tex.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/"
-	@cp src/mark2tex/*.lua "$(DIST_BUILD_DIR)/texmf-dist/scripts/mark2tex/src/mark2tex/"
 	@cp README.md LICENSE "$(DIST_BUILD_DIR)/texmf-dist/doc/lualatex/mark2tex/"
 	@{ \
 		echo "name $(PACKAGE)"; \
@@ -126,11 +131,10 @@ $(DIST_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark
 	@COPYFILE_DISABLE=1 tar -C "$(DIST_BUILD_DIR)" -cf - texmf-dist tlpkg | xz -9e > "$(DIST_ARCHIVE)"
 	@echo "Built $(DIST_ARCHIVE)"
 
-$(OVERLEAF_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE $(wildcard src/mark2tex/*.lua)
-	@mkdir -p "$(OVERLEAF_BUILD_DIR)/src/mark2tex"
+$(OVERLEAF_ARCHIVE): mark2tex.sty mark2tex.lua README.md LICENSE
+	@mkdir -p "$(OVERLEAF_BUILD_DIR)"
 	@cp mark2tex.sty mark2tex.lua README.md LICENSE "$(OVERLEAF_BUILD_DIR)/"
-	@cp src/mark2tex/*.lua "$(OVERLEAF_BUILD_DIR)/src/mark2tex/"
-	@cd "$(OVERLEAF_BUILD_DIR)" && zip -qr "../../$(notdir $(OVERLEAF_ARCHIVE))" mark2tex.sty mark2tex.lua src README.md LICENSE
+	@cd "$(OVERLEAF_BUILD_DIR)" && zip -qr "$(abspath $(OVERLEAF_ARCHIVE))" mark2tex.sty mark2tex.lua README.md LICENSE
 	@echo "Built $(OVERLEAF_ARCHIVE)"
 
 tlmgr-install-dry-run: dist

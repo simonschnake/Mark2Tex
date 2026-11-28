@@ -1,5 +1,6 @@
 local dump = require("pl.pretty").dump
-package.path = "./src/?.lua;./src/?/init.lua;" .. package.path
+-- Loading the bundle registers every mark2tex.* module.
+dofile("mark2tex.lua")
 
 local parse = require("mark2tex.parse")
 local default_config = require("mark2tex.default_config")

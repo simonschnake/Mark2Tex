@@ -18,13 +18,15 @@ erhalten.
 
 ### Teal
 
-- Alle Module in `src/mark2tex/` sind in Teal geschrieben. Die committeten
-  `.lua`-Dateien werden mit `make teal-gen` erzeugt, tragen einen
-  Generated-Header und sind als `linguist-generated` markiert. Das TeX-Paket
-  braucht zur Laufzeit kein Teal.
+- Alle Module in `src/mark2tex/` sind in Teal geschrieben; dort liegt kein
+  generiertes Lua mehr. `make teal-gen` baut daraus ein einziges Bundle
+  `mark2tex.lua`, das alle Module per `package.preload` registriert. Nur das
+  Bundle ist committet (als `linguist-generated`, ohne Diff-Anzeige). Paket,
+  Overleaf-ZIP und Wheel bestehen zur Laufzeit aus `mark2tex.sty` und
+  `mark2tex.lua` und brauchen kein Teal.
 - Teal 0.24.1 ist gepinnt. Ohne `tl` im `PATH` wird es per texlua nach
   `.luarocks/` gebootstrappt. Compiler-Einstellungen liegen in `tlconfig.lua`.
-- `make teal-check` schlägt fehl, wenn das committete Lua von den Quellen
+- `make teal-check` schlägt fehl, wenn das committete Bundle von den Quellen
   abweicht. `make dist` prüft das per `teal-check` und führt vor dem Packen die
   Tests aus.
 - Typisiert sind AST (ein Record je Knotentyp, getrennt in die Stufen
@@ -81,7 +83,9 @@ erhalten.
 ## Verifikation
 
 - `make test`: Lua-Unit-Tests und Markdown/TeX-Fixtures (aktuell 143 Tests).
-- `make teal-check`: generiertes Lua stimmt mit den Teal-Quellen überein.
+- `make test` vergleicht zusätzlich alle Beispiele und Fixture-Eingaben in sechs
+  Profilvarianten mit den Golden-Snapshots in `tests/golden/`.
+- `make teal-check`: das Bundle stimmt mit den Teal-Quellen überein.
 - `make latex-smoke`: zwei LuaLaTeX-Läufe für aufgelöste Verweise,
   Recorder-/Ausgabeprüfungen und tatsächliche PDF-Linkziele.
 - `make -j2 latex-lecture`: Handout, Folien und Annotationen als PDFs bauen

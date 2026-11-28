@@ -244,7 +244,7 @@ def cache_identity(env, executables):
         identity.update(f"{name}={tool.resolve()}:{info.st_size}:{info.st_mtime_ns}".encode())
         identity.update(release)
     sources = [Path(__file__), HERE / "cache.py", TEX / "mark2tex.lua", TEX / "mark2tex.sty",
-               TEX / "scripts/convert.lua", *sorted((TEX / "src/mark2tex").glob("*.lua")),
+               TEX / "scripts/convert.lua",
                *sorted(TEMPLATES.glob("*.tex"))]
     for path in sources:
         identity.update(path.name.encode())

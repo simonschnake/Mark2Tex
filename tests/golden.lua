@@ -4,7 +4,9 @@
 --   lua tests/golden.lua           check against the snapshots
 --   lua tests/golden.lua --update  rewrite the snapshots after an intended change
 
-package.path = "./src/?.lua;./src/?/init.lua;./?.lua;" .. package.path
+package.path = "./?.lua;" .. package.path
+-- Test the shipped bundle: loading it registers every mark2tex.* module.
+dofile("mark2tex.lua")
 
 local lfs = require("lfs")
 local helpers = require("tests.helpers")
