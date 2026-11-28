@@ -8,6 +8,10 @@ local helpers = {
 	TMP_DIR = "tests/tmp",
 }
 
+-- The scratch directory is git-ignored, so create it for fresh checkouts.
+-- lfs.mkdir only fails here when the directory already exists.
+require("lfs").mkdir(helpers.TMP_DIR)
+
 function helpers.transform(markdown, config)
 	config = config or default_config
 	local ast = parse(markdown, config)
