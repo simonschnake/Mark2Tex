@@ -4,7 +4,7 @@ local delimiters = require("mark2tex.delimiters")
 local nodes = require("mark2tex.nodes")
 
 local type Match = autolinks.Match
-local type Node = nodes.Node
+local type Inline = nodes.Inline
 
 local record Options
 	disable_links: boolean
@@ -14,7 +14,7 @@ end
 -- Placeholder token in the protected source and the node it stands for.
 local record Token
 	token: string
-	node: Node
+	node: Inline
 end
 
 -- Types are exported as aliases: nested records would emit runtime tables.
@@ -186,7 +186,7 @@ function links.match(source: string, position: integer): Match
 end
 
 -- Label warnings come from the inline parser and are passed through unchanged.
-function links.protect<W>(source: string, parse_label: function(string): ({Node}, {W}), options?: Options): string, {Token}, {W}
+function links.protect<W>(source: string, parse_label: function(string): ({Inline}, {W}), options?: Options): string, {Token}, {W}
 	options = options or {}
 	local prefix = "MARKTWOTEXLINK"
 	while source:find(prefix, 1, true) do prefix = prefix .. "X" end
@@ -194,7 +194,7 @@ function links.protect<W>(source: string, parse_label: function(string): ({Node}
 	local output: {string} = {}
 	local warnings: {W} = {}
 	local index = 1
-	local function add(node: Node)
+	local function add(node: Inline)
 		local token = prefix .. tostring(#tokens + 1) .. "END"
 		tokens[#tokens + 1] = { token = token, node = node }
 		output[#output + 1] = token
@@ -208,7 +208,7 @@ function links.protect<W>(source: string, parse_label: function(string): ({Node}
 			if image or options.disable_links then
 				add(nodes.text(source:sub(index, match.finish)))
 			else
-				local content = { nodes.text(match.label) }
+				local content: {Inline} = { nodes.text(match.label) }
 				if match.kind == "inline" then
 					local label_warnings: {W}
 					content, label_warnings = parse_label(match.label)
@@ -221,7 +221,7 @@ function links.protect<W>(source: string, parse_label: function(string): ({Node}
 			add(nodes.text(source:sub(index, malformed)))
 			index = malformed + 1
 		elseif options.link_label and not (last and source:sub(index, index + 1) == "\\(") and source:sub(index, index) == "\\" and punctuation:find(source:sub(index + 1, index + 1), 1, true) then
-			add({ type = "literal", content = source:sub(index + 1, index + 1) })
+			add(nodes.literal(source:sub(index + 1, index + 1)))
 			index = index + 2
 		elseif last then
 			output[#output + 1] = source:sub(index, last)
@@ -234,16 +234,17 @@ function links.protect<W>(source: string, parse_label: function(string): ({Node}
 	return table.concat(output), tokens, warnings
 end
 
-function links.expand(ast: {Node}, tokens: {Token}): {Node}
-	local result: {Node} = {}
+-- Replace placeholder tokens in text nodes, descending into inline containers.
+-- Footnote nodes are only inserted by the last expansion, so never descended.
+function links.expand(ast: {Inline}, tokens: {Token}): {Inline}
+	local result: {Inline} = {}
 	for _, node in ipairs(ast) do
-		if node.type == "text" then
-			-- Text nodes always carry string content.
-			local content = node.content as string
+		if node is nodes.Text then
+			local content = node.content
 			local position = 1
 			while position <= #content do
 				local first, last: integer, integer
-				local replacement: Node
+				local replacement: Inline
 				for _, token in ipairs(tokens) do
 					local start, finish = content:find(token.token, position, true)
 					if start and (not first or start < first) then first, last, replacement = start, finish, token.node end
@@ -253,8 +254,10 @@ function links.expand(ast: {Node}, tokens: {Token}): {Node}
 				result[#result + 1], position = replacement, last + 1
 			end
 		else
-			local content = node.content
-			if content is {Node} then node.content = links.expand(content, tokens) end
+			if node is nodes.Bold or node is nodes.Italic or node is nodes.Strikethrough
+				or node is nodes.Link or node is nodes.Other then
+				node.content = links.expand(node.content, tokens)
+			end
 			result[#result + 1] = node
 		end
 	end

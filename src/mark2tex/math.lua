@@ -29,7 +29,6 @@ local math_parser = {}
 
 
 
-
 local TOKEN_START = string.char(30) .. "M"
 local TOKEN_END = string.char(31)
 
@@ -146,8 +145,10 @@ local function copy_with_content(node, content)
    return copy
 end
 
+
+
 local function expand_node(node, tokens)
-   local content = node.content
+   local content = nodes.content(node)
    if type(content) == "string" then
       local result = {}
       local position = 1
@@ -167,8 +168,9 @@ local function expand_node(node, tokens)
       end
       return result
    end
-   if type(content) == "table" then
-      node.content = math_parser.expand_tokens(content, tokens)
+   if node.type == "bold" or node.type == "italic" or node.type == "strikethrough" or
+      node.type == "link" or node.type == "other" then
+      node.content = math_parser.expand_tokens(node.content, tokens)
    end
    return { node }
 end

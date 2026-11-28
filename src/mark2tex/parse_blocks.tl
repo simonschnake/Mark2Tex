@@ -2,7 +2,7 @@ local lpeg = require("lpeg")
 local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
 
-local type Node = nodes.Node
+local type RawBlock = nodes.RawBlock
 local type Pattern = lpeg.Pattern
 local type Grammar = {string | integer: Pattern}
 
@@ -32,7 +32,7 @@ local footnote_continuation = newline * (horizontal_space * newline) ^ 0
 grammar.footnote_definition = newline * P(" ") ^ -3 * P("[^")
 	* C((P(1) - S("[] \t\r\n")) ^ 1) * P("]:")
 	* C((P(1) - newline) ^ 0 * footnote_continuation ^ 0)
-	/ function(identifier: string, content: string): Node
+	/ function(identifier: string, content: string): RawBlock
 		content = content:gsub("\n    ", "\n"):gsub("\n\t", "\n")
 		return nodes.footnote_definition(identifier, content:match("^%s*(.-)%s*$"))
 	end
@@ -44,7 +44,7 @@ grammar.footnote_definition = newline * P(" ") ^ -3 * P("[^")
 grammar.header = newline
 	* space ^ 0
 	* Ct(C(hash ^ 1) * space * C((P(1) - newline) ^ 1))
-	/ function(t: {string}): Node
+	/ function(t: {string}): RawBlock
 		return nodes.header(#t[1], t[2])
 	end
 
@@ -79,7 +79,7 @@ grammar.begin_end_inner = V("begin_end") + (1 - (begin_env + end_env)) ^ 1
 grammar.latex_env = newline
 	* space ^ 0
 	* V("begin_end")
-	/ function(t: string): Node
+	/ function(t: string): RawBlock
 		return nodes.latex(t)
 	end
 
@@ -105,7 +105,7 @@ local standalone_display_environments: {string: boolean} = {
 	["multline*"] = true,
 }
 
-local function display_node(content: string): Node
+local function display_node(content: string): RawBlock
 	local environment, closing = content:match("^%s*\\begin{([^}]+)}.*\\end{([^}]+)}%s*$")
 	if environment == closing and standalone_display_environments[environment] then
 		return nodes.latex(content:match("^%s*(.-)%s*$"))
@@ -138,7 +138,7 @@ local continuation_list_marker = fence_body + S("-*+") * space + decimal_marker 
 local follow_item_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.item = Ct(start_of_item * C(rest_of_line * follow_item_line ^ 0))
-	/ function(t: {string}): Node
+	/ function(t: {string}): RawBlock
 		return nodes.item(#t[1], t[2])
 	end
 
@@ -150,7 +150,7 @@ local start_of_enum = newline * C(horizontal_space) * C(decimal_marker + alpha_m
 local follow_enum_line = newline ^ 1 * S(" \t") ^ 1 * (P(1) - continuation_list_marker) * rest_of_line ^ -1
 
 grammar.enum = Ct(start_of_enum * C(rest_of_line * follow_enum_line ^ 0))
-	/ function(t: {string}): Node
+	/ function(t: {string}): RawBlock
 		local marker = t[2]:sub(1, -2)
 		local start = tonumber(marker)
 		if start then
@@ -170,7 +170,7 @@ grammar.code = newline
 	* newline
 	* C((P(1) - P("`") ^ 3) ^ 1)
 	* P("`") ^ 3
-	/ function(code_type: string, content: string): Node
+	/ function(code_type: string, content: string): RawBlock
 		if code_type == "tex" then
 			return nodes.latex(content)
 		end
@@ -184,7 +184,7 @@ grammar.code = newline
 local quote_line = newline * P(">") * P(" ") ^ -1 * C(rest_of_line ^ -1)
 
 grammar.blockquote = Ct(quote_line * quote_line ^ 0)
-	/ function(lines: {string}): Node
+	/ function(lines: {string}): RawBlock
 		return nodes.blockquote(table.concat(lines, "\n"))
 	end
 
@@ -247,7 +247,7 @@ grammar.table = newline
 	* newline
 	* separator_line
 	* (newline * table_line) ^ 0
-	/ function(header_line: string, separator: string, ...: string): Node
+	/ function(header_line: string, separator: string, ...: string): RawBlock
 		local rows: {{string}} = {}
 		local alignments: {string} = {}
 		for _, cell in ipairs(split_table_row(separator)) do
@@ -263,7 +263,7 @@ grammar.table = newline
 -- Other
 --------------------
 
-grammar.div_fence = (fence * Cp()) / function(position: integer, delimiter: string, attributes_text: string, ending: integer): Node
+grammar.div_fence = (fence * Cp()) / function(position: integer, delimiter: string, attributes_text: string, ending: integer): RawBlock
 	return { type = "div_fence", position = position, ending = ending,
 		length = #delimiter, attributes = attributes_text }
 end
@@ -273,7 +273,7 @@ local image_path = C((P(1) - S("(){}%#\\\n")) ^ 1)
 local em_width = R("09") ^ 1 * (P(".") * R("09") ^ 1) ^ -1 * P("em")
 grammar.image = newline * horizontal_space * P("![") * (P(1) - S("]\n")) ^ 0
 	* P("](") * image_path * P(")") * (P("{width=") * C(em_width) * P("}") + C(P("")))
-	* horizontal_space * line_end / function(path: string, width: string): Node
+	* horizontal_space * line_end / function(path: string, width: string): RawBlock
 		return { type = "image", path = path, width = width }
 	end
 
@@ -282,8 +282,8 @@ grammar.image = newline * horizontal_space * P("![") * (P(1) - S("]\n")) ^ 0
 -- delimiters and is emitted outside math mode.
 grammar.outer_elements = V("image") + V("footnote_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
-grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t: string): Node
-	return nodes.other(t)
+grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t: string): RawBlock
+	return nodes.raw_other(t)
 end
 
 --------------------
@@ -301,7 +301,7 @@ end
 local end_of_paragraph = #(newline * horizontal_space * (newline + -P(1)) + fence + -P(1))
 local function standalone(pattern: Pattern): Pattern
 	return Cmt(Cp() * newline * pattern * horizontal_space * end_of_paragraph,
-		function(subject: string, ending: integer, start: integer, node: Node): integer, Node
+		function(subject: string, ending: integer, start: integer, node: RawBlock): integer, RawBlock
 			local previous = start - 1
 			while previous > 0 and subject:sub(previous, previous):match("[ \t\r]") do
 				previous = previous - 1
@@ -315,13 +315,13 @@ local function standalone(pattern: Pattern): Pattern
 end
 
 lecture.header = newline * C(P(" ") ^ 0) * C(hash ^ 1) * space * C(rest_of_line)
-	/ function(indent: string, hashes: string, content: string): Node
+	/ function(indent: string, hashes: string, content: string): RawBlock
 		local heading = nodes.header(#hashes, content)
 		heading.indented = indent ~= ""
 		return heading
 	end
-lecture.slide_break = standalone(P("-") ^ 3 / function(): Node return { type = "slide_break" } end)
-lecture.slide_pause = standalone(P(". . .") / function(): Node return { type = "slide_pause" } end)
+lecture.slide_break = standalone(P("-") ^ 3 / function(): RawBlock return { type = "slide_break" } end)
+lecture.slide_pause = standalone(P(". . .") / function(): RawBlock return { type = "slide_pause" } end)
 local nested_grammar = P(grammar) * -1
 grammar.outer_elements = V("div_fence") + grammar.outer_elements
 lecture.outer_elements = V("slide_break") + V("slide_pause") + grammar.outer_elements
@@ -329,12 +329,12 @@ lecture.outer_elements = V("slide_break") + V("slide_pause") + grammar.outer_ele
 local classic_grammar = P(grammar) * -1
 local lecture_grammar = P(lecture) * -1
 
-local function parse_blocks(str: string, lecture_profile?: boolean, nested?: boolean): {Node}
-	if nested then return nested_grammar:match(str) as {Node} end
+local function parse_blocks(str: string, lecture_profile?: boolean, nested?: boolean): {RawBlock}
+	if nested then return nested_grammar:match(str) as {RawBlock} end
 	if lecture_profile then
-		return lecture_grammar:match(str) as {Node}
+		return lecture_grammar:match(str) as {RawBlock}
 	end
-	return classic_grammar:match(str) as {Node}
+	return classic_grammar:match(str) as {RawBlock}
 end
 
 return parse_blocks

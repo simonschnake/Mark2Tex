@@ -222,7 +222,7 @@ function links.protect(source, parse_label, options)
          add(nodes.text(source:sub(index, malformed)))
          index = malformed + 1
       elseif options.link_label and not (last and source:sub(index, index + 1) == "\\(") and source:sub(index, index) == "\\" and punctuation:find(source:sub(index + 1, index + 1), 1, true) then
-         add({ type = "literal", content = source:sub(index + 1, index + 1) })
+         add(nodes.literal(source:sub(index + 1, index + 1)))
          index = index + 2
       elseif last then
          output[#output + 1] = source:sub(index, last)
@@ -235,11 +235,12 @@ function links.protect(source, parse_label, options)
    return table.concat(output), tokens, warnings
 end
 
+
+
 function links.expand(ast, tokens)
    local result = {}
    for _, node in ipairs(ast) do
       if node.type == "text" then
-
          local content = node.content
          local position = 1
          while position <= #content do
@@ -254,8 +255,10 @@ function links.expand(ast, tokens)
             result[#result + 1], position = replacement, last + 1
          end
       else
-         local content = node.content
-         if type(content) == "table" then node.content = links.expand(content, tokens) end
+         if node.type == "bold" or node.type == "italic" or node.type == "strikethrough" or
+            node.type == "link" or node.type == "other" then
+            node.content = links.expand(node.content, tokens)
+         end
          result[#result + 1] = node
       end
    end

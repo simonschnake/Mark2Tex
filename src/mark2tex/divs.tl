@@ -1,9 +1,9 @@
-local type nodes = require("mark2tex.nodes")
+local nodes = require("mark2tex.nodes")
 local type comments = require("mark2tex.comments")
 local type diagnostics = require("mark2tex.diagnostics")
 local type Config = require("mark2tex.default_config")
 
-local type Node = nodes.Node
+local type RawBlock = nodes.RawBlock
 local type CommentToken = comments.Token
 local type Issue = diagnostics.Issue
 
@@ -19,13 +19,18 @@ local record divs
 	type Warning = Warning
 end
 
+local enum AnnotationKind
+	"slide_note"
+	"slide_footer"
+end
+
 local record FenceAnnotation
-	kind: string
+	kind: AnnotationKind
 	chunks: {string}
 	owner: Fence
 end
 
--- A div_fence node from parse_blocks plus the state collected while selecting.
+-- A DivFence from parse_blocks plus the state collected while selecting.
 local record Fence
 	type: string
 	position: integer
@@ -37,22 +42,19 @@ local record Fence
 	visible: boolean
 	annotation: FenceAnnotation
 	layout: string
-	columns: {Node}
+	columns: {nodes.Latex}
 	caption: boolean
 end
 
-local annotations: {string: string} = { notes = "slide_note", footer = "slide_footer" }
+local annotations: {string: AnnotationKind} = { notes = "slide_note", footer = "slide_footer" }
 
-local function append_block(output: {Node}, node: Node)
+local function append_block(output: {RawBlock}, node: RawBlock)
 	local previous = output[#output]
-	if previous and previous.type == "other" and node.type == "other" then
-		-- Before inline parsing, "other" nodes still carry raw source text.
-		local before, after = previous.content as string, node.content as string
-		if before:find("%S") and after:find("%S") then
-			local gap = before:match("%s*$") .. after:match("^%s*")
-			local _, newlines = gap:gsub("\n", "")
-			if newlines < 2 then node.content = string.rep("\n", 2 - newlines) .. after end
-		end
+	if previous and previous is nodes.RawOther and node is nodes.RawOther
+		and previous.content:find("%S") and node.content:find("%S") then
+		local gap = previous.content:match("%s*$") .. node.content:match("^%s*")
+		local _, newlines = gap:gsub("\n", "")
+		if newlines < 2 then node.content = string.rep("\n", 2 - newlines) .. node.content end
 	end
 	output[#output + 1] = node
 end
@@ -69,23 +71,23 @@ local function classes(attributes: string): {string}
 end
 
 function divs.select(
-	ast: {Node},
+	ast: {RawBlock},
 	protected: string,
 	source: string,
 	comment_tokens: {CommentToken},
 	config: Config,
 	source_id: string,
 	warnings: {Issue}
-): {Node}
+): {RawBlock}
 	local slides = config and config.profile == "slides"
 	local lecture = slides or (config and config.profile == "handout")
 	local instructor = config and (config.audience == "instructor" or config.slide_audience == "dozent")
 	local enabled: {string: boolean} = { slides = slides == true, script = not slides,
 		instructor = instructor == true, student = not instructor }
-	local output: {Node} = {}
+	local output: {RawBlock} = {}
 	local stack: {Fence} = {}
-	local function tex(content: string): Node
-		local marker: Node = { type = "latex", content = content }
+	local function tex(content: string): nodes.Latex
+		local marker = nodes.latex(content)
 		output[#output + 1] = marker
 		return marker
 	end
@@ -157,7 +159,13 @@ function divs.select(
 				if lecture and parent.visible and parent.annotation and parent.annotation.owner == parent then
 					local title = table.concat(parent.annotation.chunks):match("^%s*(.-)%s*$")
 					if title ~= "" then
-						output[#output + 1] = { type = parent.annotation.kind, title = title }
+						if parent.annotation.kind == "slide_note" then
+							local note: nodes.SlideNote = { type = "slide_note", title = title }
+							output[#output + 1] = note
+						else
+							local footer: nodes.SlideFooter = { type = "slide_footer", title = title }
+							output[#output + 1] = footer
+						end
 					end
 				end
 			else

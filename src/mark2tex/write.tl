@@ -19,14 +19,14 @@ elements:
 
 local comments = require("mark2tex.comments")
 local links = require("mark2tex.links")
-local type nodes = require("mark2tex.nodes")
+local nodes = require("mark2tex.nodes")
 local type Config = require("mark2tex.default_config")
 
-local type Node = nodes.Node
+local type Block = nodes.Block
+local type Any = nodes.Any
 local type Document = nodes.Document
-
--- The writer runs on the fully parsed AST: container nodes hold node lists,
--- leaf nodes hold strings. Casts below rely on that invariant.
+local type ListNode = nodes.Item | nodes.Enum
+local type CommentToken = comments.Token
 
 local record ListState
 	type: string
@@ -34,8 +34,11 @@ local record ListState
 	style: string
 end
 
-local function is_list_node(ast: Node): boolean
-	return ast.type == "item" or ast.type == "enum"
+local function list_style(ast: ListNode): string
+	if ast is nodes.Enum then
+		return ast.style or "decimal"
+	end
+	return "decimal"
 end
 
 local function list_environment(list_type: string): string
@@ -62,10 +65,10 @@ local function close_all_lists(out: {string}, stack: {ListState})
 	end
 end
 
-local function open_list(out: {string}, stack: {ListState}, ast: Node)
-	table.insert(stack, { type = ast.type, level = ast.level, style = ast.style or "decimal" })
+local function open_list(out: {string}, stack: {ListState}, ast: ListNode)
+	table.insert(stack, { type = ast.type, level = ast.level, style = list_style(ast) })
 	out[1] = out[1] .. "\n\\begin{" .. list_environment(ast.type) .. "}"
-	if ast.type == "enum" then
+	if ast is nodes.Enum then
 		local counter = "\\csname @enumctr\\endcsname"
 		if ast.style == "alpha" then
 			-- Capture the counter name for references from nested lists.
@@ -81,10 +84,10 @@ local function open_list(out: {string}, stack: {ListState}, ast: Node)
 	end
 end
 
-local function ensure_list_environment(out: {string}, stack: {ListState}, ast: Node)
+local function ensure_list_environment(out: {string}, stack: {ListState}, ast: ListNode)
 	close_lists_until(out, stack, ast.level)
 
-	local style = ast.style or "decimal"
+	local style = list_style(ast)
 	if #stack > 0 and stack[#stack].level == ast.level
 		and (stack[#stack].type ~= ast.type or stack[#stack].style ~= style) then
 		close_list(out, stack)
@@ -97,38 +100,36 @@ end
 
 -- Estimate displayed text from inline nodes, excluding Markdown formatting.
 -- TeX commands/math are deliberately conservative: their source length is only
--- an approximation of their typeset width.
-local function cell_length(value: string | {Node | string}): integer
+-- an approximation of their typeset width. Footnotes in a cell count as well.
+local function cell_length(value: string | {Any | string}): integer
 	if value is string then
 		local _, count = value:gsub("[^\128-\191]", "")
 		return count
 	end
-	-- Like the original writer, any table with content is measured as a node.
-	local content = (value as Node).content
-	if content then
-		return cell_length(content)
-	end
 	local length = 0
 	for _, child in ipairs(value) do
-		length = length + cell_length(child as string | {Node | string})
+		if child is string then
+			length = length + cell_length(child)
+		else
+			local content = nodes.content(child)
+			if content then
+				length = length + cell_length(content)
+			end
+		end
 	end
 	return length
 end
 
-local function table_columns(ast: Node): string
+local function table_columns(ast: nodes.Table): string
 	local count = #ast.alignments
 	local lengths: {integer} = {}
 	local compact: {boolean} = {}
 	local text_columns = 0
 	for index = 1, count do
-		local header: string | {Node | string} = ast.headers[index]
-		if header == nil then header = {} end
-		local maximum = cell_length(header)
+		local maximum = cell_length(ast.headers[index] or {})
 		local total = maximum
 		for _, row in ipairs(ast.rows) do
-			local cell: string | {Node | string} = row[index]
-			if cell == nil then cell = {} end
-			local length = cell_length(cell)
+			local length = cell_length(row[index] or {})
 			maximum = math.max(maximum, length)
 			total = total + length
 		end
@@ -153,7 +154,7 @@ local function table_columns(ast: Node): string
 	return "@{}" .. table.concat(columns) .. "@{}"
 end
 
-local write: function(ast: Document, config: Config, nested?: boolean): string
+local write_blocks: function(ast: {Block}, config: Config, nested: boolean, comment_tokens?: {CommentToken}): string
 
 -- An ampersand in ordinary prose is a LaTeX alignment character. Escape it
 -- here, while leaving raw LaTeX nodes untouched.
@@ -179,31 +180,27 @@ local function write_annotation(text: string): string
 	return write_inline_code((text:gsub("%s+", " ")))
 end
 
-local function has_verbatim(blocks: {Node}): boolean
+local function has_verbatim(blocks: {Block}): boolean
 	for _, node in ipairs(blocks) do
-		if node.type == "code"
-			or (node.type == "latex" and (node.content as string):find("\\begin{verbatim", 1, true))
-			or (node.type == "blockquote" and has_verbatim(node.content as {Node})) then
+		if node is nodes.Code
+			or (node is nodes.Latex and node.content:find("\\begin{verbatim", 1, true))
+			or (node is nodes.Blockquote and has_verbatim(node.content)) then
 			return true
 		end
 	end
 	return false
 end
 
-local walk: function(ast: Node, out: {string}, config: Config)
+local walk: function(ast: Any, out: {string}, config: Config)
 
--- walk dispatches on the table itself, so lists and single nodes both work.
-local function walk_nodes(list: {Node | string}, out: {string}, config: Config)
-	walk(list as Node, out, config)
+local function walk_nodes(list: {Any}, out: {string}, config: Config)
+	for _, node in ipairs(list) do
+		walk(node, out, config)
+	end
 end
 
-walk = function(ast: Node, out: {string}, config: Config)
-	if ast.type == nil then
-		-- An untyped table is a node list.
-		for _, v in ipairs(ast as {Node | string}) do
-			walk(v as Node, out, config)
-		end
-	elseif ast.type == "header" then
+walk = function(ast: Any, out: {string}, config: Config)
+	if ast is nodes.Header then
 		out[1] = out[1] .. "\n\\"
 		if ast.level > #config.header then
 			ast.level = #config.header -- max level
@@ -211,14 +208,14 @@ walk = function(ast: Node, out: {string}, config: Config)
 		out[1] = out[1] .. config.header[ast.level]
 
 		out[1] = out[1] .. "{"
-		walk_nodes(ast.content as {Node}, out, config)
+		walk_nodes(ast.content, out, config)
 		out[1] = out[1] .. "}"
-	elseif ast.type == "slide_frame" then
-		local options = has_verbatim(ast.content as {Node}) and "t,fragile" or "t"
+	elseif ast is nodes.SlideFrame then
+		local options = has_verbatim(ast.content) and "t,fragile" or "t"
 		out[1] = out[1] .. "\n\\begin{frame}[" .. options .. "]\n"
 		if ast.title then
 			out[1] = out[1] .. "\\frametitle{"
-			walk_nodes(ast.title as {Node}, out, config)
+			walk_nodes(ast.title, out, config)
 			out[1] = out[1] .. "}\n"
 		end
 		if ast.footer then
@@ -231,14 +228,14 @@ walk = function(ast: Node, out: {string}, config: Config)
 			end
 			out[1] = out[1] .. "\\note{" .. table.concat(notes, "\\par ") .. "}\n"
 		end
-		out[1] = out[1] .. write(ast.content as Document, config, true) .. "\n\\end{frame}\n"
-	elseif ast.type == "slide_pause" then
+		out[1] = out[1] .. write_blocks(ast.content, config, true) .. "\n\\end{frame}\n"
+	elseif ast is nodes.SlidePause then
 		out[1] = out[1] .. "\n\\par\\pause\n"
-	elseif ast.type == "slide_subheading" then
+	elseif ast is nodes.SlideSubheading then
 		out[1] = out[1] .. "\n\\par\\medskip\\noindent\\textbf{"
-		walk_nodes(ast.content as {Node}, out, config)
+		walk_nodes(ast.content, out, config)
 		out[1] = out[1] .. "}\\par\n"
-	elseif ast.type == "lecture_annotations" then
+	elseif ast is nodes.LectureAnnotations then
 		if ast.footer then
 			out[1] = out[1] .. "\n\\par\\noindent{\\small " .. write_annotation(ast.footer) .. "}\\par\n"
 		end
@@ -246,36 +243,36 @@ walk = function(ast: Node, out: {string}, config: Config)
 			out[1] = out[1] .. "\n\\par\\noindent\\textbf{Vortragsnotiz:} "
 				.. write_annotation(note) .. "\\par\n"
 		end
-	elseif ast.type == "slide_paragraph" then
+	elseif ast is nodes.SlideParagraph then
 		out[1] = out[1] .. "\n\\par\n"
-	elseif ast.type == "horizontal_rule" then
+	elseif ast is nodes.HorizontalRule then
 		out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\rule{\\linewidth}{0.4pt}\n\\par\\addvspace{\\medskipamount}"
-	elseif ast.type == "image" then
+	elseif ast is nodes.Image then
 		local size = ast.width ~= "" and ("width=" .. ast.width .. ",") or ""
 		out[1] = out[1] .. "\n\\adjustbox{" .. size .. "max width=\\linewidth}{\\includegraphics{" .. ast.path .. "}}"
-	elseif ast.type == "latex" then
-		out[1] = out[1] .. "\n" .. (ast.content as string)
-	elseif ast.type == "item" then
+	elseif ast is nodes.Latex then
+		out[1] = out[1] .. "\n" .. ast.content
+	elseif ast is nodes.Item then
 		out[1] = out[1] .. "\n\\item "
-		walk_nodes(ast.content as {Node}, out, config)
-	elseif ast.type == "enum" then -- TODO: add
+		walk_nodes(ast.content, out, config)
+	elseif ast is nodes.Enum then -- TODO: add
 		out[1] = out[1] .. "\n\\item" -- TODO: the space after \item is not always needed
-		walk_nodes(ast.content as {Node}, out, config)
-	elseif ast.type == "code" then
+		walk_nodes(ast.content, out, config)
+	elseif ast is nodes.Code then
 		-- TODO: add code type
-		out[1] = out[1] .. "\n\\begin{verbatim}\n" .. (ast.content as string) .. "\\end{verbatim}"
-	elseif ast.type == "blockquote" then
+		out[1] = out[1] .. "\n\\begin{verbatim}\n" .. ast.content .. "\\end{verbatim}"
+	elseif ast is nodes.Blockquote then
 		out[1] = out[1] .. "\n\\begin{quote}\n"
-		out[1] = out[1] .. write(ast.content as Document, config, true)
+		out[1] = out[1] .. write_blocks(ast.content, config, true)
 		out[1] = out[1] .. "\n\\end{quote}"
-	elseif ast.type == "table" then
+	elseif ast is nodes.Table then
 		out[1] = out[1] .. "\n\\par\\addvspace{\\medskipamount}\n\\noindent\\begin{tabularx}{\\linewidth}{" .. table_columns(ast) .. "}\n\\toprule\n"
 		for index = 1, #ast.alignments do
 			if index > 1 then
 				out[1] = out[1] .. " & "
 			end
 			if ast.headers[index] then
-				walk_nodes(ast.headers[index] as {Node}, out, config)
+				walk_nodes(ast.headers[index], out, config)
 			end
 		end
 		out[1] = out[1] .. " \\\\\n\\midrule"
@@ -287,22 +284,22 @@ walk = function(ast: Node, out: {string}, config: Config)
 					out[1] = out[1] .. " & "
 				end
 				if row[index] then
-					walk_nodes(row[index] as {Node}, out, config)
+					walk_nodes(row[index], out, config)
 				end
 			end
 			out[1] = out[1] .. " \\\\"
 		end
 
 		out[1] = out[1] .. "\n\\bottomrule\n\\end{tabularx}\n\\par\\addvspace{\\medskipamount}"
-	elseif ast.type == "other" then
-		walk_nodes(ast.content as {Node}, out, config)
-	elseif ast.type == "paren_citation" then
+	elseif ast is nodes.Other then
+		walk_nodes(ast.content, out, config)
+	elseif ast is nodes.ParenCitation then
 		out[1] = out[1] .. "\\" .. config.paren_citation
 		if ast.locator then
 			out[1] = out[1] .. "[" .. ast.locator .. "]"
 		end
-		out[1] = out[1] .. "{" .. table.concat(ast.content as {string}, ", ") .. "}"
-	elseif ast.type == "link" then
+		out[1] = out[1] .. "{" .. table.concat(ast.content, ", ") .. "}"
+	elseif ast is nodes.Link then
 		local destination = ast.destination
 		if destination:match("^[%a][%w+.-]*:") then
 			destination = destination:gsub(" ", "%%20")
@@ -319,79 +316,84 @@ walk = function(ast: Node, out: {string}, config: Config)
 				local address = ast.destination:sub(8)
 				out[1] = out[1] .. "\\nolinkurl{" .. links.tex_destination(address) .. "}"
 			else
-				walk_nodes(ast.content as {Node}, out, config)
+				walk_nodes(ast.content, out, config)
 			end
 			out[1] = out[1] .. "}"
 		end
-	elseif ast.type == "footnote" then
+	elseif ast is nodes.Footnote then
 		if ast.repeated then
 			out[1] = out[1] .. "\\footref{" .. ast.label .. "}"
 		else
 			out[1] = out[1] .. "\\footnote{"
 			if ast.label then out[1] = out[1] .. "\\label{" .. ast.label .. "}" end
-			if ast.inline then walk_nodes(ast.content as {Node}, out, config)
-			else out[1] = out[1] .. write(ast.content as Document, config, true) end
+			-- Inline footnotes hold inlines, definitions hold blocks.
+			if ast.inline then walk_nodes(ast.content, out, config)
+			else out[1] = out[1] .. write_blocks(ast.content as {Block}, config, true) end
 			out[1] = out[1] .. "}"
 		end
-	elseif ast.type == "literal" then
+	elseif ast is nodes.Literal then
 		local escapes: {string: string} = { ["\\"] = "\\textbackslash{}", ["^"] = "\\textasciicircum{}", ["~"] = "\\textasciitilde{}" }
-		local content = ast.content as string
-		out[1] = out[1] .. (escapes[content] or content:gsub("[%%{}#&_$]", "\\%0"))
-	elseif ast.type == "citation" then
-		out[1] = out[1] .. "\\" .. config.citation .. "{" .. (ast.content as string) .. "}"
-	elseif ast.type == "verbatim" then
-		out[1] = out[1] .. "\\texttt{" .. write_inline_code(ast.content as string) .. "}"
-	elseif ast.type == "inline_math" or ast.type == "latex_cmd" then
-		out[1] = out[1] .. (ast.content as string)
-	elseif ast.type == "display_math" then
+		out[1] = out[1] .. (escapes[ast.content] or ast.content:gsub("[%%{}#&_$]", "\\%0"))
+	elseif ast is nodes.Citation then
+		out[1] = out[1] .. "\\" .. config.citation .. "{" .. ast.content .. "}"
+	elseif ast is nodes.Verbatim then
+		out[1] = out[1] .. "\\texttt{" .. write_inline_code(ast.content) .. "}"
+	elseif ast is nodes.InlineMath or ast is nodes.LatexCmd then
+		out[1] = out[1] .. ast.content
+	elseif ast is nodes.DisplayMath then
 		local trimmed, removed = out[1]:gsub("\n[ \t]+$", "\n")
 		out[1] = trimmed
 		if removed == 0 then
 			out[1] = out[1] .. "\n"
 		end
-		out[1] = out[1] .. "\\[" .. (ast.content as string) .. "\\]"
-	elseif ast.type == "italic" then
+		out[1] = out[1] .. "\\[" .. ast.content .. "\\]"
+	elseif ast is nodes.Italic then
 		out[1] = out[1] .. "\\emph{"
-		walk_nodes(ast.content as {Node}, out, config)
+		walk_nodes(ast.content, out, config)
 		out[1] = out[1] .. "}"
-	elseif ast.type == "bold" then
+	elseif ast is nodes.Bold then
 		out[1] = out[1] .. "\\textbf{"
-		walk_nodes(ast.content as {Node}, out, config)
+		walk_nodes(ast.content, out, config)
 		out[1] = out[1] .. "}"
-	elseif ast.type == "strikethrough" then
+	elseif ast is nodes.Strikethrough then
 		out[1] = out[1] .. "\\sout{"
-		walk_nodes(ast.content as {Node}, out, config)
+		walk_nodes(ast.content, out, config)
 		out[1] = out[1] .. "}"
-	elseif ast.type == "text" then
-		out[1] = out[1] .. write_text(ast.content as string)
+	elseif ast is nodes.Text then
+		out[1] = out[1] .. write_text(ast.content)
 	else
+		-- slide_break, slide_note and slide_footer are consumed by lecture.structure.
 		error("Unknown type: " .. ast.type)
 	end
 end
 
-local function contains_links(ast: {Node | string}): boolean
-	for _, value in ipairs(ast) do
-		local node = value as Node
-		if node.type == "link" then return true end
-		local content = node.content
-		if content is {Node | string} and contains_links(content) then return true end
-		if node.type == "slide_frame" and node.title and contains_links(node.title as {Node}) then return true end
-		if node.type == "table" then
-			for _, cell in ipairs(node.headers) do if contains_links(cell as {Node}) then return true end end
-			for _, row in ipairs(node.rows) do
-				for _, cell in ipairs(row) do if contains_links(cell as {Node}) then return true end end
+local contains_links: function(list: {Any | string}): boolean
+
+contains_links = function(list: {Any | string}): boolean
+	for _, node in ipairs(list) do
+		-- Strings are citation keys and hold no links.
+		if not (node is string) then
+			if node is nodes.Link then return true end
+			local content = nodes.content(node)
+			if content is {Any | string} and contains_links(content) then return true end
+			if node is nodes.SlideFrame and node.title and contains_links(node.title) then return true end
+			if node is nodes.Table then
+				for _, cell in ipairs(node.headers) do if contains_links(cell) then return true end end
+				for _, row in ipairs(node.rows) do
+					for _, cell in ipairs(row) do if contains_links(cell) then return true end end
+				end
 			end
 		end
 	end
 	return false
 end
 
-write = function(ast: Document, config: Config, nested?: boolean): string
+write_blocks = function(ast: {Block}, config: Config, nested: boolean, comment_tokens?: {CommentToken}): string
 	local output = { "" }
 	local list_stack: {ListState} = {}
 
 	for _, node in ipairs(ast) do
-		if is_list_node(node) then
+		if node is nodes.Item or node is nodes.Enum then
 			ensure_list_environment(output, list_stack, node)
 			walk(node, output, config)
 		else
@@ -402,11 +404,15 @@ write = function(ast: Document, config: Config, nested?: boolean): string
 
 	close_all_lists(output, list_stack)
 
-	local result = comments.restore(output[1]:sub(2), ast.comments)
+	local result = comments.restore(output[1]:sub(2), comment_tokens)
 	if not nested and contains_links(ast) then
 		result = "\\ifcsname hyper@normalise\\endcsname\\else\\PackageError{mark2tex}{Markdown links require hyperref}{Load \\string\\usepackage{hyperref} in the document preamble.}\\fi\n" .. result
 	end
 	return result -- remove first newline that was added
+end
+
+local function write(ast: Document, config: Config, nested?: boolean): string
+	return write_blocks(ast, config, nested, ast.comments)
 end
 
 return write

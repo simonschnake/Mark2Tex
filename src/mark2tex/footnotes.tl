@@ -3,7 +3,7 @@ local nodes = require("mark2tex.nodes")
 local links = require("mark2tex.links")
 local type diagnostics = require("mark2tex.diagnostics")
 
-local type Node = nodes.Node
+local type Inline = nodes.Inline
 local type Token = links.Token
 local type Issue = diagnostics.Issue
 
@@ -26,10 +26,10 @@ local record footnotes
 	type Warning = Warning
 end
 
-local function literal(source: string): {Node}
-	local result: {Node} = {}
+local function literal(source: string): {Inline}
+	local result: {Inline} = {}
 	for character in source:gmatch(".") do
-		result[#result + 1] = { type = "literal", content = character }
+		result[#result + 1] = nodes.literal(character)
 	end
 	return result
 end
@@ -41,8 +41,8 @@ end
 -- Warnings from parse_content are passed through alongside footnote warnings.
 function footnotes.protect<W is Issue>(
 	source: string,
-	resolve: function(identifier: string): Node,
-	parse_content: function(content: string): ({Node}, {W}),
+	resolve: function(identifier: string): nodes.Footnote,
+	parse_content: function(content: string): ({Inline}, {W}),
 	disabled?: boolean
 ): string, {Token}, {Issue}
 	local prefix = "MARKTWOTEXFOOTNOTE"
@@ -50,7 +50,7 @@ function footnotes.protect<W is Issue>(
 	local output: {string} = {}
 	local tokens: {Token} = {}
 	local warnings: {Issue} = {}
-	local function add(node: Node)
+	local function add(node: Inline)
 		local token = prefix .. tostring(#tokens + 1) .. "END"
 		tokens[#tokens + 1] = { token = token, node = node }
 		output[#output + 1] = token
@@ -81,7 +81,7 @@ function footnotes.protect<W is Issue>(
 			end
 		end
 		if finish then
-			local node: Node
+			local node: Inline
 			local kind: WarningKind
 			if disabled then kind = "nested-or-restricted"
 			elseif identifier then
@@ -90,8 +90,9 @@ function footnotes.protect<W is Issue>(
 			else
 				local parsed, inner_warnings = parse_content(content)
 				for _, warning in ipairs(inner_warnings) do warnings[#warnings + 1] = warning end
-				node = nodes.footnote(parsed)
-				node.inline = true
+				local footnote = nodes.footnote(parsed)
+				footnote.inline = true
+				node = footnote
 			end
 			if not node then
 				node = nodes.other(literal(source:sub(index, finish)))
@@ -104,12 +105,12 @@ function footnotes.protect<W is Issue>(
 			output[#output + 1], index = source:sub(index, ending), ending + 1
 		elseif source:sub(index, index + 1) == "^[" then
 			-- A malformed opener must not introduce an unescaped TeX superscript.
-			add({ type = "literal", content = "^" })
+			add(nodes.literal("^"))
 			warnings[#warnings + 1] = footnote_warning("unclosed", "inline")
 			index = index + 1
 		elseif source:sub(index, index + 1) == "[^" then
 			output[#output + 1] = "["
-			add({ type = "literal", content = "^" })
+			add(nodes.literal("^"))
 			warnings[#warnings + 1] = footnote_warning("unclosed", "reference")
 			index = index + 2
 		else

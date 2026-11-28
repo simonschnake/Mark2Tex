@@ -1,5 +1,5 @@
 -- Generated from src/mark2tex/divs.tl by Teal 0.24.1. Edit the .tl file and run 'make teal-gen'.
-
+local nodes = require("mark2tex.nodes")
 
 
 
@@ -42,18 +42,20 @@ local divs = {}
 
 
 
+
+
+
+
+
 local annotations = { notes = "slide_note", footer = "slide_footer" }
 
 local function append_block(output, node)
    local previous = output[#output]
-   if previous and previous.type == "other" and node.type == "other" then
-
-      local before, after = previous.content, node.content
-      if before:find("%S") and after:find("%S") then
-         local gap = before:match("%s*$") .. after:match("^%s*")
-         local _, newlines = gap:gsub("\n", "")
-         if newlines < 2 then node.content = string.rep("\n", 2 - newlines) .. after end
-      end
+   if previous and previous.type == "other" and node.type == "other" and
+      previous.content:find("%S") and node.content:find("%S") then
+      local gap = previous.content:match("%s*$") .. node.content:match("^%s*")
+      local _, newlines = gap:gsub("\n", "")
+      if newlines < 2 then node.content = string.rep("\n", 2 - newlines) .. node.content end
    end
    output[#output + 1] = node
 end
@@ -86,7 +88,7 @@ instructor = instructor == true, student = not instructor, }
    local output = {}
    local stack = {}
    local function tex(content)
-      local marker = { type = "latex", content = content }
+      local marker = nodes.latex(content)
       output[#output + 1] = marker
       return marker
    end
@@ -158,7 +160,13 @@ line = at_line, column = at_column, }
             if lecture and parent.visible and parent.annotation and parent.annotation.owner == parent then
                local title = table.concat(parent.annotation.chunks):match("^%s*(.-)%s*$")
                if title ~= "" then
-                  output[#output + 1] = { type = parent.annotation.kind, title = title }
+                  if parent.annotation.kind == "slide_note" then
+                     local note = { type = "slide_note", title = title }
+                     output[#output + 1] = note
+                  else
+                     local footer = { type = "slide_footer", title = title }
+                     output[#output + 1] = footer
+                  end
                end
             end
          else

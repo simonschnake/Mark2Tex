@@ -284,7 +284,7 @@ end
 grammar.outer_elements = V("image") + V("footnote_definition") + V("table") + V("horizontal_rule") + V("header") + V("code") + V("display_math") + V("latex_env") + V("blockquote") + V("item") + V("enum")
 
 grammar.other = C((P(1) - V("outer_elements")) ^ 1) / function(t)
-   return nodes.other(t)
+   return nodes.raw_other(t)
 end
 
 

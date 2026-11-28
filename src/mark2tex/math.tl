@@ -2,7 +2,7 @@ local delimiters = require("mark2tex.delimiters")
 local nodes = require("mark2tex.nodes")
 local type diagnostics = require("mark2tex.diagnostics")
 
-local type Node = nodes.Node
+local type Inline = nodes.Inline
 
 local record Options
 	allow_display: boolean
@@ -25,8 +25,7 @@ local record math_parser
 	type Options = Options
 	type WarningKind = WarningKind
 	type Warning = Warning
-	type Node = Node
-	expand_tokens: function({Node}, {Node}): {Node}
+	expand_tokens: function({Inline}, {Inline}): {Inline}
 end
 
 local TOKEN_START = string.char(30) .. "M"
@@ -36,7 +35,7 @@ local function token(index: integer): string
 	return TOKEN_START .. tostring(index) .. TOKEN_END
 end
 
-local function add_token(tokens: {Node}, node: Node): string
+local function add_token(tokens: {Inline}, node: Inline): string
 	tokens[#tokens + 1] = node
 	return token(#tokens)
 end
@@ -52,10 +51,10 @@ end
 -- Protect math before the general inline grammar runs.  This keeps Markdown
 -- markers inside math literal and lets malformed delimiters coexist with other
 -- inline constructs instead of making the entire line fall back to plain text.
-function math_parser.protect_inlines(input: string, options?: Options): string, {Node}, {Warning}
+function math_parser.protect_inlines(input: string, options?: Options): string, {Inline}, {Warning}
 	options = options or {}
 	local allow_display = options.allow_display ~= false
-	local tokens: {Node} = {}
+	local tokens: {Inline} = {}
 	local warnings: {Warning} = {}
 	local output: {string} = {}
 	local index = 1
@@ -135,20 +134,22 @@ function math_parser.protect_inlines(input: string, options?: Options): string, 
 	return table.concat(output), tokens, warnings
 end
 
-local function copy_with_content(node: Node, content: string): Node
+local function copy_with_content(node: Inline, content: string): Inline
 	-- Carry through node fields owned by other parser stages.
 	local copy: {string: any} = {}
 	for key, value in pairs(node as {string: any}) do
 		copy[key] = value
 	end
 	copy.content = content
-	return copy as Node
+	return copy as Inline
 end
 
-local function expand_node(node: Node, tokens: {Node}): {Node}
-	local content = node.content
+-- Split every node with string content at the math tokens and descend into
+-- inline containers. Link and footnote nodes are only inserted afterwards.
+local function expand_node(node: Inline, tokens: {Inline}): {Inline}
+	local content = nodes.content(node)
 	if content is string then
-		local result: {Node} = {}
+		local result: {Inline} = {}
 		local position = 1
 		while true do
 			local first, last, number = content:find(TOKEN_START .. "(%d+)" .. TOKEN_END, position)
@@ -166,14 +167,15 @@ local function expand_node(node: Node, tokens: {Node}): {Node}
 		end
 		return result
 	end
-	if content is {Node} then
-		node.content = math_parser.expand_tokens(content, tokens)
+	if node is nodes.Bold or node is nodes.Italic or node is nodes.Strikethrough
+		or node is nodes.Link or node is nodes.Other then
+		node.content = math_parser.expand_tokens(node.content, tokens)
 	end
 	return { node }
 end
 
-function math_parser.expand_tokens(ast: {Node}, tokens: {Node}): {Node}
-	local expanded: {Node} = {}
+function math_parser.expand_tokens(ast: {Inline}, tokens: {Inline}): {Inline}
+	local expanded: {Inline} = {}
 	for _, node in ipairs(ast) do
 		local replacement = expand_node(node, tokens)
 		for _, value in ipairs(replacement) do

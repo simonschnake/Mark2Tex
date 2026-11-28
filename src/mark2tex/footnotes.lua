@@ -30,7 +30,7 @@ local footnotes = {}
 local function literal(source)
    local result = {}
    for character in source:gmatch(".") do
-      result[#result + 1] = { type = "literal", content = character }
+      result[#result + 1] = nodes.literal(character)
    end
    return result
 end
@@ -91,8 +91,9 @@ function footnotes.protect(
          else
             local parsed, inner_warnings = parse_content(content)
             for _, warning in ipairs(inner_warnings) do warnings[#warnings + 1] = warning end
-            node = nodes.footnote(parsed)
-            node.inline = true
+            local footnote = nodes.footnote(parsed)
+            footnote.inline = true
+            node = footnote
          end
          if not node then
             node = nodes.other(literal(source:sub(index, finish)))
@@ -105,12 +106,12 @@ function footnotes.protect(
          output[#output + 1], index = source:sub(index, ending), ending + 1
       elseif source:sub(index, index + 1) == "^[" then
 
-         add({ type = "literal", content = "^" })
+         add(nodes.literal("^"))
          warnings[#warnings + 1] = footnote_warning("unclosed", "inline")
          index = index + 1
       elseif source:sub(index, index + 1) == "[^" then
          output[#output + 1] = "["
-         add({ type = "literal", content = "^" })
+         add(nodes.literal("^"))
          warnings[#warnings + 1] = footnote_warning("unclosed", "reference")
          index = index + 2
       else

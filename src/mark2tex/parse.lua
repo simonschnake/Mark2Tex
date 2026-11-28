@@ -22,12 +22,7 @@ local md5 = require("md5")
 
 
 
-local INLINE_BLOCK_TYPES = {
-   header = true,
-   item = true,
-   enum = true,
-   other = true,
-}
+
 
 local function normalize_input(str)
    return "\n" .. str
@@ -50,7 +45,10 @@ local function append_warning(warnings, candidate)
    warnings[#warnings + 1] = candidate
 end
 
-local function add_inline_nodes(ast, warnings, context, disabled)
+local add_inline_nodes
+
+
+add_inline_nodes = function(ast, warnings, context, disabled)
    local function parse_content(content, allow_display, disable_footnotes)
       local parsed, content_warnings = parse_inlines(content, {
          allow_display = allow_display,
@@ -63,26 +61,51 @@ local function add_inline_nodes(ast, warnings, context, disabled)
       return parsed
    end
 
+   local result = {}
    for _, element in ipairs(ast) do
+      local block
       if element.type == "code" and disabled then
 
-         element.type, element.content = "other", { nodes.text("\n"), nodes.verbatim(element.content) }
+         block = nodes.other({ nodes.text("\n"), nodes.verbatim(element.content) })
       elseif element.type == "blockquote" then
-         element.content = add_inline_nodes(element.content, warnings, context, disabled)
+         local parsed = { type = "blockquote", content = add_inline_nodes(element.blocks, warnings, context, disabled) }
+         block = parsed
       elseif element.type == "table" then
+         local headers = {}
          for index, cell in ipairs(element.headers) do
-            element.headers[index] = parse_content(cell, false)
+            headers[index] = parse_content(cell, false)
          end
-         for _, row in ipairs(element.rows) do
+         local rows = {}
+         for row_index, row in ipairs(element.rows) do
+            local cells = {}
             for index, cell in ipairs(row) do
-               row[index] = parse_content(cell, false)
+               cells[index] = parse_content(cell, false)
             end
+            rows[row_index] = cells
          end
-      elseif INLINE_BLOCK_TYPES[element.type] then
-         element.content = parse_content(element.content, nil, element.type == "header")
+         local parsed = { type = "table", headers = headers, alignments = element.alignments, rows = rows }
+         block = parsed
+      elseif element.type == "header" then
+         local parsed = { type = "header", level = element.level, indented = element.indented,
+content = parse_content(element.content, nil, true), }
+         block = parsed
+      elseif element.type == "item" then
+         local parsed = { type = "item", level = element.level, content = parse_content(element.content) }
+         block = parsed
+      elseif element.type == "enum" then
+         local parsed = { type = "enum", level = element.level, style = element.style, start = element.start,
+content = parse_content(element.content), }
+         block = parsed
+      elseif element.type == "other" then
+         block = nodes.other(parse_content(element.content))
+      else
+
+
+         block = element
       end
+      result[#result + 1] = block
    end
-   return ast
+   return result
 end
 
 
@@ -99,9 +122,9 @@ local function collect_definitions(ast, context, warnings, disabled)
          end
       else
          if element.type == "footnote_definition" then
-            element = nodes.other("[^" .. element.identifier .. "]: " .. (element.content))
+            element = nodes.raw_other("[^" .. element.identifier .. "]: " .. element.content)
          elseif element.type == "blockquote" then
-            element.content = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
+            element.blocks = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
          end
          result[#result + 1] = element
       end

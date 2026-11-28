@@ -7,7 +7,9 @@ local nodes = require("mark2tex.nodes")
 local md5 = require("md5")
 
 local type Config = require("mark2tex.default_config")
-local type Node = nodes.Node
+local type Inline = nodes.Inline
+local type RawBlock = nodes.RawBlock
+local type Block = nodes.Block
 local type Document = nodes.Document
 local type Issue = diagnostics.Issue
 
@@ -15,18 +17,11 @@ local record FootnoteContext
 	definitions: {string: string}
 	seen: {string: string}
 	count: integer
-	resolve: function(string): Node
+	resolve: function(string): nodes.Footnote
 end
 
 local record DuplicateWarning is Issue
 end
-
-local INLINE_BLOCK_TYPES: {string: boolean} = {
-	header = true,
-	item = true,
-	enum = true,
-	other = true,
-}
 
 local function normalize_input(str: string): string
 	return "\n" .. str
@@ -49,8 +44,11 @@ local function append_warning(warnings: {Issue}, candidate: Issue)
 	warnings[#warnings + 1] = candidate
 end
 
-local function add_inline_nodes(ast: {Node}, warnings: {Issue}, context: FootnoteContext, disabled?: boolean): {Node}
-	local function parse_content(content: string, allow_display?: boolean, disable_footnotes?: boolean): {Node}
+local add_inline_nodes: function(ast: {RawBlock}, warnings: {Issue}, context: FootnoteContext, disabled?: boolean): {Block}
+
+-- Parse the inline content of raw blocks, building the parsed block nodes.
+add_inline_nodes = function(ast: {RawBlock}, warnings: {Issue}, context: FootnoteContext, disabled?: boolean): {Block}
+	local function parse_content(content: string, allow_display?: boolean, disable_footnotes?: boolean): {Inline}
 		local parsed, content_warnings = parse_inlines(content, {
 			allow_display = allow_display,
 			resolve_footnote = context.resolve,
@@ -62,45 +60,70 @@ local function add_inline_nodes(ast: {Node}, warnings: {Issue}, context: Footnot
 		return parsed
 	end
 
+	local result: {Block} = {}
 	for _, element in ipairs(ast) do
-		if element.type == "code" and disabled then
+		local block: Block
+		if element is nodes.Code and disabled then
 			-- verbatim environments cannot occur inside a \footnote argument.
-			element.type, element.content = "other", { nodes.text("\n"), nodes.verbatim(element.content as string) }
-		elseif element.type == "blockquote" then
-			element.content = add_inline_nodes(element.content as {Node}, warnings, context, disabled)
-		elseif element.type == "table" then
+			block = nodes.other({ nodes.text("\n"), nodes.verbatim(element.content) })
+		elseif element is nodes.RawBlockquote then
+			local parsed: nodes.Blockquote = { type = "blockquote", content = add_inline_nodes(element.blocks, warnings, context, disabled) }
+			block = parsed
+		elseif element is nodes.RawTable then
+			local headers: {{Inline}} = {}
 			for index, cell in ipairs(element.headers) do
-				element.headers[index] = parse_content(cell as string, false)
+				headers[index] = parse_content(cell, false)
 			end
-			for _, row in ipairs(element.rows) do
+			local rows: {{{Inline}}} = {}
+			for row_index, row in ipairs(element.rows) do
+				local cells: {{Inline}} = {}
 				for index, cell in ipairs(row) do
-					row[index] = parse_content(cell as string, false)
+					cells[index] = parse_content(cell, false)
 				end
+				rows[row_index] = cells
 			end
-		elseif INLINE_BLOCK_TYPES[element.type] then
-			element.content = parse_content(element.content as string, nil, element.type == "header")
+			local parsed: nodes.Table = { type = "table", headers = headers, alignments = element.alignments, rows = rows }
+			block = parsed
+		elseif element is nodes.RawHeader then
+			local parsed: nodes.Header = { type = "header", level = element.level, indented = element.indented,
+				content = parse_content(element.content, nil, true) }
+			block = parsed
+		elseif element is nodes.RawItem then
+			local parsed: nodes.Item = { type = "item", level = element.level, content = parse_content(element.content) }
+			block = parsed
+		elseif element is nodes.RawEnum then
+			local parsed: nodes.Enum = { type = "enum", level = element.level, style = element.style, start = element.start,
+				content = parse_content(element.content) }
+			block = parsed
+		elseif element is nodes.RawOther then
+			block = nodes.other(parse_content(element.content))
+		else
+			-- The remaining raw blocks have no inline content and are shared with
+			-- the parsed stage. Footnote definitions and div fences never get here.
+			block = element as Block
 		end
+		result[#result + 1] = block
 	end
-	return ast
+	return result
 end
 
 -- Collect before resolving, allowing definitions after their references and
 -- sharing the document scope with blockquotes. First duplicate wins.
-local function collect_definitions(ast: {Node}, context: FootnoteContext, warnings: {Issue}, disabled?: boolean): {Node}
-	local result: {Node} = {}
+local function collect_definitions(ast: {RawBlock}, context: FootnoteContext, warnings: {Issue}, disabled?: boolean): {RawBlock}
+	local result: {RawBlock} = {}
 	for _, element in ipairs(ast) do
-		if element.type == "footnote_definition" and not disabled then
+		if element is nodes.FootnoteDefinition and not disabled then
 			if context.definitions[element.identifier] then
 				local duplicate: DuplicateWarning = { category = "footnote", kind = "duplicate", identifier = element.identifier }
 				append_warning(warnings, duplicate)
 			else
-				context.definitions[element.identifier] = element.content as string
+				context.definitions[element.identifier] = element.content
 			end
 		else
-			if element.type == "footnote_definition" then
-				element = nodes.other("[^" .. element.identifier .. "]: " .. (element.content as string))
-			elseif element.type == "blockquote" then
-				element.content = collect_definitions(parse_blocks(normalize_input(element.content as string), false, true), context, warnings, disabled)
+			if element is nodes.FootnoteDefinition then
+				element = nodes.raw_other("[^" .. element.identifier .. "]: " .. element.content)
+			elseif element is nodes.RawBlockquote then
+				element.blocks = collect_definitions(parse_blocks(normalize_input(element.content), false, true), context, warnings, disabled)
 			end
 			result[#result + 1] = element
 		end
@@ -126,7 +149,7 @@ local function parse(str: string, config?: Config, source_id?: string): Document
 	end
 	local context: FootnoteContext = { definitions = {}, seen = {}, count = 0 }
 	block_ast = collect_definitions(block_ast, context, warnings)
-	context.resolve = function(identifier: string): Node
+	context.resolve = function(identifier: string): nodes.Footnote
 		local definition = context.definitions[identifier]
 		if definition == nil then return nil end
 		if context.seen[identifier] then return nodes.footnote(nil, context.seen[identifier], true) end

@@ -1,136 +1,409 @@
 local type comments = require("mark2tex.comments")
 local type Issue = require("mark2tex.issue")
 
-local record AstNode
+-- The AST has two stages. parse_blocks (and divs) produce RawBlock nodes whose
+-- text is still unparsed; parse turns them into Block nodes holding Inline
+-- lists. Every node type is its own record, discriminated by its type field.
+
+local interface NodeBase
 	type: string
-	content: string | {AstNode | string}
+end
+
+--------------------
+-- Inline nodes
+--------------------
+
+local record Text is NodeBase where self.type == "text"
+	content: string
+end
+
+local record Bold is NodeBase where self.type == "bold"
+	content: {Inline}
+end
+
+local record Italic is NodeBase where self.type == "italic"
+	content: {Inline}
+end
+
+local record Strikethrough is NodeBase where self.type == "strikethrough"
+	content: {Inline}
+end
+
+local record Verbatim is NodeBase where self.type == "verbatim"
+	content: string
+end
+
+local record LatexCmd is NodeBase where self.type == "latex_cmd"
+	content: string
+end
+
+local record Citation is NodeBase where self.type == "citation"
+	content: string
+end
+
+local record ParenCitation is NodeBase where self.type == "paren_citation"
+	-- Citation keys.
+	content: {string}
+	locator: string
+end
+
+local record InlineMath is NodeBase where self.type == "inline_math"
+	content: string
+end
+
+-- Display math occurs as a block and, inside paragraphs, as an inline node.
+local record DisplayMath is NodeBase where self.type == "display_math"
+	content: string
+end
+
+local record Link is NodeBase where self.type == "link"
+	destination: string
+	content: {Inline}
+	title: string
+	kind: string
+end
+
+local record Footnote is NodeBase where self.type == "footnote"
+	-- Inline footnotes hold inlines (inline = true), definitions hold blocks;
+	-- repeated references hold nothing.
+	content: {Inline | Block}
 	label: string
 	repeated: boolean
 	inline: boolean
-	identifier: string
-	destination: string
-	-- A string for links and slide annotations; parsed header content for slide frames.
-	title: string | {AstNode | string}
-	footer: string
-	notes: {string}
-	kind: string
+end
+
+-- A single source character that the writer escapes for TeX.
+local record Literal is NodeBase where self.type == "literal"
+	content: string
+end
+
+-- A paragraph, or a run of inlines kept together (e.g. a rejected footnote).
+local record Other is NodeBase where self.type == "other"
+	content: {Inline}
+end
+
+local type Inline = Text | Bold | Italic | Strikethrough | Verbatim | LatexCmd
+	| Citation | ParenCitation | InlineMath | DisplayMath | Link | Footnote
+	| Literal | Other
+
+--------------------
+-- Blocks shared by both stages
+--------------------
+
+local record HorizontalRule is NodeBase where self.type == "horizontal_rule"
+end
+
+local record Latex is NodeBase where self.type == "latex"
+	content: string
+end
+
+local record Code is NodeBase where self.type == "code"
+	code_type: string
+	content: string
+end
+
+local record Image is NodeBase where self.type == "image"
+	path: string
+	width: string
+end
+
+local record SlideBreak is NodeBase where self.type == "slide_break"
+end
+
+local record SlidePause is NodeBase where self.type == "slide_pause"
+end
+
+local record SlideNote is NodeBase where self.type == "slide_note"
+	title: string
+end
+
+local record SlideFooter is NodeBase where self.type == "slide_footer"
+	title: string
+end
+
+--------------------
+-- Raw blocks (before inline parsing)
+--------------------
+
+local record RawHeader is NodeBase where self.type == "header"
 	level: integer
+	content: string
+	indented: boolean
+end
+
+local record RawItem is NodeBase where self.type == "item"
+	level: integer
+	content: string
+end
+
+local record RawEnum is NodeBase where self.type == "enum"
+	level: integer
+	content: string
 	style: string
 	start: integer
-	code_type: string
-	headers: {string | {AstNode}}
+end
+
+local record RawOther is NodeBase where self.type == "other"
+	content: string
+end
+
+local record RawBlockquote is NodeBase where self.type == "blockquote"
+	content: string
+	-- Set by parse while collecting footnote definitions.
+	blocks: {RawBlock}
+end
+
+local record RawTable is NodeBase where self.type == "table"
+	headers: {string}
 	alignments: {string}
-	rows: {{string | {AstNode}}}
-	locator: string
+	rows: {{string}}
+end
+
+local record FootnoteDefinition is NodeBase where self.type == "footnote_definition"
+	identifier: string
+	content: string
+end
+
+local record DivFence is NodeBase where self.type == "div_fence"
 	position: integer
 	ending: integer
 	length: integer
 	attributes: string
-	path: string
-	width: string
+end
+
+local type RawBlock = RawHeader | RawItem | RawEnum | RawOther | RawBlockquote
+	| RawTable | FootnoteDefinition | DivFence | HorizontalRule | Latex | Code
+	| DisplayMath | Image | SlideBreak | SlidePause | SlideNote | SlideFooter
+
+--------------------
+-- Parsed blocks
+--------------------
+
+local record Header is NodeBase where self.type == "header"
+	level: integer
+	content: {Inline}
 	indented: boolean
 end
 
+local record Item is NodeBase where self.type == "item"
+	level: integer
+	content: {Inline}
+end
+
+local record Enum is NodeBase where self.type == "enum"
+	level: integer
+	content: {Inline}
+	style: string
+	start: integer
+end
+
+local record Blockquote is NodeBase where self.type == "blockquote"
+	content: {Block}
+end
+
+local record Table is NodeBase where self.type == "table"
+	headers: {{Inline}}
+	alignments: {string}
+	rows: {{{Inline}}}
+end
+
+-- Lecture structure (lecture.structure).
+local record SlideFrame is NodeBase where self.type == "slide_frame"
+	content: {Block}
+	title: {Inline}
+	footer: string
+	notes: {string}
+end
+
+local record LectureAnnotations is NodeBase where self.type == "lecture_annotations"
+	footer: string
+	notes: {string}
+end
+
+local record SlideParagraph is NodeBase where self.type == "slide_paragraph"
+end
+
+local record SlideSubheading is NodeBase where self.type == "slide_subheading"
+	content: {Inline}
+end
+
+local type Block = Header | Item | Enum | Other | Blockquote | Table
+	| HorizontalRule | Latex | Code | DisplayMath | Image | SlideBreak
+	| SlidePause | SlideNote | SlideFooter | SlideFrame | LectureAnnotations
+	| SlideParagraph | SlideSubheading
+
+-- Any parsed node, for traversals that treat inlines and blocks alike.
+local type Any = Inline | Block
+
 -- The AST root carries document-wide comments and parser warnings.
 local record AstDocument
-	{AstNode}
+	{Block}
 	comments: {comments.Token}
 	warnings: {Issue}
 end
 
-local record nodes
-	type Node = AstNode
-	type Document = AstDocument
+-- The view that generic traversals use: every node may carry content.
+local record ContentView
+	content: string | {Any | string}
 end
 
-local type Node = nodes.Node
+-- Types are exported as aliases: nested records would emit runtime tables.
+local record nodes
+	type Inline = Inline
+	type RawBlock = RawBlock
+	type Block = Block
+	type Any = Any
+	type Document = AstDocument
 
-function nodes.footnote(content?: {Node}, label?: string, repeated?: boolean): Node
+	type Text = Text
+	type Bold = Bold
+	type Italic = Italic
+	type Strikethrough = Strikethrough
+	type Verbatim = Verbatim
+	type LatexCmd = LatexCmd
+	type Citation = Citation
+	type ParenCitation = ParenCitation
+	type InlineMath = InlineMath
+	type DisplayMath = DisplayMath
+	type Link = Link
+	type Footnote = Footnote
+	type Literal = Literal
+	type Other = Other
+
+	type HorizontalRule = HorizontalRule
+	type Latex = Latex
+	type Code = Code
+	type Image = Image
+	type SlideBreak = SlideBreak
+	type SlidePause = SlidePause
+	type SlideNote = SlideNote
+	type SlideFooter = SlideFooter
+
+	type RawHeader = RawHeader
+	type RawItem = RawItem
+	type RawEnum = RawEnum
+	type RawOther = RawOther
+	type RawBlockquote = RawBlockquote
+	type RawTable = RawTable
+	type FootnoteDefinition = FootnoteDefinition
+	type DivFence = DivFence
+
+	type Header = Header
+	type Item = Item
+	type Enum = Enum
+	type Blockquote = Blockquote
+	type Table = Table
+	type SlideFrame = SlideFrame
+	type LectureAnnotations = LectureAnnotations
+	type SlideParagraph = SlideParagraph
+	type SlideSubheading = SlideSubheading
+end
+
+-- The content field of any node (nil for nodes without one), for generic
+-- traversals such as measuring or searching the AST.
+function nodes.content(node: Any): string | {Any | string}
+	return (node as ContentView).content
+end
+
+--------------------
+-- Constructors
+--------------------
+
+function nodes.footnote(content?: {Inline | Block}, label?: string, repeated?: boolean): Footnote
 	return { type = "footnote", content = content, label = label, repeated = repeated }
 end
 
-function nodes.footnote_definition(identifier: string, content: string): Node
+function nodes.footnote_definition(identifier: string, content: string): FootnoteDefinition
 	return { type = "footnote_definition", identifier = identifier, content = content }
 end
 
-function nodes.link(destination: string, content: {Node}, title?: string, kind?: string): Node
+function nodes.link(destination: string, content: {Inline}, title?: string, kind?: string): Link
 	return { type = "link", destination = destination, content = content, title = title, kind = kind or "inline" }
 end
 
-function nodes.header(level: integer, content: string): Node
+function nodes.header(level: integer, content: string): RawHeader
 	return { type = "header", level = level, content = content }
 end
 
-function nodes.horizontal_rule(): Node
+function nodes.horizontal_rule(): HorizontalRule
 	return { type = "horizontal_rule" }
 end
 
-function nodes.latex(content: string): Node
+function nodes.latex(content: string): Latex
 	return { type = "latex", content = content }
 end
 
-function nodes.item(level: integer, content: string): Node
+function nodes.item(level: integer, content: string): RawItem
 	return { type = "item", level = level, content = content }
 end
 
-function nodes.enum(level: integer, content: string, style: string, start: integer): Node
+function nodes.enum(level: integer, content: string, style: string, start: integer): RawEnum
 	return { type = "enum", level = level, content = content, style = style, start = start }
 end
 
-function nodes.code(code_type: string, content: string): Node
+function nodes.code(code_type: string, content: string): Code
 	return { type = "code", code_type = code_type, content = content }
 end
 
-function nodes.blockquote(content: string): Node
+function nodes.blockquote(content: string): RawBlockquote
 	return { type = "blockquote", content = content }
 end
 
-function nodes.table(headers: {string}, alignments: {string}, rows: {{string}}): Node
+function nodes.table(headers: {string}, alignments: {string}, rows: {{string}}): RawTable
 	return { type = "table", headers = headers, alignments = alignments, rows = rows }
 end
 
-function nodes.other(content: string | {Node}): Node
+-- An unparsed paragraph.
+function nodes.raw_other(content: string): RawOther
 	return { type = "other", content = content }
 end
 
-function nodes.paren_citation(content: {string}, locator?: string): Node
+function nodes.other(content: {Inline}): Other
+	return { type = "other", content = content }
+end
+
+function nodes.paren_citation(content: {string}, locator?: string): ParenCitation
 	return { type = "paren_citation", content = content, locator = locator }
 end
 
-function nodes.citation(content: string): Node
+function nodes.citation(content: string): Citation
 	return { type = "citation", content = content }
 end
 
-function nodes.verbatim(content: string): Node
+function nodes.verbatim(content: string): Verbatim
 	return { type = "verbatim", content = content }
 end
 
-function nodes.inline_math(content: string): Node
+function nodes.inline_math(content: string): InlineMath
 	return { type = "inline_math", content = content }
 end
 
-function nodes.display_math(content: string): Node
+function nodes.display_math(content: string): DisplayMath
 	return { type = "display_math", content = content }
 end
 
-function nodes.latex_cmd(content: string): Node
+function nodes.latex_cmd(content: string): LatexCmd
 	return { type = "latex_cmd", content = content }
 end
 
-function nodes.italic(content: {Node}): Node
+function nodes.italic(content: {Inline}): Italic
 	return { type = "italic", content = content }
 end
 
-function nodes.bold(content: {Node}): Node
+function nodes.bold(content: {Inline}): Bold
 	return { type = "bold", content = content }
 end
 
-function nodes.strikethrough(content: {Node}): Node
+function nodes.strikethrough(content: {Inline}): Strikethrough
 	return { type = "strikethrough", content = content }
 end
 
-function nodes.text(content: string): Node
+function nodes.text(content: string): Text
 	return { type = "text", content = content }
+end
+
+function nodes.literal(content: string): Literal
+	return { type = "literal", content = content }
 end
 
 return nodes
